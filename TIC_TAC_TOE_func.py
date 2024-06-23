@@ -91,50 +91,49 @@ def coord_to_slot(coord: str, main_board: list, board_sz: int) -> int | bool:
         return slot_num
 
 
-def check_winner(board: list, board_sz: int, win_len: int, origin: int = 0) -> tuple:
-    # OPTIMIZATION STRATEGIES (numbered):
-    # 1. Use 'not in' as it is faster than .count()
-    # 2. Returns the result as a tuple instead of list.
-    # 3. Check the diagonals before the orthogonals. This does not need for loops.
-    # if the top left corner has an X and the diagonal top left to down right is filled with X, then X wins.
-    if board[origin] == 'X' and board[origin: origin + board_sz*win_len: board_sz+1].count('X') == win_len:
-        return 'X', 'from top left to down right',
-    # if the top left corner has an O and the diagonal top left to down right is filled with O, then O wins.
-    elif board[origin] == 'O' and board[origin: origin + board_sz*win_len: board_sz+1].count('O') == win_len:
-        return 'O', 'from top left to down right',
-
-    # if the top right corner has an X and the diagonal top right to down left is filled with X, then X wins.
-    elif board[origin+win_len-1] == 'X' and board[origin+win_len-1: origin + board_sz*win_len-1: board_sz-1].count('X') == win_len:
-        return 'X', 'from top right to down left',
-    # if the top right corner has an O and the diagonal top right to down left is filled with O, then O wins.
-    elif board[origin+win_len-1] == 'O' and board[origin+win_len-1: origin + board_sz*win_len-1: board_sz-1].count('O') == win_len:
-        return 'O', 'from top right to down left',
-
-    else:
-        # 4. Instead of using 2 loops for column and row, use only 1 loop that moves one column left and one row down together.
-        for count in range(0, win_len):
-            # for every X/O in the first row, check if its column is filled with either X/O
-            if board[origin+count] != ' ':
-                # if board[checker's current pos: l dist to the right]
-                if board[origin+count: origin + board_sz*win_len: board_sz].count('X') == win_len:
-                    return 'X', 'vertically',
-                elif board[origin+count: origin + board_sz*win_len: board_sz].count('O') == win_len:
-                    return 'O', 'vertically',
-
-            # for every X/O in the first column, check if its row is filled with either X/O
-            if board[count*board_sz + origin] != ' ':
-                # if board[checker's current pos: l dist downwards]
-                if board[count*board_sz + origin: count*board_sz + origin + win_len].count('X') == win_len:
-                    return 'X', 'horizontally',
-                elif board[count*board_sz + origin: count*board_sz + origin + win_len].count('O') == win_len:
-                    return 'O', 'horizontally',
-
-    # If no one wins yet and no empty slot left, the game is a draw.
-    if ' ' not in board:
-        return ' ', 'tie',
-    # If no one wins yet but there are empty slots, game continues.
-    else:
-        return ' ', ' ',
+# def check_winner(board: list, board_sz: int, win_len: int, origin: int = 0) -> tuple:
+#     # OPTIMIZATION STRATEGIES (numbered):
+#     # 1. Use 'not in' as it is faster than .count()
+#     # 2. Returns the result as a tuple instead of list.
+#     # 3. Check the diagonals before the orthogonals. This does not need for loops.
+#     # if the top left corner has an X and the diagonal top left to down right is filled with X, then X wins.
+#     if board[origin] == 'X' and board[origin: origin + board_sz*win_len: board_sz+1].count('X') == win_len:
+#         return 'X', 'from top left to down right',
+#     # if the top left corner has an O and the diagonal top left to down right is filled with O, then O wins.
+#     elif board[origin] == 'O' and board[origin: origin + board_sz*win_len: board_sz+1].count('O') == win_len:
+#         return 'O', 'from top left to down right',
+#
+#     # if the top right corner has an X and the diagonal top right to down left is filled with X, then X wins.
+#     elif board[origin+win_len-1] == 'X' and board[origin+win_len-1: origin + board_sz*win_len-1: board_sz-1].count('X') == win_len:
+#         return 'X', 'from top right to down left',
+#     # if the top right corner has an O and the diagonal top right to down left is filled with O, then O wins.
+#     elif board[origin+win_len-1] == 'O' and board[origin+win_len-1: origin + board_sz*win_len-1: board_sz-1].count('O') == win_len:
+#         return 'O', 'from top right to down left',
+#
+#     else:
+#         # 4. Instead of using 2 loops for column and row, use only 1 loop that moves one column left and one row down together.
+#         for count in range(0, win_len):
+#             # for every X/O in the first row, check if its column is filled with either X/O
+#             if board[origin+count] != ' ':
+#                 # if board[checker's current pos: l dist to the right]
+#                 if board[origin+count: origin + board_sz*win_len: board_sz].count('X') == win_len:
+#                     return 'X', 'vertically',
+#                 elif board[origin+count: origin + board_sz*win_len: board_sz].count('O') == win_len:
+#                     return 'O', 'vertically',
+#
+#             # for every X/O in the first column, check if its row is filled with either X/O
+#             if board[count*board_sz + origin] != ' ':
+#                 # if board[checker's current pos: l dist downwards]
+#                 if board[count*board_sz + origin: count*board_sz + origin + win_len].count('X') == win_len:
+#                     return 'X', 'horizontally',
+#                 elif board[count*board_sz + origin: count*board_sz + origin + win_len].count('O') == win_len:
+#                     return 'O', 'horizontally',
+#
+#             # If no one wins yet and no empty slot left, the game is a draw.
+#             if ' ' not in board:
+#                 return ' ', 'tie',
+#     # If no one wins yet but there are empty slots, game continues.
+#     return ' ', ' ',
 
 
 def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner_area: list) -> tuple:
@@ -149,10 +148,52 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
 
     # OPTIMIZATION STRATEGY:
     # Instead of checking every slot to find those that r outside the checked area, I give the AI indexes of slots that r outside.
-    for slot in check_winner_area:
-        winner = check_winner(board, board_sz, win_len, origin=slot)
-        if winner != (' ', ' '):
-            return winner
+    for origin in check_winner_area:
+        # OPTIMIZATION STRATEGIES (numbered):
+        # 1. Use 'not in' as it is faster than .count()
+        # 2. Returns the result as a tuple instead of list.
+        # 3. Check the diagonals before the orthogonals. This does not need for loops.
+        # if the top left corner has an X and the diagonal top left to down right is filled with X, then X wins.
+        if board[origin] == 'X' and board[origin: origin + board_sz * win_len: board_sz + 1].count('X') == win_len:
+            return 'X', 'from top left to down right',
+        # if the top left corner has an O and the diagonal top left to down right is filled with O, then O wins.
+        elif board[origin] == 'O' and board[origin: origin + board_sz * win_len: board_sz + 1].count('O') == win_len:
+            return 'O', 'from top left to down right',
+
+        # if the top right corner has an X and the diagonal top right to down left is filled with X, then X wins.
+        elif board[origin + win_len - 1] == 'X' and board[
+                                                    origin + win_len - 1: origin + board_sz * win_len - 1: board_sz - 1].count(
+                'X') == win_len:
+            return 'X', 'from top right to down left',
+        # if the top right corner has an O and the diagonal top right to down left is filled with O, then O wins.
+        elif board[origin + win_len - 1] == 'O' and board[
+                                                    origin + win_len - 1: origin + board_sz * win_len - 1: board_sz - 1].count(
+                'O') == win_len:
+            return 'O', 'from top right to down left',
+
+        else:
+            # 4. Instead of using 2 loops for column and row, use only 1 loop that moves one column left and one row down together.
+            for count in range(0, win_len):
+                # for every X/O in the first row, check if its column is filled with either X/O
+                if board[origin + count] != ' ':
+                    # if board[checker's current pos: l dist to the right]
+                    if board[origin + count: origin + board_sz * win_len: board_sz].count('X') == win_len:
+                        return 'X', 'vertically',
+                    elif board[origin + count: origin + board_sz * win_len: board_sz].count('O') == win_len:
+                        return 'O', 'vertically',
+
+                # for every X/O in the first column, check if its row is filled with either X/O
+                if board[count * board_sz + origin] != ' ':
+                    # if board[checker's current pos: l dist downwards]
+                    if board[count * board_sz + origin: count * board_sz + origin + win_len].count('X') == win_len:
+                        return 'X', 'horizontally',
+                    elif board[count * board_sz + origin: count * board_sz + origin + win_len].count('O') == win_len:
+                        return 'O', 'horizontally',
+
+                # If no one wins yet and no empty slot left, the game is a draw.
+                if ' ' not in board:
+                    return ' ', 'tie',
+    # If no one wins yet but there are empty slots, game continues.
     return ' ', ' ',
 
 
@@ -261,12 +302,13 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         ]
         for slot in empty_slots_ind:
             if prev_move[slot] == ' ':
-                moves.append(prev_move[:])
+                moves.append(prev_move.copy())
                 moves[-1][slot] = nxt_plyr
 
                 # if the child nodes are the first generation and are played by pc, record the first move as a str at the end of each board
                 if prev_move[-1] == '_':
                     moves[-1][-1] = slot
+
         return moves
 
     def sim_all_next_layers(pc: str, pboard: list, prev_moves: list) -> tuple:
@@ -364,7 +406,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 
         # try putting the final move decision onto the current board to check for any statistical deathtraps
         # statistical deathtraps are only confirmed to exist on 3x3 board
-        pboard_copy = pboard[:]
+        pboard_copy = pboard.copy()
         pboard_copy[move] = plyr
         # if (the board size is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
         if board_sz == 3 and check_deathtrap(plyr, pboard_copy) and len(list(outcomes.keys())) > 1:
@@ -388,10 +430,10 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                 next_next_moves = sim_next_layer(plyr, next_move)
                 death_count = 0
                 for next_next_move in next_next_moves[1:]:
-                    if check_winner(next_next_move, board_sz, board_sz) == (' ', ' ',):
+                    if check_winner_anywhere(next_next_move, board_sz, board_sz, [0]) == (' ', ' ',):
                         next_next_next_moves = sim_next_layer(opponent(plyr), next_next_move)
                         for next_next_next_move in next_next_next_moves[1:]:
-                            if check_winner(next_next_next_move, board_sz, board_sz)[0] == 'X':
+                            if check_winner_anywhere(next_next_next_move, board_sz, board_sz, [0])[0] == 'X':
                                 # counts how many child nodes loose
                                 death_count += 1
 

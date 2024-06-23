@@ -1,3 +1,4 @@
+import time
 from tkinter import *
 from tkinter import messagebox
 from TIC_TAC_TOE_func import *
@@ -416,11 +417,11 @@ class GameMenu:
         self.is_o_turn.grid(columnspan=3, row=2, column=self.board_sz.get() // 2 + 1)
         self.b_back.grid(row=1, column=0)
         self.replay_button.grid(row=1, column=1)
-        self.board_sz_label.grid(row=3, column=1)
-        self.board_sz_slider.grid(row=3, column=2)
-        self.board_sz_tip.grid(columnspan=2, row=4, column=1)
-        self.board_zoom_label.grid(row=6, column=1)
-        self.board_zoom_slider.grid(row=6, column=2)
+        self.board_sz_label.grid(row=4, column=1)
+        self.board_sz_slider.grid(row=4, column=2)
+        self.board_sz_tip.grid(columnspan=2, row=5, column=1)
+        self.board_zoom_label.grid(row=7, column=1)
+        self.board_zoom_slider.grid(row=7, column=2)
         self.debug_checkbox.grid(columnspan=2, row=9, column=1)
 
         # initialize the board_frame and settings_frame
@@ -519,7 +520,8 @@ class GameMenu:
     def update_slot_pvc(self, last_input: int):
         # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners
         pc_move = pc_input(opponent(self.plyr), self.main_board, self.board_sz.get(), self.filled_slots_ind,
-                           min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)), last_input, self.is_debugging.get(), self.debugger,
+                           min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
+                           last_input, self.is_debugging.get(), self.debugger,
                            self.slot_buttons)
         self.filled_slots_ind.append(pc_move)
         # update backend board
@@ -603,7 +605,104 @@ class GameMenu:
 
 
 class GameMenuT(GameMenu):
-    pass
+    def __init__(self, window, board_sz, board_zoom, mode: str):
+        super().__init__(window, board_sz, board_zoom, mode)
+        self.is_timer_paused = False
+        self.init_min = -1
+        self.init_sec = -1
+        self.min = StringVar()
+        self.sec = StringVar()
+        self.min.set('00')
+        self.sec.set('10')
+
+        self.settime_button = Button(self.settings_frame,
+                                     text='Begin!',
+                                     cursor='hand2',
+                                     borderwidth=3,
+                                     relief='raised',
+                                     overrelief='sunken',
+                                     command=self.setup_timer)
+        self.clock_frame = Frame(self.settings_frame)
+        self.minuteEntry = Entry(self.clock_frame,
+                                 width=3,
+                                 borderwidth=2,
+                                 cursor='xterm',
+                                 font=('Courier', 18),
+                                 justify=CENTER,
+                                 textvariable=self.min)
+        self.secondEntry = Entry(self.clock_frame,
+                                 width=3,
+                                 borderwidth=2,
+                                 font=('Courier', 18),
+                                 justify=CENTER,
+                                 textvariable=self.sec)
+
+        self.settime_button.grid(row=3, column=1)
+        self.clock_frame.grid(row=3, column=2, pady=10)
+        self.minuteEntry.pack(side=LEFT, padx=3)
+        self.secondEntry.pack(side=LEFT, padx=3)
+
+    def setup_timer(self):
+        if not self.min.get().isdigit() or not self.sec.get().isdigit():
+            messagebox.askretrycancel('Warning', f'You entered {self.min.get()} and {self.sec.get()}. Please enter a valid time!')
+            return None
+
+        else:
+            self.settime_button.config(state=DISABLED)
+
+            # we need the starting time set by the player to revert the timer when switching turns
+            self.init_min = int(self.min.get())
+            self.init_sec = int(self.sec.get())
+
+            self.start_timer()
+
+    def start_timer(self):
+        cur_time = self.init_min * 60 + self.init_sec
+
+        while cur_time > -1:
+            # divmod(arg1 = cur_time//60, arg2 = cur_time%60)
+            mins, secs = divmod(cur_time, 60)
+
+            # using format () method to store the value up to
+            # two decimal places
+            self.min.set('{0:2d}'.format(mins))
+            self.sec.set('{0:2d}'.format(secs))
+
+            # updating the GUI window after decrementing the cur_time value every time
+            self.clock_frame.update()
+            time.sleep(1)
+
+            # if player runs out of time, the opponent wins
+            if cur_time == 0:
+                messagebox.showinfo('Result', f"Time's up! {opponent(self.plyr)} wins")
+                self.disable_all_buttons()
+                self.is_timer_paused = True
+
+            # if timer is not called off by other functions, continue countdown
+            elif not self.is_timer_paused:
+                cur_time -= 1
+
+    def update_slot(self, last_input: int):
+        super().update_slot(last_input)
+        # if the player didn't click 'Begin!' beforehand to set the starting time and started playing
+        if self.init_min == self.init_sec == -1:
+            self.setup_timer()
+
+        # if the starting time was alr set
+        elif check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area) != (' ', ' '):
+            self.is_timer_paused = True
+        else:
+            self.start_timer()
+
+    def update_slot_pvc(self, last_input: int):
+        self.is_timer_paused = True
+        super().update_slot_pvc(last_input)
+        self.is_timer_paused = False
+
+    def replay(self):
+        pass
+
+        
 
 
 class GameMenuV(GameMenu):
