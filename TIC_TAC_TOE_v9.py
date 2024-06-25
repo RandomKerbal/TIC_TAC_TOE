@@ -138,7 +138,12 @@ def default_hint():
 
 def timed_hint():
     messagebox.showinfo('Hint',
-                        'In Timed Trial, you can set a time limit before you begin. Each player will have that amount of time to complete the game.\nBut not so fast - You can earn you 1 more second after each move!\n\n(other details are same as the Traditional Mode)')
+                        'In Timed Trial, you can set a time limit for each player before you begin. Each player will have that amount of time to complete the game.\n\nBut not so fast - you can earn you 1 extra second after each move!\n\n(other details are same as the Traditional Mode)')
+
+
+def vanish_hint():
+    messagebox.showinfo('Hint',
+                        'Once you placed the minimum number of X/O you need to win, your oldest move will disappear!\n\nThis mode challenges your strategy, memory, and perseverance. Feeling impatient? You can make your moves last longer by changing \'Remain for\' slider.\n\n(other details are same as the Traditional Mode)')
 
 
 class SubMenu:
@@ -231,6 +236,18 @@ class SubMenu:
                                font=('FixedSys', 15),
                                borderwidth=5)
 
+        self.b_vanish_hint = Button(self.window,
+                                    bitmap='question',
+                                    cursor='question_arrow',
+                                    overrelief='sunken',
+                                    command=vanish_hint,
+                                    activeforeground='white',
+                                    activebackground='sea green',
+                                    background='sea green1',
+                                    foreground='black',
+                                    width=30,
+                                    borderwidth=5)
+
         self.b_colonize = Button(self.window,
                                  text='Colonizer',
                                  cursor='hand2',
@@ -273,6 +290,7 @@ class SubMenu:
         self.b_timed.grid(row=2, column=1)
         self.b_timed_hint.grid(row=2, column=2)
         self.b_vanish.grid(row=3, column=1)
+        self.b_vanish_hint.grid(row=3, column=2)
         self.b_colonize.grid(row=4, column=1)
         self.b_back.grid(row=5, column=1, columnspan=2, pady=25)
 
@@ -321,6 +339,7 @@ class GameMenu:
     filled_slots_ind: List containing the index of filled slots of main_board.\n
     slot_buttons: List containing all the buttons that represent slots on the GUI.\n
     is_debugging: Show/hide the debugger.\n
+    is_game_active: Whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
     """
 
     def __init__(self, window, board_sz, board_zoom, mode: str):
@@ -336,6 +355,7 @@ class GameMenu:
         self.filled_slots_ind = []
         self.slot_buttons = []
         self.is_debugging = BooleanVar(value=False)
+        self.is_game_active = False
 
         self.settings_frame = Frame(self.window)
         self.board_frame = Frame(self.window)
@@ -471,7 +491,7 @@ class GameMenu:
                 last_input = row * self.board_sz.get() + col
                 slot_button = Button(
                     self.board_frame,
-                    font=('Helvetica', self.board_zoom.get()*4, 'bold'),
+                    font=('Helvetica', self.board_zoom.get() * 4, 'bold'),
                     cursor='pencil',
                     command=lambda _=last_input: self.update_slot(_),
                     width=3,
@@ -500,11 +520,11 @@ class GameMenu:
         self.turn_hint.grid(column=self.board_sz.get() // 2 + 1)
 
     def adjust_zoom(self, *args):
-        # Update the position of the turn indicator and the scale of the buttons
+        # Update the position of the turn indicator and the scale of the buttons.
         for slot_button in self.slot_buttons:
-            slot_button.config(font=('Helvetica', self.board_zoom.get()*4, 'bold'))
-            self.x_turn_hint.config(font=('Helvetica', self.board_zoom.get()*2, 'bold'))
-            self.o_turn_hint.config(font=('Helvetica', self.board_zoom.get()*2, 'bold'))
+            slot_button.config(font=('Helvetica', self.board_zoom.get() * 4, 'bold'))
+            self.x_turn_hint.config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
+            self.o_turn_hint.config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
 
     def pvc_first(self):
         self.mode = 'pvc'
@@ -516,6 +536,7 @@ class GameMenu:
         self.pvco_checkbox.config(state=DISABLED)
         self.replay_button.config(state=ACTIVE)
         self.update_slot_pvc(-1)
+        self.is_game_active = True
 
     def toggle_debugger(self):
         if self.is_debugging.get():
@@ -538,6 +559,7 @@ class GameMenu:
         self.board_sz_label.config(state=DISABLED)
         self.replay_button.config(state=ACTIVE)
         self.pvco_checkbox.config(state=DISABLED)
+        self.is_game_active = True
 
         if self.mode == 'pvp':
             self.update_slot_pvp(last_input)
@@ -589,7 +611,8 @@ class GameMenu:
         self.main_board[last_input] = self.plyr
         self.filled_slots_ind.append(last_input)
         # update frontend board
-        self.slot_buttons[last_input].config(text=self.main_board[last_input], disabledforeground='red4' if self.plyr == 'X' else 'navy',
+        self.slot_buttons[last_input].config(text=self.main_board[last_input],
+                                             disabledforeground='red4' if self.plyr == 'X' else 'navy',
                                              state=DISABLED)
         self.debugger.insert(END, f'Player\'s move:{last_input}\n')
 
@@ -611,11 +634,13 @@ class GameMenu:
             self.o_turn_hint.config(foreground='SystemDisabledText', relief='flat')
 
     def stop_game(self):
+        self.is_game_active = False
         for button in self.slot_buttons:
             button.config(state=DISABLED)
 
     def to_menu(self):
         if messagebox.askyesno('Confirmation', 'Are you sure you want to quit?\n\nYou will loose all your progress.'):
+            self.is_game_active = False
             for widget in self.window.winfo_children():
                 widget.destroy()
 
@@ -624,6 +649,7 @@ class GameMenu:
     def replay(self):
         if messagebox.askyesno('Confirmation',
                                'Are you sure you want to restart?\n\nYou will loose all your progress.'):
+            self.is_game_active = False
             for widget in self.window.winfo_children():
                 widget.destroy()
 
@@ -633,14 +659,12 @@ class GameMenu:
 class GameMenuT(GameMenu):
     """
     === Attributes ===\n
-    is_game_active: Whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
     x_remain_time: How much time does player X still have.\n
     o_remain_time: How much time does player O still have.\n
-    hint_scale: Used to animate the inflate of turn indicators at the start of each turn.\n
+    hint_scale: Used to animate the inflate of timer at the start of each turn.\n
     """
     def __init__(self, window, board_sz, board_zoom, mode: str):
         super().__init__(window, board_sz, board_zoom, mode)
-        self.is_game_active = False
         self.x_remain_time = StringVar(value='10')
         self.o_remain_time = StringVar(value='10')
         self.hint_scale = 0
@@ -650,7 +674,7 @@ class GameMenuT(GameMenu):
         self.o_turn_hint.destroy()
         self.x_turn_hint = LabelFrame(self.turn_hint,
                                       text='X turn',
-                                      font=('Helvetica', self.board_zoom.get()*2+1, 'bold'),
+                                      font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
                                       foreground='red4',
                                       borderwidth=5,
                                       relief='ridge',
@@ -659,7 +683,7 @@ class GameMenuT(GameMenu):
         self.x_time_entry = Entry(self.x_turn_hint,
                                   width=4,
                                   borderwidth=1,
-                                  font=('Courier', self.board_zoom.get()*3+1, 'bold'),
+                                  font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
                                   foreground='red4',
                                   disabledforeground='red4',
                                   disabledbackground='white',
@@ -667,7 +691,7 @@ class GameMenuT(GameMenu):
                                   textvariable=self.x_remain_time)
         self.o_turn_hint = LabelFrame(self.turn_hint,
                                       text='O turn',
-                                      font=('Helvetica', self.board_zoom.get()*2+1, 'bold'),
+                                      font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
                                       foreground='navy',
                                       borderwidth=5,
                                       relief='ridge',
@@ -676,7 +700,7 @@ class GameMenuT(GameMenu):
         self.o_time_entry = Entry(self.o_turn_hint,
                                   width=4,
                                   borderwidth=1,
-                                  font=('Courier', self.board_zoom.get()*3+1, 'bold'),
+                                  font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
                                   foreground='navy',
                                   disabledforeground='navy',
                                   disabledbackground='white',
@@ -694,7 +718,7 @@ class GameMenuT(GameMenu):
     def x_countdown(self):
         # If (time's not up) and (X is playing this turn) and (game is ongoing):
         if float(self.x_remain_time.get()) > 0.0 and self.plyr == 'X' and self.is_game_active is True:
-            # inflate X turn indicator
+            # inflate X timer
             self.x_time_entry.config(font=('Courier', self.board_zoom.get() * 3 + 1 + self.hint_scale, 'bold'))
             self.hint_scale = min(self.hint_scale + 2, 3)
 
@@ -711,7 +735,8 @@ class GameMenuT(GameMenu):
 
         # If X is not playing this turn or the game has ended, stop X's countdown and flash.
         else:
-            self.x_time_entry.config(relief='sunken', disabledbackground='white')
+            self.x_time_entry.config(relief='sunken', disabledforeground=self.x_turn_hint.cget('foreground'),
+                                     disabledbackground='white')
             return None
 
         # If X has under 5 secs left, flash the timer.
@@ -734,7 +759,8 @@ class GameMenuT(GameMenu):
             return None
 
         else:
-            self.o_time_entry.config(relief='sunken', disabledbackground='white')
+            self.o_time_entry.config(relief='sunken', disabledforeground=self.o_turn_hint.cget('foreground'),
+                                     disabledbackground='white')
             return None
 
         if float(self.o_remain_time.get()) < 5.0 and float(self.o_remain_time.get()) % 1 < 0.4:
@@ -748,7 +774,7 @@ class GameMenuT(GameMenu):
             if not self.x_remain_time.get().isdigit() or not self.o_remain_time.get().isdigit():
                 messagebox.askretrycancel('Warning', f'Please enter a decimal number!')
                 return None
-        # If the time is valid:
+            # If the time is valid:
             # clear debugger window
             self.debugger.delete('1.0', END)
             # disable some settings
@@ -769,22 +795,21 @@ class GameMenuT(GameMenu):
         # Updates backend and frontend board. Also check for any winner.
         self.update_slot_pvp(last_input)
 
-        # After each move by X and no one wins yet, X gets bonus time and grey out X's timer and start O's timer.
+        # After each move by X and no one wins yet:
         if self.plyr == 'X' and self.is_game_active is True:
+            # X gets bonus time
             self.x_remain_time.set(str(float(self.x_remain_time.get()) + 1))
-
-            # reset inflate of X turn indicator
             self.hint_scale = 0
             # Only in PVP, switching turns will cause a player's timer to stop and needs to be restarted in their next turn.
             if self.mode == 'pvp':
-                # Reset inflate of X turn indicator and turn it off. Turn on O turn indicator.
+                # Reset inflate of X's timer and grey it out. Turn on O's timer.
                 self.x_time_entry.config(relief='flat', disabledforeground='SystemDisabledText',
-                                         disabledbackground='SystemButtonFace', font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
+                                         disabledbackground='SystemButtonFace',
+                                         font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
                 self.o_time_entry.config(relief='sunken', disabledforeground='navy', disabledbackground='white')
-
+                # switch to O's turn and start O's countdown
                 self.plyr = opponent(self.plyr)
                 self.o_countdown()
-
             elif self.mode == 'pvc':
                 # call AI and update backend board
                 self.update_slot_pvc(last_input)
@@ -795,12 +820,12 @@ class GameMenuT(GameMenu):
             self.hint_scale = 0
             if self.mode == 'pvp' and self.is_game_active is True:
                 self.o_time_entry.config(relief='flat', disabledforeground='SystemDisabledText',
-                                         disabledbackground='SystemButtonFace', font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
+                                         disabledbackground='SystemButtonFace',
+                                         font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
                 self.x_time_entry.config(relief='sunken', disabledforeground='red4', disabledbackground='white')
 
                 self.plyr = opponent(self.plyr)
                 self.x_countdown()
-
             elif self.mode == 'pvc':
                 self.update_slot_pvc(last_input)
 
@@ -808,22 +833,15 @@ class GameMenuT(GameMenu):
         self.o_turn_hint.pack()
         self.x_turn_hint.pack_forget()
         self.o_time_entry.config(state=DISABLED)
-        self.is_game_active = True
         super().pvc_first()
         self.o_countdown()
 
     def adjust_zoom(self, *args):
-        self.x_turn_hint.config(font=('Helvetica', self.board_zoom.get()*2+1, 'bold'))
-        self.o_turn_hint.config(font=('Helvetica', self.board_zoom.get()*2+1, 'bold'))
-        self.x_time_entry.config(font=('Helvetica', self.board_zoom.get()*3+1, 'bold'))
-        self.o_time_entry.config(font=('Helvetica', self.board_zoom.get()*3+1, 'bold'))
+        self.x_turn_hint.config(font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'))
+        self.o_turn_hint.config(font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'))
+        self.x_time_entry.config(font=('Helvetica', self.board_zoom.get() * 3 + 1, 'bold'))
+        self.o_time_entry.config(font=('Helvetica', self.board_zoom.get() * 3 + 1, 'bold'))
         super().adjust_zoom()
-
-    def stop_game(self):
-        self.is_game_active = False
-        self.x_time_entry.config(disabledforeground=self.x_turn_hint.cget('foreground'))
-        self.o_time_entry.config(disabledforeground=self.o_turn_hint.cget('foreground'))
-        super().stop_game()
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
@@ -834,13 +852,66 @@ class GameMenuT(GameMenu):
 
             GameMenuT(self.window, self.board_sz, self.board_zoom, self.mode)
 
-    def to_menu(self):
-        self.is_game_active = False
-        super().to_menu()
-
 
 class GameMenuV(GameMenu):
-    pass
+    """
+    === Attributes ===\n
+    last_inputs: A list containing the l most recent moves on the board, in chronological order. Leftmost element = earliest move. Rightmost element = latest move.\n
+    remain_steps: How many steps into the future will an X/O last.\n
+    """
+
+    def __init__(self, window, board_sz, board_zoom, mode: str):
+        super().__init__(window, board_sz, board_zoom, mode)
+        self.last_inputs = []
+        self.remain_steps = IntVar(value=1)
+
+        self.remain_stps_label = Label(
+            self.settings_frame,
+            text='\nRemain for'
+        )
+        self.remain_stps_slider = Scale(
+            self.settings_frame,
+            orient=HORIZONTAL,
+            variable=self.remain_steps,
+            length=100,
+            from_=self.win_len,
+            to=self.win_len * 2,
+            cursor='sb_h_double_arrow'
+        )
+
+        self.remain_stps_label.grid(row=3, column=1)
+        self.remain_stps_slider.grid(row=3, column=2)
+
+    def delete_moves(self):
+        if (len(self.last_inputs) >= self.remain_steps.get() * 2 - 1) and self.is_game_active is True:
+            self.debugger.insert(END, f'Most recent moves:\n{self.last_inputs}')
+            self.main_board[self.last_inputs[0]] = ' '
+            self.slot_buttons[self.last_inputs[0]].config(text='', state=NORMAL)
+            self.filled_slots_ind.remove(self.last_inputs[0])
+            self.last_inputs = self.last_inputs[1:]
+
+    def adjust_length(self, *args):
+        super().adjust_length()
+        self.remain_stps_slider.config(from_=self.win_len, to=self.win_len * 2)
+
+    def update_slot_pvp(self, last_input: int):
+        super().update_slot_pvp(last_input)
+        self.last_inputs.append(last_input)
+        self.delete_moves()
+
+    def update_slot_pvc(self, last_input: int):
+        super().update_slot_pvc(last_input)
+        self.last_inputs.append(last_input)
+        self.delete_moves()
+
+    def replay(self):
+        if messagebox.askyesno('Confirmation',
+                               'Are you sure you want to restart?\n\nYou will loose all your progress.'):
+            self.is_game_active = False
+            for widget in self.window.winfo_children():
+                widget.destroy()
+
+            GameMenuV(self.window, self.board_sz, self.board_zoom, self.mode)
 
 
 class GameMenuC(GameMenu):
