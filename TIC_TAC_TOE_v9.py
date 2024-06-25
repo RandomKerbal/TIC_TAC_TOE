@@ -21,8 +21,10 @@ Ver 10: Added 4 modes: Traditional, Time Trial, Vanishing Moves, Colonizer\n
 
 class MainMenu:
     """
-    ### Attributes ###
-    window: name of window that displays MainMenu
+    === Attributes ===\n
+    window: Name of window that displays MainMenu.\n
+    board_sz: Length of the board.\n
+    board_zoom: Magnification of the board.\n
     """
 
     def __init__(self, window, board_sz_: int = 3, board_zoom_: int = 5):
@@ -141,15 +143,12 @@ def timed_hint():
 
 class SubMenu:
     """
-    === Attributes ===
-    window: name of window that displays MainMenu
-    board_sz: length of the board
-    board_zoom: magnifies the board grid
-    win_len: how many X in a row/column/diagonal to win
-    mode:
-        either:
-        1.pvp: player versus player
-        2.pvc: player versus pc
+    === Attributes ===\n
+    window: Name of window that displays MainMenu.\n
+    board_sz: Length of the board.\n
+    board_zoom: Magnification of the board.\n
+    win_len: How many X in a row/column/diagonal to win.\n
+    mode: pvp = Player versus player; pvc = Player versus pc.\n
     """
 
     def __init__(self, window, board_sz, board_zoom, mode: str):
@@ -311,18 +310,17 @@ class SubMenu:
 class GameMenu:
     """
     === Attributes ===\n
-    window: name of window that displays MainMenu\n
-    board_sz: length of the board\n
-    win_len: how many X/O needed in a chain to win\n
-    check_winner_area = list containing slots where the winning chain will fall on\n
-    board_zoom: magnifies the board grid\n
-    win_len: how many X in a row/column/diagonal to win\n
-    mode: 1.pvp: player versus player; 2.pvc: player versus pc\n
-    plyr: current player making the move\n
-    main_board: list containing the board on screen\n
-    filled_slots_ind: list containing the index of filled slots of main_board\n
-    slot_buttons: list containing all the buttons that represent slots on the GUI\n
-    is_debugging: show/hide the debugger\n
+    window: Name of window that displays MainMenu.\n
+    board_sz: Length of the board.\n
+    check_winner_area = List containing slots where the winning chain will fall on.\n
+    board_zoom: Magnification of the board.\n
+    win_len: How many X in a row/column/diagonal to win.\n
+    mode: pvp = Player versus player; pvc = Player versus pc.\n
+    plyr: Player playing in the current turn.\n
+    main_board: List containing the board on screen.\n
+    filled_slots_ind: List containing the index of filled slots of main_board.\n
+    slot_buttons: List containing all the buttons that represent slots on the GUI.\n
+    is_debugging: Show/hide the debugger.\n
     """
 
     def __init__(self, window, board_sz, board_zoom, mode: str):
@@ -550,28 +548,19 @@ class GameMenu:
             self.update_slot_pvc(last_input)
 
     def update_slot_pvc(self, last_input: int):
-        # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners
+        # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
         pc_move = pc_input(opponent(self.plyr), self.main_board, self.board_sz.get(), self.filled_slots_ind,
                            min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
                            last_input, self.is_debugging.get(), self.debugger,
                            self.slot_buttons)
         self.filled_slots_ind.append(pc_move)
-        # update backend board
         self.main_board[pc_move] = opponent(self.plyr)
-
-        # update frontend board. Player = X means PC = O. Player = O means PC = X.
-        if self.plyr == 'O':
-            self.x_turn_hint.config(foreground='SystemDisabledText', relief='flat')
-            self.o_turn_hint.config(foreground='navy', relief='ridge')
-            self.slot_buttons[pc_move].config(text=self.main_board[pc_move], disabledforeground='red4', state=DISABLED)
-        if self.plyr == 'X':
-            self.x_turn_hint.config(foreground='red4', relief='ridge')
-            self.o_turn_hint.config(foreground='SystemDisabledText', relief='flat')
-            self.slot_buttons[pc_move].config(text=self.main_board[pc_move], disabledforeground='navy', state=DISABLED)
-
+        # Update frontend board. If player = O, PC = X so 'red4'. If player = X, PC = O so 'navy'.
+        self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
+                                          disabledforeground='red4' if self.plyr == 'O' else 'navy', state=DISABLED)
         self.debugger.insert(END, f'PC\'s move:{pc_move}\n')
 
-        # check winner after each time computer makes a move
+        # check winner after each PC turn
         winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
         if winner[1] == 'tie':
             self.stop_game()
@@ -583,6 +572,14 @@ class GameMenu:
             self.stop_game()
             messagebox.showinfo('Result', f'You win {winner[1]}!\n\n"Time to fix more bugs..."')
 
+        # If no one wins, update frontend indicators for the next turn.
+        elif self.plyr == 'O':
+            self.x_turn_hint.config(foreground='SystemDisabledText', relief='flat')
+            self.o_turn_hint.config(foreground='navy', relief='ridge')
+        elif self.plyr == 'X':
+            self.x_turn_hint.config(foreground='red4', relief='ridge')
+            self.o_turn_hint.config(foreground='SystemDisabledText', relief='flat')
+
     def update_slot_pvp(self, last_input: int):
         # reset tint from peach puff back to default color
         for slot_button in self.slot_buttons:
@@ -591,22 +588,12 @@ class GameMenu:
         # update backend board
         self.main_board[last_input] = self.plyr
         self.filled_slots_ind.append(last_input)
-
         # update frontend board
-        if self.plyr == 'X':
-            self.x_turn_hint.config(foreground='SystemDisabledText', relief='flat')
-            self.o_turn_hint.config(foreground='navy', relief='ridge')
-            self.slot_buttons[last_input].config(text=self.main_board[last_input], disabledforeground='red4',
-                                                 state=DISABLED)
-        elif self.plyr == 'O':
-            self.x_turn_hint.config(foreground='red4', relief='ridge')
-            self.o_turn_hint.config(foreground='SystemDisabledText', relief='flat')
-            self.slot_buttons[last_input].config(text=self.main_board[last_input], disabledforeground='navy',
-                                                 state=DISABLED)
-
+        self.slot_buttons[last_input].config(text=self.main_board[last_input], disabledforeground='red4' if self.plyr == 'X' else 'navy',
+                                             state=DISABLED)
         self.debugger.insert(END, f'Player\'s move:{last_input}\n')
 
-        # check winner after each time player makes a move
+        # check winner after each player turn
         winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
         if self.mode == 'pvp' and winner[1] == 'tie':
             self.stop_game()
@@ -614,6 +601,14 @@ class GameMenu:
         elif self.mode == 'pvp' and winner != (' ', ' ',):
             self.stop_game()
             messagebox.showinfo('Result', f'Player \'{winner[0]}\' wins {winner[1]}!')
+
+        # If no one wins, update frontend indicators for the next turn.
+        elif self.plyr == 'X':
+            self.x_turn_hint.config(foreground='SystemDisabledText', relief='flat')
+            self.o_turn_hint.config(foreground='navy', relief='ridge')
+        elif self.plyr == 'O':
+            self.x_turn_hint.config(foreground='red4', relief='ridge')
+            self.o_turn_hint.config(foreground='SystemDisabledText', relief='flat')
 
     def stop_game(self):
         for button in self.slot_buttons:
@@ -638,15 +633,17 @@ class GameMenu:
 class GameMenuT(GameMenu):
     """
     === Attributes ===\n
-    is_game_active: whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
-    x_remain_time: how much time does player X still have\n
-    o_remain_time: how much time does player O still have\n
+    is_game_active: Whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
+    x_remain_time: How much time does player X still have.\n
+    o_remain_time: How much time does player O still have.\n
+    hint_scale: Used to animate the inflate of turn indicators at the start of each turn.\n
     """
     def __init__(self, window, board_sz, board_zoom, mode: str):
         super().__init__(window, board_sz, board_zoom, mode)
         self.is_game_active = False
         self.x_remain_time = StringVar(value='10')
         self.o_remain_time = StringVar(value='10')
+        self.hint_scale = 0
 
         # destroy the original x_turn_hint and o_turn_hint created by superclass
         self.x_turn_hint.destroy()
@@ -695,8 +692,12 @@ class GameMenuT(GameMenu):
             self.o_turn_hint.pack_forget()
 
     def x_countdown(self):
-        # If (time's not up) and (X is playing this turn) and (game is ongoing), continue countdown.
+        # If (time's not up) and (X is playing this turn) and (game is ongoing):
         if float(self.x_remain_time.get()) > 0.0 and self.plyr == 'X' and self.is_game_active is True:
+            # inflate X turn indicator
+            self.x_time_entry.config(font=('Courier', self.board_zoom.get() * 3 + 1 + self.hint_scale, 'bold'))
+            self.hint_scale = min(self.hint_scale + 2, 3)
+
             # Decrease the remain_time value by 0.1 every 100ms and display only 1 deci point using round().
             # I didn't decrease by 1 every 1000ms (1sec) as the timer delayed update when switching turns.
             self.x_remain_time.set(str(round(float(self.x_remain_time.get()) - 0.1, 1)))
@@ -708,8 +709,9 @@ class GameMenuT(GameMenu):
             self.stop_game()
             return None
 
-        # If X is not playing this turn or the game has ended, stop X's countdown and all recursions.
+        # If X is not playing this turn or the game has ended, stop X's countdown and flash.
         else:
+            self.x_time_entry.config(relief='sunken', disabledbackground='white')
             return None
 
         # If X has under 5 secs left, flash the timer.
@@ -720,6 +722,9 @@ class GameMenuT(GameMenu):
 
     def o_countdown(self):
         if float(self.o_remain_time.get()) > 0.0 and self.plyr == 'O' and self.is_game_active is True:
+            self.o_time_entry.config(font=('Courier', self.board_zoom.get() * 3 + 1 + self.hint_scale, 'bold'))
+            self.hint_scale = min(self.hint_scale + 2, 3)
+
             self.o_remain_time.set(str(round(float(self.o_remain_time.get()) - 0.1, 1)))
             self.window.after(100, self.o_countdown)
 
@@ -729,6 +734,7 @@ class GameMenuT(GameMenu):
             return None
 
         else:
+            self.o_time_entry.config(relief='sunken', disabledbackground='white')
             return None
 
         if float(self.o_remain_time.get()) < 5.0 and float(self.o_remain_time.get()) % 1 < 0.4:
@@ -742,51 +748,66 @@ class GameMenuT(GameMenu):
             if not self.x_remain_time.get().isdigit() or not self.o_remain_time.get().isdigit():
                 messagebox.askretrycancel('Warning', f'Please enter a decimal number!')
                 return None
-            # if the time is valid
+        # If the time is valid:
+            # clear debugger window
+            self.debugger.delete('1.0', END)
+            # disable some settings
+            self.board_sz_slider.config(state=DISABLED)
+            self.board_sz_label.config(state=DISABLED)
+            self.replay_button.config(state=ACTIVE)
+            self.pvco_checkbox.config(state=DISABLED)
             self.x_time_entry.config(state=DISABLED)
             self.o_time_entry.config(state=DISABLED)
             self.is_game_active = True
+
             # If playing against PC, there r no turns to stop a player's timer. So the timer only start once.
             if self.mode == 'pvc' and self.plyr == 'X':
                 self.x_countdown()
             elif self.mode == 'pvc' and self.plyr == 'O':
                 self.o_countdown()
 
-        # After each move by X, X gets bonus time and grey out X's timer and start O's timer.
-        if self.plyr == 'X':
+        # Updates backend and frontend board. Also check for any winner.
+        self.update_slot_pvp(last_input)
+
+        # After each move by X and no one wins yet, X gets bonus time and grey out X's timer and start O's timer.
+        if self.plyr == 'X' and self.is_game_active is True:
             self.x_remain_time.set(str(float(self.x_remain_time.get()) + 1))
 
-            # I can't put update_slot before 'if self.plyr == 'X':' as it changes self.plyr to the next player
-            # I also can't put it after 'self.o_countdown()' which need self.plyr to be the next player to work
-            super().update_slot(last_input)
-
-            # Only during PVP, switching turns will cause a player's timer to stop and needs to be restarted in their next turn.
+            # reset inflate of X turn indicator
+            self.hint_scale = 0
+            # Only in PVP, switching turns will cause a player's timer to stop and needs to be restarted in their next turn.
             if self.mode == 'pvp':
-                self.x_turn_hint.config(relief='flat')
+                # Reset inflate of X turn indicator and turn it off. Turn on O turn indicator.
                 self.x_time_entry.config(relief='flat', disabledforeground='SystemDisabledText',
-                                         disabledbackground='SystemButtonFace')
-                self.o_turn_hint.config(relief='ridge')
+                                         disabledbackground='SystemButtonFace', font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
                 self.o_time_entry.config(relief='sunken', disabledforeground='navy', disabledbackground='white')
 
+                self.plyr = opponent(self.plyr)
                 self.o_countdown()
 
-        elif self.plyr == 'O':
+            elif self.mode == 'pvc':
+                # call AI and update backend board
+                self.update_slot_pvc(last_input)
+
+        elif self.plyr == 'O' and self.is_game_active is True:
             self.o_remain_time.set(str(float(self.o_remain_time.get()) + 1))
 
-            super().update_slot(last_input)
-
-            if self.mode == 'pvp':
-                self.o_turn_hint.config(relief='flat')
+            self.hint_scale = 0
+            if self.mode == 'pvp' and self.is_game_active is True:
                 self.o_time_entry.config(relief='flat', disabledforeground='SystemDisabledText',
-                                         disabledbackground='SystemButtonFace')
-                self.x_turn_hint.config(relief='ridge')
+                                         disabledbackground='SystemButtonFace', font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
                 self.x_time_entry.config(relief='sunken', disabledforeground='red4', disabledbackground='white')
 
+                self.plyr = opponent(self.plyr)
                 self.x_countdown()
+
+            elif self.mode == 'pvc':
+                self.update_slot_pvc(last_input)
 
     def pvc_first(self):
         self.o_turn_hint.pack()
         self.x_turn_hint.pack_forget()
+        self.o_time_entry.config(state=DISABLED)
         self.is_game_active = True
         super().pvc_first()
         self.o_countdown()
@@ -800,6 +821,8 @@ class GameMenuT(GameMenu):
 
     def stop_game(self):
         self.is_game_active = False
+        self.x_time_entry.config(disabledforeground=self.x_turn_hint.cget('foreground'))
+        self.o_time_entry.config(disabledforeground=self.o_turn_hint.cget('foreground'))
         super().stop_game()
 
     def replay(self):
