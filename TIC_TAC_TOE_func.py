@@ -75,7 +75,7 @@ def coord_to_slot(coord: str, main_board: list, board_sz: int) -> int | bool:
 
     # if the player inputted valid coordinates...
     # take the first number as the column num, the second number as the row num
-    # I observed that the slot num = (row num*board size) + column num
+    # I observed that the slot num = (row num*board len) + column num
     slot_num = int(coord[:coord.find(',')]) + ((int((coord[coord.find(',') + 1:])) - 1) * board_sz) - 1
 
     # if the slot number exceeds the board, return False
@@ -146,6 +146,7 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
     #     NO, NO, NO, NO, NO,
     #     NO, NO, NO, NO, NO
 
+    # TODO: IS BUGGED
     # OPTIMIZATION STRATEGY:
     # Instead of checking every slot to find those that r outside the checked area, I give the AI indexes of slots that r outside.
     for origin in check_winner_area:
@@ -268,7 +269,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         empty_slots_ind = []
 
         # if the slots in reserved_area are:
-        #   1. inside the board (0 <= slot_index < board_size)
+        #   1. inside the board (0 <= slot_index < len)
         #   2. 'N' on the board
         #   and there aren't enough empty slots
         # then turn them back to '[ ]'
@@ -408,7 +409,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         # statistical deathtraps are only confirmed to exist on 3x3 board
         pboard_copy = pboard.copy()
         pboard_copy[move] = plyr
-        # if (the board size is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
+        # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
         if board_sz == 3 and check_deathtrap(plyr, pboard_copy) and len(list(outcomes.keys())) > 1:
             print('Deathtrap found! Choosing a new move...')
             debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
@@ -481,18 +482,18 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 # 
 # board_sz: str | int = ''
 # while board_sz == '':
-#     # ask player for board length
+#     # ask player for board len
 #     board_sz = input(
 #        'Select a board length. Boards that are 7*7 or larger only needs half the board length to win!\n>')
 #     # if player input rubbish, ask again
 #     if board_sz.isdigit() is False:
-#         print('Board size must be an integer!')
+#         print('Board length must be an integer!')
 #         board_sz = ''
 #     elif int(board_sz) < 2:
-#         print('Board size must be 2 or larger!')
+#         print('Board length must be 2 or larger!')
 #         board_sz = ''
 # 
-# # initialize the board size and how many slots in a row/column/diagonal to win
+# # initialize the board len and how many slots in a row/column/diagonal to win
 # board_sz = int(board_sz)
 # filled_slots_ind = []
 # win_len = set_win_len(board_sz)

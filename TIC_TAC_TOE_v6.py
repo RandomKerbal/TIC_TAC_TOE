@@ -32,13 +32,13 @@ while board_sz == '':
        'Select a board length. Boards that are 7*7 or larger only needs half the board length to win!\n>')
     # if player input rubbish, ask again
     if board_sz.isdigit() is False:
-        print('Board size must be an integer!')
+        print('Board length must be an integer!')
         board_sz = ''
     elif int(board_sz) < 2:
-        print('Board size must be 2 or larger!')
+        print('Board length must be 2 or larger!')
         board_sz = ''
 
-# initialize the board size and how many slots in a row/column/diagonal to win
+# initialize the board len and how many slots in a row/column/diagonal to win
 board_sz = int(board_sz)
 filled_slots_ind = []
 win_len = set_win_len(board_sz)
