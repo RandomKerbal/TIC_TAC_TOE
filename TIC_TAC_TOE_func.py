@@ -146,7 +146,6 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
     #     NO, NO, NO, NO, NO,
     #     NO, NO, NO, NO, NO
 
-    # TODO: IS BUGGED
     # OPTIMIZATION STRATEGY:
     # Instead of checking every slot to find those that r outside the checked area, I give the AI indexes of slots that r outside.
     for origin in check_winner_area:
@@ -191,9 +190,9 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
                     elif board[count * board_sz + origin: count * board_sz + origin + win_len].count('O') == win_len:
                         return 'O', 'horizontally',
 
-                # If no one wins yet and no empty slot left, the game is a draw.
-                if ' ' not in board:
-                    return ' ', 'tie',
+            # If no one wins yet and no empty slot left, the game is a draw.
+            if ' ' not in board:
+                return ' ', 'tie',
     # If no one wins yet but there are empty slots, game continues.
     return ' ', ' ',
 
