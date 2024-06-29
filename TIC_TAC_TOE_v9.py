@@ -189,12 +189,17 @@ def default_hint():
 
 def timed_hint():
     messagebox.showinfo('Hint',
-                        'In Timed Trial, you can set a time limit for each player before you begin. Each player will have that amount of time to complete the game.\n\nBut not so fast - you can earn you 1 extra second after each move!\n\n(other details are same as the Traditional Mode)')
+                        'At the start, you can set a time limit for each player. Each player will have that amount of time to complete the game.\n\nBut not so fast - you will earn 1 extra second after each move!\n\n(other details are same as the Traditional Mode)')
 
 
 def vanish_hint():
     messagebox.showinfo('Hint',
-                        'Once you placed the minimum number of X/O you need to win, your oldest move will disappear!\n\nThis mode challenges your strategy, memory, and perseverance. Feeling impatient? You can make your moves last longer by changing \'Remain for\' slider.\n\n(other details are same as the Traditional Mode)')
+                        'Once you placed the minimum number of X/O you need to win, your oldest move will disappear!\n\nBad memory? You can enable \'next vanishing moves\' to see them highlighted in yellow. You can also make your moves last longer by changing the \'remain for\' slider.\n\n(other details are same as the Traditional Mode)')
+
+
+def colonise_hint():
+    messagebox.showinfo('Hint',
+                        'Let\'s expand your territories like 1500\'s Great Britain!\n\nIn your first move, you can place wherever you want. Be strategic with your first move, as you can ONLY place your next move in the + around any existing moves (including your opponent\'s)!\n\nI would recommend playing this mode on a 7x7 or larger board.\n\n(other details are same as the Traditional Mode)')
 
 
 class SubMenu:
@@ -312,6 +317,18 @@ class SubMenu:
                                  font=('FixedSys', 15),
                                  borderwidth=5)
 
+        self.b_colonise_hint = Button(self.window,
+                                     bitmap='question',
+                                     cursor='question_arrow',
+                                     overrelief='sunken',
+                                     command=colonise_hint,
+                                     activeforeground='white',
+                                     activebackground='sea green',
+                                     background='sea green1',
+                                     foreground='black',
+                                     width=30,
+                                     borderwidth=5)
+
         self.b_back = Button(self.window,
                              text='Back',
                              cursor='hand2',
@@ -343,6 +360,7 @@ class SubMenu:
         self.b_vanish.grid(row=3, column=1)
         self.b_vanish_hint.grid(row=3, column=2)
         self.b_colonize.grid(row=4, column=1)
+        self.b_colonise_hint.grid(row=4, column=2)
         self.b_back.grid(row=5, column=1, columnspan=2, pady=25)
 
     def to_gamemenu(self, mode: str):
@@ -542,7 +560,7 @@ class GameMenu:
                 slot_button = Button(
                     self.board_frame,
                     font=('Helvetica', self.board_zoom.get() * 4, 'bold'),
-                    cursor='hand2',
+                    cursor='crosshair',
                     command=lambda _=last_input: self.update_slot(_),
                     width=3,
                     borderwidth=5
@@ -599,7 +617,7 @@ class GameMenu:
             self.debugger.grid_forget()
             for slot_button in self.slot_buttons:
                 slot_button.config(background='SystemButtonFace')
-                # if the slot has a number printed, it has no X/O
+                # if the slot has a number on, it has no X/O
                 if type(slot_button.cget('text')) == int:
                     slot_button.config(text='')
 
@@ -1010,7 +1028,22 @@ class GameMenuV(GameMenu):
 
 
 class GameMenuC(GameMenu):
-    pass
+    # def update_slot_pvp(self, last_input: int):
+    #     super().update_slot_pvp(last_input)
+    #     [button.config(background='MistyRose', state='disabled') for button in self.slot_buttons]
+    #     for row in range(self.board_sz.get()):
+    #         for col in range(self.board_sz.get()):
+    #             c = row*self.board_sz.get() + col
+    #             n = max(0, row-1)*self.board_sz.get() + col
+    #             s = min(row+1, self.board_sz.get()-1)*self.board_sz.get() + col
+    #             e = row*self.board_sz.get() + min(col+1, self.board_sz.get()-1)
+    #             w = row*self.board_sz.get() + max(0, col-1)
+    #             if self.main_board[c] != ' ':
+    #                 self.slot_buttons[n].config(background='SystemButtonFace', state='normal')
+    #                 self.slot_buttons[s].config(background='SystemButtonFace', state='normal')
+    #                 self.slot_buttons[e].config(background='SystemButtonFace', state='normal')
+    #                 self.slot_buttons[w].config(background='SystemButtonFace', state='normal')
+
 
 
 ver_no = 'Tic Tac Toe v9'
