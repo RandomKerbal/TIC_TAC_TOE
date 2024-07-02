@@ -25,12 +25,32 @@ class MainMenu:
     window: Name of window that displays MainMenu.\n
     board_sz: Length of the board.\n
     board_zoom: Magnification of the board.\n
+    color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
     """
 
-    def __init__(self, window, board_sz_: int = 3, board_zoom_: int = 5):
+    def __init__(self, window, board_sz: int = 3, board_zoom: int = 5, colors: dict = None):
         self.window = window
-        self.board_sz = tk.IntVar(value=board_sz_)
-        self.board_zoom = tk.IntVar(value=board_zoom_)
+        self.board_sz = tk.IntVar(value=board_sz)
+        self.board_zoom = tk.IntVar(value=board_zoom)
+        if colors is None:
+            self.colors = {
+                'X': {
+                    'symbol': 'red4',
+                    'snake_head': 'OliveDrab2',
+                    'snake_body': 'Dark Olive Green1'
+                },
+                'O': {
+                    'symbol': 'navy',
+                    'snake_head': 'gold',
+                    'snake_body': 'khaki1',
+                },
+                'pc_move': 'yellow',
+                'winner_area': '#ddddf8',
+                'nxt_disappearing_move': ['Navajo White', 'Antique White'],
+                '': ''
+            }
+        else:
+            self.colors = colors
 
         self.title_line1 = Label(self.window,
                                  takefocus=False,
@@ -113,6 +133,18 @@ class MainMenu:
                                   width=500,
                                   font=('FixedSys', 15),
                                   borderwidth=5)
+        self.b_col_settings = Button(self.window,
+                                     text='Color Settings',
+                                     cursor='hand2',
+                                     overrelief='sunken',
+                                     command=self.to_col_settings,
+                                     activeforeground='white',
+                                     activebackground='sea green',
+                                     background='sea green1',
+                                     foreground='black',
+                                     width=500,
+                                     font=('FixedSys', 15),
+                                     borderwidth=5)
 
         self.b_exit = Button(self.window,
                              text='Exit',
@@ -133,6 +165,7 @@ class MainMenu:
         self.title_line2.pack(side='top')
         self.b_pvc.pack(side='top')
         self.b_pvp.pack(side='top')
+        self.b_col_settings.pack(side='top')
         self.b_changelog.pack(side='top')
         self.b_exit.pack(side='top')
 
@@ -164,7 +197,7 @@ class MainMenu:
         self.window.protocol('WM_DELETE_WINDOW', self.exit)
 
         # set the MainMenu window to the correct resolution
-        self.window.geometry('700x400')
+        self.window.geometry('700x425')
         self.window.config(background='black')
 
     def to_submenu(self, mode: str):
@@ -174,7 +207,16 @@ class MainMenu:
 
         for widget in self.window.winfo_children():
             widget.destroy()
-        SubMenu(self.window, self.board_sz, self.board_zoom, mode)
+        SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, mode)
+
+    def to_col_settings(self):
+        # stops all queued frames of the title animation
+        for frame in self.anim_frames:
+            self.window.after_cancel(frame)
+
+        for widget in self.window.winfo_children():
+            widget.destroy()
+        ColMenu(self.window, self.board_sz, self.board_zoom, self.colors)
 
     def exit(self):
         messagebox.showinfo('Afterword',
@@ -203,6 +245,15 @@ def snake_hint():
                         'In your first move, you can place wherever you want. Afterwards, you can only place around your previous move - the head of the snake. Watch where your snake is going, as turning back can take some time.\n\nIf you accidentally get trapped in a dead end, you can continue at your last move before being trapped. I recommend playing this on a 7x7 or larger board.\n\n(other details are same as the Traditional Mode)')
 
 
+class ColMenu:
+    """
+    === Attributes ===\n
+    """
+
+    def __init__(self, window, board_sz, board_zoom, colors):
+        pass
+
+
 class SubMenu:
     """
     === Attributes ===\n
@@ -210,15 +261,17 @@ class SubMenu:
     board_sz: Length of the board.\n
     board_zoom: Magnification of the board.\n
     win_len: How many X in a row/column/diagonal to win.\n
+    color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
     mode: pvp = Player versus player; pvc = Player versus pc.\n
     """
 
-    def __init__(self, window, board_sz, board_zoom, mode: str):
+    def __init__(self, window, board_sz, board_zoom, colors, mode: str):
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
         self.check_winner_area = set_check_winner_area(board_sz.get(), self.win_len)
         self.board_zoom = board_zoom
+        self.colors = colors
         self.mode = mode
 
         self.title = Button(self.window,
@@ -347,7 +400,7 @@ class SubMenu:
         self.window.protocol('WM_DELETE_WINDOW', lambda _=self: MainMenu.exit(_))
 
         # set the MainMenu window to the correct resolution and color
-        self.window.geometry('700x400')
+        self.window.geometry('700x425')
         self.window.configure(background='black')
         # center buttons horizontally by giving a weight to all columns except the ones with the button
         self.window.grid_columnconfigure(0, weight=1)
@@ -368,31 +421,31 @@ class SubMenu:
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenu(self.window, self.board_sz, self.board_zoom, mode)
+        GameMenu(self.window, self.board_sz, self.board_zoom, self.colors, mode)
 
     def to_gamemenu_t(self, mode: str):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenuT(self.window, self.board_sz, self.board_zoom, mode)
+        GameMenuT(self.window, self.board_sz, self.board_zoom, self.colors, mode)
 
     def to_gamemenu_v(self, mode: str):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenuV(self.window, self.board_sz, self.board_zoom, mode)
+        GameMenuV(self.window, self.board_sz, self.board_zoom, self.colors, mode)
 
     def to_gamemenu_s(self, mode: str):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenuS(self.window, self.board_sz, self.board_zoom, mode)
+        GameMenuS(self.window, self.board_sz, self.board_zoom, self.colors, mode)
 
     def to_mainmenu(self):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        MainMenu(self.window, self.board_sz.get(), self.board_zoom.get())
+        MainMenu(self.window, self.board_sz.get(), self.board_zoom.get(), self.colors)
 
 
 class GameMenu:
@@ -403,6 +456,7 @@ class GameMenu:
     check_winner_area = List containing slots where the winning chain will fall on.\n
     board_zoom: Magnification of the board.\n
     win_len: How many X in a row/column/diagonal to win.\n
+    color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
     mode: pvp = Player versus player; pvc = Player versus pc.\n
     plyr: Player playing in the current turn.\n
     main_board: List containing the board on screen.\n
@@ -412,13 +466,14 @@ class GameMenu:
     is_game_active: Whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
     """
 
-    def __init__(self, window, board_sz, board_zoom, mode: str):
+    def __init__(self, window, board_sz, board_zoom, colors, mode: str):
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
         self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_zoom = board_zoom
         self.mode = mode
+        self.colors = colors
 
         self.plyr = 'X'
         self.main_board = setup_board(self.board_sz.get())
@@ -434,7 +489,7 @@ class GameMenu:
             self.turn_hint,
             text='X turn',
             font=('Helvetica', self.board_zoom.get() * 2, 'bold'),
-            foreground='red4',
+            foreground=self.colors['X']['symbol'],
             width=13,
             borderwidth=5,
             relief='ridge',
@@ -444,7 +499,7 @@ class GameMenu:
             self.turn_hint,
             text='O turn',
             font=('Helvetica', self.board_zoom.get() * 2, 'bold'),
-            foreground='navy',
+            foreground=self.colors['O']['symbol'],
             width=13,
             borderwidth=5,
             relief='ridge',
@@ -558,9 +613,9 @@ class GameMenu:
             # if the slot has a number on, it has no X/O
             if type(button.cget('text')) == int:
                 button.config(text='')
-            if button.cget('background') == 'lemon chiffon2' or button.cget('background') == 'yellow':
+            if button.cget('background') == 'lemon chiffon2' or button.cget('background') == self.colors['pc_move']:
                 button.config(background='SystemButtonFace')
-            if button.cget('background') == '#ddddf8':
+            if button.cget('background') == self.colors['winner_area']:
                 button.config(background='SystemButtonFace')
 
         if self.is_debugging.get() is True:
@@ -569,7 +624,7 @@ class GameMenu:
                 if slot not in self.filled_slots_ind:
                     self.slot_buttons[slot].config(text=slot, foreground='gray')
                 if slot in self.check_winner_area:
-                    self.slot_buttons[slot].config(background='#ddddf8')
+                    self.slot_buttons[slot].config(background=self.colors['winner_area'])
         else:
             self.debugger.grid_forget()
 
@@ -619,7 +674,7 @@ class GameMenu:
         self.mode = 'pvc'
         self.plyr = 'O'
         self.x_turn_hint.config(foreground='SystemDisabledText')
-        self.o_turn_hint.config(foreground='navy')
+        self.o_turn_hint.config(foreground=self.colors['O']['symbol'])
         self.board_sz_slider.config(state='disabled')
         self.board_sz_label.config(state='disabled')
         self.pvco_checkbox.config(state='disabled')
@@ -657,9 +712,9 @@ class GameMenu:
                            self.slot_buttons)
         self.filled_slots_ind.append(pc_move)
         self.main_board[pc_move] = opponent(self.plyr)
-        # Update frontend board. If player = O, PC = X so 'red4'. If player = X, PC = O so 'navy'.
+        # Update frontend board. If player = O, PC = X. If player = X, PC = O.
         self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
-                                          disabledforeground='red4' if self.plyr == 'O' else 'navy', background='yellow', state='disabled')
+                                          disabledforeground=self.colors[self.plyr]['symbol'], background=self.colors['pc_move'], state='disabled')
         self.debugger.insert('end', f'PC\'s move:{pc_move}\n')
 
         return pc_move
@@ -680,9 +735,9 @@ class GameMenu:
         # If no one wins, update frontend indicators and player for the next turn.
         elif self.plyr == 'O':
             self.x_turn_hint.config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
-            self.o_turn_hint.config(foreground='navy', background='white', relief='ridge')
+            self.o_turn_hint.config(foreground=self.colors['O']['symbol'], background='white', relief='ridge')
         elif self.plyr == 'X':
-            self.x_turn_hint.config(foreground='red4', background='white', relief='ridge')
+            self.x_turn_hint.config(foreground=self.colors['X']['symbol'], background='white', relief='ridge')
             self.o_turn_hint.config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
 
     def update_slot_pvp(self, last_input: int):
@@ -693,7 +748,7 @@ class GameMenu:
         self.filled_slots_ind.append(last_input)
         # update frontend board
         self.slot_buttons[last_input].config(text=self.main_board[last_input],
-                                             disabledforeground='red4' if self.plyr == 'X' else 'navy',
+                                             disabledforeground=self.colors[self.plyr]['symbol'],
                                              state='disabled')
         self.debugger.insert('end', f'Player\'s move:{last_input}\n')
 
@@ -710,10 +765,10 @@ class GameMenu:
         # If no one wins, update frontend indicators for the next turn.
         elif self.plyr == 'X':
             self.x_turn_hint.config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
-            self.o_turn_hint.config(foreground='navy', background='white', relief='ridge')
+            self.o_turn_hint.config(foreground=self.colors['O']['symbol'], background='white', relief='ridge')
             self.plyr = 'O'
         elif self.plyr == 'O':
-            self.x_turn_hint.config(foreground='red4', background='white', relief='ridge')
+            self.x_turn_hint.config(foreground=self.colors['X']['symbol'], background='white', relief='ridge')
             self.o_turn_hint.config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
             self.plyr = 'X'
 
@@ -737,7 +792,7 @@ class GameMenu:
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenu(self.window, self.board_sz, self.board_zoom, self.mode)
+            GameMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
 class GameMenuT(GameMenu):
@@ -748,8 +803,8 @@ class GameMenuT(GameMenu):
     hint_scale: Used to animate the inflate of timer at the start of each turn.\n
     """
 
-    def __init__(self, window, board_sz, board_zoom, mode: str):
-        super().__init__(window, board_sz, board_zoom, mode)
+    def __init__(self, window, board_sz, board_zoom, colors, mode: str):
+        super().__init__(window, board_sz, board_zoom, colors, mode)
         self.x_remain_time = StringVar(value='10')
         self.o_remain_time = StringVar(value='10')
         self.hint_scale = 0
@@ -760,7 +815,7 @@ class GameMenuT(GameMenu):
         self.x_turn_hint = LabelFrame(self.turn_hint,
                                       text='X turn',
                                       font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
-                                      foreground='red4',
+                                      foreground=self.colors['X']['symbol'],
                                       borderwidth=5,
                                       relief='ridge',
                                       takefocus=False
@@ -769,15 +824,15 @@ class GameMenuT(GameMenu):
                                   width=4,
                                   borderwidth=1,
                                   font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
-                                  foreground='red4',
-                                  disabledforeground='red4',
+                                  foreground=self.colors['X']['symbol'],
+                                  disabledforeground=self.colors['X']['symbol'],
                                   disabledbackground='white',
                                   justify='center',
                                   textvariable=self.x_remain_time)
         self.o_turn_hint = LabelFrame(self.turn_hint,
                                       text='O turn',
                                       font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
-                                      foreground='navy',
+                                      foreground=self.colors['O']['symbol'],
                                       borderwidth=5,
                                       relief='ridge',
                                       takefocus=False
@@ -786,8 +841,8 @@ class GameMenuT(GameMenu):
                                   width=4,
                                   borderwidth=1,
                                   font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
-                                  foreground='navy',
-                                  disabledforeground='navy',
+                                  foreground=self.colors['O']['symbol'],
+                                  disabledforeground=self.colors['O']['symbol'],
                                   disabledbackground='white',
                                   justify='center',
                                   textvariable=self.o_remain_time)
@@ -905,7 +960,7 @@ class GameMenuT(GameMenu):
             self.x_time_entry.config(relief='flat', disabledforeground='SystemDisabledText',
                                      disabledbackground='SystemButtonFace',
                                      font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
-            self.o_time_entry.config(relief='sunken', disabledforeground='navy', disabledbackground='white')
+            self.o_time_entry.config(relief='sunken', disabledforeground=self.colors['O']['symbol'], disabledbackground='white')
             self.o_countdown()
 
         elif self.plyr == 'X' and self.is_game_active is True:
@@ -914,7 +969,7 @@ class GameMenuT(GameMenu):
             self.o_time_entry.config(relief='flat', disabledforeground='SystemDisabledText',
                                      disabledbackground='SystemButtonFace',
                                      font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
-            self.x_time_entry.config(relief='sunken', disabledforeground='red4', disabledbackground='white')
+            self.x_time_entry.config(relief='sunken', disabledforeground=self.colors['X']['symbol'], disabledbackground='white')
             self.x_countdown()
 
     def pvc_first(self):
@@ -931,7 +986,7 @@ class GameMenuT(GameMenu):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenuT(self.window, self.board_sz, self.board_zoom, self.mode)
+            GameMenuT(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
 class GameMenuV(GameMenu):
@@ -942,8 +997,8 @@ class GameMenuV(GameMenu):
     is_showing_nxt_vanishing_move: Show/hide which move is going to vanish in the next turn.
     """
 
-    def __init__(self, window, board_sz, board_zoom, mode: str):
-        super().__init__(window, board_sz, board_zoom, mode)
+    def __init__(self, window, board_sz, board_zoom, colors, mode: str):
+        super().__init__(window, board_sz, board_zoom, colors, mode)
         self.last_inputs = []
         self.remain_steps = IntVar()
         self.is_showing_nxt_vanish_move = BooleanVar(value=False)
@@ -981,11 +1036,12 @@ class GameMenuV(GameMenu):
             self.slot_buttons[self.last_inputs[0]].config(text='', background='SystemButtonFace', state='normal')
             self.filled_slots_ind.remove(self.last_inputs[0])
             self.last_inputs = self.last_inputs[1:]
+            self.toggle_debugger()
 
         # if (num of moves by X & O so far) + (moves by X & O in this turn) is one less before vanishing begins, tint the 3 oldest moves about to vanish.
         if (len(self.last_inputs) + 2 > self.remain_steps.get() * 2 - 1) and self.is_showing_nxt_vanish_move.get():
-            self.slot_buttons[self.last_inputs[1]].config(background='Antique White')
-            self.slot_buttons[self.last_inputs[0]].config(background='Navajo White')
+            self.slot_buttons[self.last_inputs[1]].config(background=self.colors['nxt_disappearing_move'][1])
+            self.slot_buttons[self.last_inputs[0]].config(background=self.colors['nxt_disappearing_move'][0])
 
     def adjust_length(self, *args):
         super().adjust_length(*args)
@@ -1014,17 +1070,18 @@ class GameMenuV(GameMenu):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenuV(self.window, self.board_sz, self.board_zoom, self.mode)
+            GameMenuV(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
 class GameMenuS(GameMenu):
     """
     === Attributes ===\n
-    last_inputs: A list containing the 2 most recent moves on the board, in chronological order. Leftmost element = earliest move. Rightmost element = latest move.\n
+    x_last_inputs: A list containing all the moves made by X, in chronological order. Leftmost element = earliest move. Rightmost element = latest move.\n
+    o_last_inputs: A list containing all the moves made by O, in chronological order. Leftmost element = earliest move. Rightmost element = latest move.\n
     """
 
-    def __init__(self, window, board_sz, board_zoom, mode: str):
-        super().__init__(window, board_sz, board_zoom, mode)
+    def __init__(self, window, board_sz, board_zoom, colors, mode: str):
+        super().__init__(window, board_sz, board_zoom, colors, mode)
         self.x_last_inputs = []
         self.o_last_inputs = []
         self.win_len = self.board_sz.get()
@@ -1040,25 +1097,24 @@ class GameMenuS(GameMenu):
 
     def update_slot_pvp(self, last_input: int):
         super().update_slot_pvp(last_input)
+        self.slot_buttons[last_input].config(background=self.colors[self.plyr]['snake_head'])
 
         if self.plyr == 'X':
-            self.slot_buttons[last_input].config(background='OliveDrab2')
             if len(self.x_last_inputs) > 0:
                 # turn the snake's previous head to the snake's body color
-                self.slot_buttons[self.x_last_inputs[-1]].config(background='Dark Olive Green1')
+                self.slot_buttons[self.x_last_inputs[-1]].config(background=self.colors[self.plyr]['snake_body'])
             self.x_last_inputs.append(last_input)
 
         elif self.plyr == 'O':
-            self.slot_buttons[last_input].config(background='gold')
             if len(self.o_last_inputs) > 0:
                 # turn the snake's previous head to the snake's body color
-                self.slot_buttons[self.o_last_inputs[-1]].config(background='khaki1')
+                self.slot_buttons[self.o_last_inputs[-1]].config(background=self.colors[self.plyr]['snake_body'])
             self.o_last_inputs.append(last_input)
 
     def check_winner_pvp(self):
         super().check_winner_pvp()
         # I override check_winner_pvp to include switching snake head
-        if self.plyr == 'O':    # if the next plyr is O, this plyr is X.
+        if self.plyr == 'O':  # if the next plyr is O, this plyr is X.
             is_surrounded = True
             while is_surrounded is True and len(self.x_last_inputs) + len(self.o_last_inputs) > 1 and self.is_game_active is True:
                 # while (next plyr is not stuck) and (both X and O alr placed their first move)
@@ -1097,7 +1153,7 @@ class GameMenuS(GameMenu):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenuS(self.window, self.board_sz, self.board_zoom, self.mode)
+            GameMenuS(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
 ver_no = 'Tic Tac Toe v10'
