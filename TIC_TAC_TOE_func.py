@@ -54,7 +54,7 @@ def print_board(board: list, board_sz: int) -> None:
     print(end='\n')
 
 
-def opponent(original: str) -> str:
+def opp(original: str) -> str:
     # changes player X to O, O to X
     if original == 'O':
         return 'X'
@@ -280,14 +280,14 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
             # 1. If the number of O is less than the number needed to win, then no one wins (assuming that a player can't win a 3x3 with just 3 moves, a 4x4 with just 4 moves, etc.), so we skip the check_winner().
             # 2. If there are no X/O in the first row and column, then no one wins so we skip the check_winner().
             if (prev_move.count('O') < win_len) or ('X' not in prev_move[: board_sz] and 'X' not in prev_move[: (board_sz**2): board_sz] and 'O' not in prev_move[: board_sz] and 'O' not in prev_move[0: (board_sz**2): board_sz]):
-                sort_childs(sim_childs(opponent(prev_moves[0]), prev_move))
+                sort_childs(sim_childs(opp(prev_moves[0]), prev_move))
 
             else:
                 winner = check_winner_anywhere(prev_move, board_sz, win_len, check_winner_area)
                 if winner[0] == pc:
                     # end_moves saved as ({bad}, {good}, {tie})
                     end_moves[1].add(tuple(prev_move))
-                elif winner[0] == opponent(pc):
+                elif winner[0] == opp(pc):
                     end_moves[0].add(tuple(prev_move))
                 elif winner[1] == 'tie' and len(empty_slots_ind) <= board_sz+1:
                     # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
@@ -298,7 +298,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                     end_moves[2].add(tuple(prev_move))
                 else:
                     # if the parent node has no outcome yet, continue branching down
-                    sort_childs(sim_childs(opponent(prev_moves[0]), prev_move))
+                    sort_childs(sim_childs(opp(prev_moves[0]), prev_move))
 
     def weight_init_moves(is_debugging: bool) -> dict:
         # recall that each child node saved its first-gen move
@@ -370,7 +370,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         # [O] [ ] [X]
         # [ ] [X] [ ]
         # [O] [ ] [O]
-        next_moves = sim_childs(opponent(plyr), pboard)
+        next_moves = sim_childs(opp(plyr), pboard)
         # simulates the current board with the final move decision 3 times into the future
         # a statistical deathtrap can be identified by checking 3 moves later, whether all the child nodes of a parent node will loose
         for next_move in next_moves[1:]:
@@ -379,7 +379,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                 death_count = 0
                 for next_next_move in next_next_moves[1:]:
                     if check_winner_anywhere(next_next_move, board_sz, board_sz, [0]) == (' ', ' ',):
-                        next_next_next_moves = sim_childs(opponent(plyr), next_next_move)
+                        next_next_next_moves = sim_childs(opp(plyr), next_next_move)
                         for next_next_next_move in next_next_next_moves[1:]:
                             if check_winner_anywhere(next_next_next_move, board_sz, board_sz, [0])[0] == 'X':
                                 # counts how many child nodes loose

@@ -54,7 +54,7 @@ elif mode == 'pvcx':
     plyr = 'O'
     # computer's turn if computer starts first
     # last_input = -1 means there is no last_input yet and the computer will randomly generate a number
-    main_board[pc_input(opponent(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input=-1, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opponent(plyr)
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input=-1, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opp(plyr)
 elif mode == 'pvco' or mode == 'pvc':
     plyr = 'X'
 
@@ -66,7 +66,7 @@ while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
     main_board[last_input] = plyr
 
     # computer's turn regardless computer or human starts first
-    main_board[pc_input(opponent(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opponent(plyr)
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opp(plyr)
 
     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
     if winner[1] == 'tie':
@@ -74,7 +74,7 @@ while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw'))//2) + 'Game ended in a draw')
         print(' ' * ((51 - len('So close...but I will NEVER lose!'))//2) + 'So close...but I will NEVER lose!' + '\n' + '=' * 50)
         break
-    elif winner[0] == opponent(plyr):
+    elif winner[0] == opp(plyr):
         print_board(main_board, board_sz)
         print('=' * 50 + '\n' + ' ' * ((51 - len(f'Computer wins {winner[1]}!')) // 2) + f'Computer wins {winner[1]}!')
         print(' ' * ((51 - len('Humans should\'ve been smarter...'))//2) + 'Humans should\'ve been smarter...' + '\n' + '=' * 50)
@@ -90,7 +90,7 @@ while mode == 'pvp':
     main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = plyr
 
     # player 'O' turn
-    main_board[ask_input(opponent(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opponent(plyr)
+    main_board[ask_input(opp(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opp(plyr)
 
     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
     if winner[1] == 'tie':
