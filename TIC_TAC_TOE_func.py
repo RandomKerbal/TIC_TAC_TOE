@@ -167,8 +167,12 @@ def ask_input(plyr: str, main_board: list, board_sz: int, filled_slots_ind: list
     return -1
 
 
-# noinspection PyUnboundLocalVariable
-def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, win_len: int, check_winner_area: list, last_input: int, is_debugging: bool, debugger, slot_buttons) -> int:
+full_tree = []
+
+
+def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, win_len: int, check_winner_area: list, prev_input: int, is_debugging: bool, debugger, slot_buttons) -> int:
+    # TODO: Possible optimizations: 1. Button to pre-simulate all moves. 2. Simulate all next moves while plyr thinking.
+
     def prune(origin: int) -> list:
         # OPTIMIZATION STRATEGY:
         #   only reserve empty slots in the 3x3 area around the origin
@@ -234,7 +238,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                 pboard[slot] = ' '
                 empty_slots_ind.append(slot)
                 if is_debugging:
-                    slot_buttons[slot].config(background='lemon chiffon2')
+                    slot_buttons[slot].config(background='Lemon Chiffon2')
                 count += 1
 
         print(f'Player\'s move: {origin}')
@@ -248,26 +252,26 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 
     def sim_childs(nxt_plyr: str, prev_move: list) -> list:
         # branches a parent node down by 1 layer
-        # given that next player is 'plyr' and the board now looks like 'prev_move'...
+        # given that next player is 'plyr' and the board now looks like 'child_move'...
         # returns a list of all possible moves that the player could play next
         # OPTIMIZATION STRATEGIES:
         # instead of every time checking all slots in the parent node for empty slots for simulation, I give the AI indexes of all slots that r empty
-        prev_moves = [
+        child_moves = [
             nxt_plyr
         ]
         for slot in empty_slots_ind:
             if prev_move[slot] == ' ':
-                prev_moves.append(prev_move.copy())
-                prev_moves[-1][slot] = nxt_plyr
+                child_moves.append(prev_move.copy())
+                child_moves[-1][slot] = nxt_plyr
 
                 # if the child nodes are the first generation and are played by pc, record the first move as a str at the end of each board
                 if prev_move[-1] == '_':
-                    prev_moves[-1][-1] = slot
+                    child_moves[-1][-1] = slot
 
-        return prev_moves
+        return child_moves
 
-    def sort_childs(prev_moves: list):
-        # For each move in 'prev_moves', branches it down by 1 layer.
+    def sort_childs(child_moves: list):
+        # For each move in 'child_moves', branches it down by 1 layer.
         # Sorts the childs by whether the computer wins, looses, or draws. If no results, branches it down again...
         # OPTIMIZATION STRATEGIES:
         # 1. don't go through boards where player already win
@@ -275,30 +279,31 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         # 3. don't go through or save tie boards until when there is only a few empty slots left
         # 4. sets are faster and automatically don't repeat items
 
-        for prev_move in prev_moves[1:]:
+        for child_move in child_moves[1:]:
+            full_tree.append(child_move)
             # OPTIMIZATION STRATEGY:
             # 1. If the number of O is less than the number needed to win, then no one wins (assuming that a player can't win a 3x3 with just 3 moves, a 4x4 with just 4 moves, etc.), so we skip the check_winner().
             # 2. If there are no X/O in the first row and column, then no one wins so we skip the check_winner().
-            if (prev_move.count('O') < win_len) or ('X' not in prev_move[: board_sz] and 'X' not in prev_move[: (board_sz**2): board_sz] and 'O' not in prev_move[: board_sz] and 'O' not in prev_move[0: (board_sz**2): board_sz]):
-                sort_childs(sim_childs(opp(prev_moves[0]), prev_move))
+            if (child_move.count('O') < win_len) or ('X' not in child_move[: board_sz] and 'X' not in child_move[: (board_sz**2): board_sz] and 'O' not in child_move[: board_sz] and 'O' not in child_move[0: (board_sz**2): board_sz]):
+                sort_childs(sim_childs(opp(child_moves[0]), child_move))
 
             else:
-                winner = check_winner_anywhere(prev_move, board_sz, win_len, check_winner_area)
+                winner = check_winner_anywhere(child_move, board_sz, win_len, check_winner_area)
                 if winner[0] == pc:
                     # end_moves saved as ({bad}, {good}, {tie})
-                    end_moves[1].add(tuple(prev_move))
+                    end_moves[1].add(tuple(child_move))
                 elif winner[0] == opp(pc):
-                    end_moves[0].add(tuple(prev_move))
+                    end_moves[0].add(tuple(child_move))
                 elif winner[1] == 'tie' and len(empty_slots_ind) <= board_sz+1:
                     # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
                     # But, we still need the best tie boards so the computer can still make moves while unable to win...
                     # so, we start saving tie boards when there is only a few empty slots left
                     print('Start including draws in my calculation')
                     debugger.insert(tk.END, 'PC\'s comment:\nStart including draws in my calculation\n')
-                    end_moves[2].add(tuple(prev_move))
+                    end_moves[2].add(tuple(child_move))
                 else:
                     # if the parent node has no outcome yet, continue branching down
-                    sort_childs(sim_childs(opp(prev_moves[0]), prev_move))
+                    sort_childs(sim_childs(opp(child_moves[0]), child_move))
 
     def weight_init_moves(is_debugging: bool) -> dict:
         # recall that each child node saved its first-gen move
@@ -392,13 +397,13 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 
     print_board(main_board, board_sz)
     print(f'Computer [{pc}]\'s turn! Please wait...')
-    if last_input == -1:
+    if prev_input == -1:
         return random.randint(0, board_sz**2 - 1)
     else:
         # if the board_sz <= 4, prune a 3x3 area around the most recent player input
         # if the board_sz >= 5, prune a 5x5 area around the most recent player input
         # we cannot prune a 4x4 area as 4x4 has no center slot
-        pboard = prune(last_input)
+        pboard = prune(prev_input)
 
         if ' ' not in pboard:
             return -1
@@ -412,96 +417,97 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
             end_moves = (set(), set(), set())
             sort_childs(sim_childs(pc, pboard))
             fin_move = pick_init_move(pc, weight_init_moves(is_debugging))
+            print(full_tree)
         filled_slots_ind.append(fin_move)
     return int(fin_move)
 
 
-# tmp = tk.Text()
-# mode = ''
-# while mode == '':
-#     # ask player for mode pvp, pvcx, or pvco
-#     mode = input(
-#         'Type:\n>PvP  - play against another player\n>PvCX - play against the computer with the computer starting first\n>PvCO - play against the computer with you starting first\n>')
-#     mode = mode.lower()
-#
-#     # if player input rubbish, ask again
-#     if mode != 'pvp' and mode != 'pvcx' and mode != 'pvco' and mode != 'pvc':
-#         print('Invalid Answer!')
-#         mode = ''
-#
-# board_sz: str | int = ''
-# while board_sz == '':
-#     # ask player for board len
-#     board_sz = input(
-#        'Select a board length. Boards that are 7*7 or larger only needs half the board length to win!\n>')
-#     # if player input rubbish, ask again
-#     if board_sz.isdigit() is False:
-#         print('Board length must be an integer!')
-#         board_sz = ''
-#     elif int(board_sz) < 2:
-#         print('Board length must be 2 or larger!')
-#         board_sz = ''
-#
-# # initialize the board len and how many slots in a row/column/diagonal to win
-# board_sz = int(board_sz)
-# filled_slots_ind = []
-# win_len = set_win_len(board_sz)
-# check_winner_area = set_check_winner_area(board_sz, win_len)
-#
-# # initialize the board based on board_sz
-# main_board = setup_board(board_sz)
-#
-# # initialize the sign for player and computer (if not pvp)
-# if mode == 'pvp':
-#     plyr = 'X'
-# elif mode == 'pvcx':
-#     plyr = 'O'
-#     # computer's turn if computer starts first
-#     # last_input = -1 means there is no last_input yet and the computer will randomly generate a number
-#     main_board[pc_input(opponent(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input=-1, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opponent(plyr)
-# elif mode == 'pvco' or mode == 'pvc':
-#     plyr = 'X'
-#
-# # start of the Player versus Computer mode
-# while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
-#     # human's turn if human starts first
-#     # noinspection PyUnboundLocalVariable
-#     last_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)
-#     main_board[last_input] = plyr
-#
-#     # computer's turn regardless computer or human starts first
-#     main_board[pc_input(opponent(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opponent(plyr)
-#
-#     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
-#     if winner[1] == 'tie':
-#         print_board(main_board, board_sz)
-#         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw'))//2) + 'Game ended in a draw')
-#         print(' ' * ((51 - len('So close...but I will NEVER lose!'))//2) + 'So close...but I will NEVER lose!' + '\n' + '=' * 50)
-#         break
-#     elif winner[0] == opponent(plyr):
-#         print_board(main_board, board_sz)
-#         print('=' * 50 + '\n' + ' ' * ((51 - len(f'Computer wins {winner[1]}!')) // 2) + f'Computer wins {winner[1]}!')
-#         print(' ' * ((51 - len('Humans should\'ve been smarter...'))//2) + 'Humans should\'ve been smarter...' + '\n' + '=' * 50)
-#         break
-#     elif winner[0] == plyr:
-#         print_board(main_board, board_sz)
-#         print('=' * 50 + '\n' + ' ' * ((51 - len(f'You win {winner[1]}!')) // 2) + f'You win {winner[1]}!' + '\n' + '=' * 50)
-#         break
-#
-# # start of the Player versus Player mode
-# while mode == 'pvp':
-#     # player 'X' turn
-#     main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = plyr
-#
-#     # player 'O' turn
-#     main_board[ask_input(opponent(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opponent(plyr)
-#
-#     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
-#     if winner[1] == 'tie':
-#         print_board(main_board, board_sz)
-#         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw.'))//2) + 'Game ended in a draw.' + '\n' + '=' * 50)
-#         break
-#     elif winner != (' ', ' ',):
-#         print_board(main_board, board_sz)
-#         print('=' * 50 + '\n' + ' ' * ((51 - len(f'Player \'{winner[0]}\' wins {winner[1]}!')) // 2) + f'Player \'{winner[0]}\' wins {winner[1]}!' + '\n' + '=' * 50)
-#         break
+tmp = tk.Text()
+mode = ''
+while mode == '':
+    # ask player for mode pvp, pvcx, or pvco
+    mode = input(
+        'Type:\n>PvP  - play against another player\n>PvCX - play against the computer with the computer starting first\n>PvCO - play against the computer with you starting first\n>')
+    mode = mode.lower()
+
+    # if player input rubbish, ask again
+    if mode != 'pvp' and mode != 'pvcx' and mode != 'pvco' and mode != 'pvc':
+        print('Invalid Answer!')
+        mode = ''
+
+board_sz: str | int = ''
+while board_sz == '':
+    # ask player for board len
+    board_sz = input(
+       'Select a board length. Boards that are 7*7 or larger only needs half the board length to win!\n>')
+    # if player input rubbish, ask again
+    if board_sz.isdigit() is False:
+        print('Board length must be an integer!')
+        board_sz = ''
+    elif int(board_sz) < 2:
+        print('Board length must be 2 or larger!')
+        board_sz = ''
+
+# initialize the board len and how many slots in a row/column/diagonal to win
+board_sz = int(board_sz)
+filled_slots_ind = []
+win_len = set_win_len(board_sz)
+check_winner_area = set_check_winner_area(board_sz, win_len)
+
+# initialize the board based on board_sz
+main_board = setup_board(board_sz)
+
+# initialize the sign for player and computer (if not pvp)
+if mode == 'pvp':
+    plyr = 'X'
+elif mode == 'pvcx':
+    plyr = 'O'
+    # computer's turn if computer starts first
+    # prev_input = -1 means there is no prev_input yet and the computer will randomly generate a number
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opp(plyr)
+elif mode == 'pvco' or mode == 'pvc':
+    plyr = 'X'
+
+# start of the Player versus Computer mode
+while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
+    # human's turn if human starts first
+    # noinspection PyUnboundLocalVariable
+    prev_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)
+    main_board[prev_input] = plyr
+
+    # computer's turn regardless computer or human starts first
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opp(plyr)
+
+    winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
+    if winner[1] == 'tie':
+        print_board(main_board, board_sz)
+        print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw'))//2) + 'Game ended in a draw')
+        print(' ' * ((51 - len('So close...but I will NEVER lose!'))//2) + 'So close...but I will NEVER lose!' + '\n' + '=' * 50)
+        break
+    elif winner[0] == opp(plyr):
+        print_board(main_board, board_sz)
+        print('=' * 50 + '\n' + ' ' * ((51 - len(f'Computer wins {winner[1]}!')) // 2) + f'Computer wins {winner[1]}!')
+        print(' ' * ((51 - len('Humans should\'ve been smarter...'))//2) + 'Humans should\'ve been smarter...' + '\n' + '=' * 50)
+        break
+    elif winner[0] == plyr:
+        print_board(main_board, board_sz)
+        print('=' * 50 + '\n' + ' ' * ((51 - len(f'You win {winner[1]}!')) // 2) + f'You win {winner[1]}!' + '\n' + '=' * 50)
+        break
+
+# start of the Player versus Player mode
+while mode == 'pvp':
+    # player 'X' turn
+    main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = plyr
+
+    # player 'O' turn
+    main_board[ask_input(opp(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opp(plyr)
+
+    winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
+    if winner[1] == 'tie':
+        print_board(main_board, board_sz)
+        print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw.'))//2) + 'Game ended in a draw.' + '\n' + '=' * 50)
+        break
+    elif winner != (' ', ' ',):
+        print_board(main_board, board_sz)
+        print('=' * 50 + '\n' + ' ' * ((51 - len(f'Player \'{winner[0]}\' wins {winner[1]}!')) // 2) + f'Player \'{winner[0]}\' wins {winner[1]}!' + '\n' + '=' * 50)
+        break

@@ -16,6 +16,7 @@ Ver 7 : Added Tkinter GUI. Rebuild winner checker for HUGE optimization. Changed
 Ver 8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both pruning and land-filling into 1 function. Pruned board and main board now have the same dimension - no additional function is needed to convert slots between the two boards!\n
 Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty slots. Added 'Replay' button. Changed empty slots from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
 Ver 10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
+Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Make AI able to play Snake mode.\n
     ''')
 
 
@@ -36,17 +37,18 @@ class MainMenu:
             self.colors = {
                 'X': {
                     'symbol': 'Red4',
-                    'snake_head': 'OliveDrab2',
+                    'snake_head': 'Green Yellow',
                     'snake_body': 'Dark Olive Green1'
                 },
                 'O': {
                     'symbol': 'Navy',
-                    'snake_head': 'Gold',
-                    'snake_body': 'Khaki1',
+                    'snake_head': 'Cyan1',
+                    'snake_body': 'Dark Slate Gray1',
                 },
                 '': {
                     'pc_move': 'Khaki1',
-                    'winner_area': '#ddddf8',
+                    'winner_area': 'Lavender',
+                    'pruned_area': 'Lemon Chiffon2',
                     'nxt_vanish_move0': 'Navajo White',
                     'nxt_vanish_move1': 'Antique White'
                 }
@@ -385,6 +387,8 @@ class SubMenu:
         # disables the close window (X) button in the top right corner
         self.window.protocol('WM_DELETE_WINDOW', lambda _=self: MainMenu.exit(_))
 
+        # set the SubMenu window to the correct resolution
+        self.window.geometry('700x370')
         self.window.configure(background='black')
         # center buttons horizontally by giving a weight to all columns except the ones with the button
         self.window.grid_columnconfigure(0, weight=1)
@@ -436,18 +440,19 @@ class SubMenu:
     def to_settings(self):
         for widget in self.window.winfo_children():
             widget.destroy()
-        ColMenu(self.window, self.board_sz, self.board_zoom, self.colors)
+        ColMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
 class ColMenu:
 
-    def __init__(self, window, board_sz, board_zoom, colors):
+    def __init__(self, window, board_sz, board_zoom, colors, mode):
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
         self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_zoom = board_zoom
         self.colors = colors
+        self.mode = mode
 
         self.col_frames = {
             'X': LabelFrame(self.window,
@@ -480,7 +485,7 @@ class ColMenu:
                              text='Save and Exit',
                              cursor='hand2',
                              overrelief='sunken',
-                             command=self.to_mainmenu,
+                             command=self.to_submenu,
                              activeforeground='white',
                              activebackground='Sea Green',
                              background='Sea Green1',
@@ -489,9 +494,9 @@ class ColMenu:
                              font=('FixedSys', 15),
                              borderwidth=5)
 
-        self.col_frames['X'].grid(row=0, column=1, pady=10)
-        self.col_frames['O'].grid(row=0, column=2, pady=10)
-        self.col_frames[''].grid(row=1, column=1, columnspan=2, pady=10)
+        self.col_frames['X'].grid(row=0, column=1, pady=5)
+        self.col_frames['O'].grid(row=0, column=2, pady=5)
+        self.col_frames[''].grid(row=1, column=1, columnspan=2, pady=5)
         self.b_exit.grid(row=2, column=1, columnspan=2, pady=15)
 
         # self.col_entries is a copy of self.colors, but containing col_entry instead of color str for each feature.
@@ -516,6 +521,7 @@ class ColMenu:
                     textvariable=StringVar(value=col),
                     borderwidth=1,
                     font=('FixedSys', 15),
+                    cursor='xterm',
                     foreground='black',
                     background=col)
 
@@ -524,6 +530,7 @@ class ColMenu:
                 # make the key release event update bg of textbox
                 col_entry.bind('<KeyRelease>', lambda event, _p=plyr, _f=feat: self.update_col(_p, _f))
                 self.col_entries[plyr][feat] = col_entry
+        self.col_entries['']['pruned_area'].config(state='disabled', cursor='no')
 
     def update_col(self, plyr: str, feat: str):
         try:
@@ -533,17 +540,22 @@ class ColMenu:
             # If the color is not valid, do nothing
             pass
 
-    def to_mainmenu(self):
+    def to_submenu(self):
         # update self.color with new colors
         for plyr, feats in self.col_entries.items():
             for feat, entry in feats.items():
-                self.colors[plyr][feat] = entry.get()
+                try:
+                    self.window.winfo_rgb(entry.get())
+                    self.colors[plyr][feat] = entry.get()
+                except tk.TclError:
+                    messagebox.askretrycancel('Settings', f'Please enter a valid color for {feat}!')
+                    return None
 
         if messagebox.showinfo('Settings', f'Your settings have been updated!\n\n{self.colors}'):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            MainMenu(self.window, self.board_sz.get(), self.board_zoom.get(), self.colors)
+            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
 class GameMenu:
@@ -609,7 +621,7 @@ class GameMenu:
             cursor='hand2',
             relief='groove',
             overrelief='sunken',
-            command=self.to_menu,
+            command=self.to_submenu,
             width=5,
             borderwidth=5
         )
@@ -703,7 +715,7 @@ class GameMenu:
         # initialize the board_frame and settings_frame
         self.create_boardframe()
         # rebinds the close window (X) slot_button in the top right corner
-        self.window.protocol('WM_DELETE_WINDOW', self.to_menu)
+        self.window.protocol('WM_DELETE_WINDOW', self.to_submenu)
 
     def toggle_debugger(self):
         # reset all previous debugging info
@@ -711,7 +723,7 @@ class GameMenu:
             # if the slot has a number on, it has no X/O
             if type(button.cget('text')) == int:
                 button.config(text='')
-            if button.cget('background') in ['lemon chiffon2', self.colors['']['pc_move'], self.colors['']['winner_area']]:
+            if button.cget('background') in [self.colors['']['pruned_area'], self.colors['']['winner_area']]:
                 button.config(background='SystemButtonFace')
 
         if self.is_debugging.get() is True:
@@ -723,6 +735,10 @@ class GameMenu:
                     self.slot_buttons[slot].config(background=self.colors['']['winner_area'])
         else:
             self.debugger.grid_forget()
+            for button in self.slot_buttons:
+                if button.cget('background') == self.colors['']['pc_move']:
+                    button.config(background='SystemButtonFace')
+                    break
 
     def create_boardframe(self):
         self.slot_buttons = []
@@ -859,7 +875,7 @@ class GameMenu:
         for button in self.slot_buttons:
             button.config(state='disabled')
 
-    def to_menu(self):
+    def to_submenu(self):
         if messagebox.askyesno('Confirmation', 'Are you sure you want to quit?\n\nYou will loose all your progress.'):
             self.is_game_active = False
             self.board_sz.trace_remove('write', self.trace1)
@@ -867,7 +883,7 @@ class GameMenu:
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            MainMenu(self.window, self.board_sz.get(), self.board_zoom.get(), self.colors)
+            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
@@ -942,9 +958,6 @@ class GameMenuT(GameMenu):
         self.time_entry['X'].pack()
         self.time_entry['O'].pack()
 
-        if mode == 'pvc':
-            self.turn_hint['O'].pack_forget()
-
     def adjust_zoom(self, *args):
         super().adjust_zoom()
         self.time_entry['X'].config(font=('Helvetica', self.board_zoom.get() * 3 + 1, 'bold'))
@@ -996,12 +1009,12 @@ class GameMenuT(GameMenu):
             self.pvco_checkbox.config(state='disabled')
             self.time_entry['X'].config(state='disabled')
             self.time_entry['O'].config(state='disabled')
+            # If game is started by player, PC must be O. So, hide O's timer.
+            self.turn_hint['O'].pack_forget()
 
-            # In X's first move, I execute update_slot_pvp before set is_game_active = True to prevent X gaining bonus time.
-            self.update_slot_pvp(prev_input)
-            self.check_winner_pvp()
-            self.is_game_active = True
-            self.countdown()  # timer only starts once
+            # I put update_slot before countdown in X's first move to prevent X losing 0.1 sec.
+            super().update_slot(prev_input)
+            self.countdown()
         else:
             self.hint_scale = 0
             super().update_slot(prev_input)
@@ -1009,7 +1022,7 @@ class GameMenuT(GameMenu):
     # Below, I override update_slot_pvc and check_winner_pvp to include timer switching.
     # I chose these as: update_slot_pvc is only executed once in PVC; check_winner_pvp is the only func used in PVP and not PVC
     def update_slot_pvc(self, prev_input):
-        if self.is_game_active is True:
+        if self.is_game_active is True and len(self.filled_slots_ind) > 1:
             # this plyr gets bonus time
             self.remain_time[self.plyr].set(str(float(self.remain_time[self.plyr].get()) + 1))
         super().update_slot_pvc(prev_input)
@@ -1022,7 +1035,7 @@ class GameMenuT(GameMenu):
                                                font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
         self.time_entry[self.plyr].config(relief='sunken', disabledforeground=self.colors[self.plyr]['symbol'], disabledbackground='white')
 
-        if self.is_game_active is True:
+        if self.is_game_active is True and len(self.filled_slots_ind) > 1:
             # This plyr gets bonus time. Note: self.plyr is the NEXT plyr
             self.remain_time[opp(self.plyr)].set(str(float(self.remain_time[opp(self.plyr)].get()) + 1))
 
@@ -1154,6 +1167,28 @@ class GameMenuS(GameMenu):
         self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
         self.toggle_debugger()
+
+    def update_slot_pvc(self, prev_input: int) -> int:
+        is_surrounded = True
+
+        # while (next plyr is not stuck) and (both X and O alr placed their first move):
+        while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
+            for slot in range(self.board_sz.get() ** 2):
+                pass
+
+        # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
+        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.filled_slots_ind,
+                           min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
+                           self.prev_inputs[opp(self.plyr)][-1], self.is_debugging.get(), self.debugger,
+                           self.slot_buttons)
+        self.filled_slots_ind.append(pc_move)
+        self.main_board[pc_move] = opp(self.plyr)
+        # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
+        self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
+                                          disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
+        self.debugger.insert('end', f'PC\'s move:{pc_move}\n')
+
+        return pc_move
 
     def update_slot_pvp(self, prev_input: int):
         super().update_slot_pvp(prev_input)
