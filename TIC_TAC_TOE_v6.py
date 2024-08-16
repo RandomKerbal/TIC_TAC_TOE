@@ -12,7 +12,6 @@ print(r"""
 *                                                                                                                *
 * ============================================================================================================== *""")
 
-tmp = tk.Text()
 mode = ''
 while mode == '':
     # ask player for mode pvp, pvcx, or pvco
@@ -29,7 +28,7 @@ board_sz: str | int = ''
 while board_sz == '':
     # ask player for board length
     board_sz = input(
-       'Select a board length. Boards that are 7*7 or larger only needs half the board length to win!\n>')
+       'Select a board length.\n>')
     # if player input rubbish, ask again
     if board_sz.isdigit() is False:
         print('Board length must be an integer!')
@@ -54,7 +53,7 @@ elif mode == 'pvcx':
     plyr = 'O'
     # computer's turn if computer starts first
     # prev_input = -1 means there is no prev_input yet and the computer will randomly generate a number
-    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opp(plyr)
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
 elif mode == 'pvco' or mode == 'pvc':
     plyr = 'X'
 
@@ -66,7 +65,7 @@ while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
     main_board[prev_input] = plyr
 
     # computer's turn regardless computer or human starts first
-    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opp(plyr)
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False)] = opp(plyr)
 
     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
     if winner[1] == 'tie':

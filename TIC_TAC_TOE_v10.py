@@ -60,7 +60,7 @@ class MainMenu:
                                  takefocus=False,
                                  width=500,
                                  borderwidth=0,
-                                 background='black',
+                                 background='Black',
                                  foreground='Sea Green1',
                                  text='=' * 999,
                                  font='TkFixedFont')
@@ -68,15 +68,15 @@ class MainMenu:
                                  takefocus=False,
                                  width=500,
                                  borderwidth=0,
-                                 background='black',
+                                 background='Black',
                                  foreground='Sea Green1',
                                  text='\n' + '=' * 999,
                                  font='TkFixedFont')
         self.title_label = Label(self.window,
                                  takefocus=False,
                                  borderwidth=0,
-                                 width=1,
-                                 background='black',
+                                 width=82,
+                                 background='Black',
                                  foreground='Sea Green1',
                                  text='''
 ████████ ██  ██████       ████████  █████   ██████       ████████  ██████  ███████
@@ -92,7 +92,7 @@ class MainMenu:
                                     takefocus=False,
                                     borderwidth=0,
                                     width=500,
-                                    background='black',
+                                    background='Black',
                                     foreground='Sea Green1',
                                     text='',
                                     font='TkFixedFont',
@@ -107,7 +107,7 @@ class MainMenu:
                             activeforeground='white',
                             activebackground='Sea Green',
                             background='Sea Green1',
-                            foreground='black',
+                            foreground='Black',
                             width=500,
                             font=('FixedSys', 15),
                             borderwidth=5)
@@ -120,7 +120,7 @@ class MainMenu:
                             activeforeground='white',
                             activebackground='Sea Green',
                             background='Sea Green1',
-                            foreground='black',
+                            foreground='Black',
                             width=500,
                             font=('FixedSys', 15),
                             borderwidth=5)
@@ -133,7 +133,7 @@ class MainMenu:
                                   activeforeground='white',
                                   activebackground='Sea Green',
                                   background='Sea Green1',
-                                  foreground='black',
+                                  foreground='Black',
                                   width=500,
                                   font=('FixedSys', 15),
                                   borderwidth=5)
@@ -146,7 +146,7 @@ class MainMenu:
                              activeforeground='white',
                              activebackground='Sea Green',
                              background='Sea Green1',
-                             foreground='black',
+                             foreground='Black',
                              width=500,
                              font=('FixedSys', 15),
                              borderwidth=5)
@@ -162,24 +162,25 @@ class MainMenu:
 
         # Animating title & subtitle:
         # time between frames, in milliseconds
-        wait = 200
-        # There r total 94 frames (frame 0 - 93) stored in anim_frames. All frames r called at the same time, but their executions r queued up.
+        wait = 250
+        # There r total 95 frames (frame 0 - 94) stored in anim_frames. All frames r called at the same time, but their executions r queued up.
         self.anim_frames = []
-        # frames 0 - 10: animating title
-        self.anim_frames.append(self.window.after(wait * 0, lambda _=8: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 1, lambda _=11: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 2, lambda _=19: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 3, lambda _=25: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 4, lambda _=34: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 5, lambda _=42: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 6, lambda _=50: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 7, lambda _=56: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 8, lambda _=65: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 9, lambda _=74: self.title_label.config(width=_)))
-        self.anim_frames.append(self.window.after(wait * 10, lambda _=82: self.title_label.config(width=_)))
+        # frames 0 - 11: animating title
+        self.anim_frames.append(self.window.after(wait * 0, lambda: self.title_label.config(foreground='Black')))
+        self.anim_frames.append(self.window.after(wait * 1, lambda _=8: self.title_label.config(width=_, foreground='Sea Green1')))
+        self.anim_frames.append(self.window.after(wait * 2, lambda _=11: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 3, lambda _=19: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 4, lambda _=25: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 5, lambda _=34: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 6, lambda _=42: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 7, lambda _=50: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 8, lambda _=56: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 9, lambda _=65: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 10, lambda _=74: self.title_label.config(width=_)))
+        self.anim_frames.append(self.window.after(wait * 11, lambda _=82: self.title_label.config(width=_)))
 
-        # frames 11 - 93: animating subtitle
-        # loop iterates to 82 as it's the number of chars in the subtitle
+        # frames 12 - 94: animating subtitle
+        # loop iterates 82 times  as it's the number of chars in the subtitle
         for i in range(0, 83):
             self.anim_frames.append(self.window.after(wait * (i + 11), lambda _=i: self.subtitle_label.config(
                 text=subtitle_text[:_] + '_' * min(1, 82 - _) + ' ' * (81 - _))))
@@ -189,7 +190,7 @@ class MainMenu:
 
         # set the MainMenu window to the correct resolution
         self.window.geometry('700x370')
-        self.window.config(background='black')
+        self.window.config(background='Black')
 
     def to_submenu(self, mode: str):
         # stops all queued frames of the title animation
@@ -209,7 +210,7 @@ class MainMenu:
 
 def default_hint():
     messagebox.showinfo('Hint',
-                        'Ah, just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity! Length 7 or larger only needs half the length to win.\n\nThe starting player will be X, and the other will be O. No friends? No worries! You can play with my AI:\n\'The First-Gen Tallyman\'.')
+                        'Ah, just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity! Boards larger or equal to 7x7 only needs half length to win!\n\nThe starting player will be X, and the other will be O. No friends? No worries! You can play with my AI:\n\'The First-Gen Tallyman\'.')
 
 
 def timed_hint():
@@ -251,7 +252,7 @@ class SubMenu:
                             state='disabled',
                             takefocus=False,
                             borderwidth=0,
-                            background='black',
+                            background='Black',
                             disabledforeground='Sea Green1',
                             text='\nChoose a mode',
                             font=('FixedSys', 25, 'underline', 'bold'))
@@ -264,7 +265,7 @@ class SubMenu:
                                 activeforeground='white',
                                 activebackground='Sea Green',
                                 background='Sea Green1',
-                                foreground='black',
+                                foreground='Black',
                                 width=25,
                                 font=('FixedSys', 15),
                                 borderwidth=5)
@@ -277,7 +278,7 @@ class SubMenu:
                                      activeforeground='white',
                                      activebackground='Sea Green',
                                      background='Sea Green1',
-                                     foreground='black',
+                                     foreground='Black',
                                      width=30,
                                      borderwidth=5)
 
@@ -289,7 +290,7 @@ class SubMenu:
                               activeforeground='white',
                               activebackground='Sea Green',
                               background='Sea Green1',
-                              foreground='black',
+                              foreground='Black',
                               width=25,
                               font=('FixedSys', 15),
                               borderwidth=5)
@@ -302,7 +303,7 @@ class SubMenu:
                                    activeforeground='white',
                                    activebackground='Sea Green',
                                    background='Sea Green1',
-                                   foreground='black',
+                                   foreground='Black',
                                    width=30,
                                    borderwidth=5)
 
@@ -314,7 +315,7 @@ class SubMenu:
                                activeforeground='white',
                                activebackground='Sea Green',
                                background='Sea Green1',
-                               foreground='black',
+                               foreground='Black',
                                width=25,
                                font=('FixedSys', 15),
                                borderwidth=5)
@@ -327,7 +328,7 @@ class SubMenu:
                                     activeforeground='white',
                                     activebackground='Sea Green',
                                     background='Sea Green1',
-                                    foreground='black',
+                                    foreground='Black',
                                     width=30,
                                     borderwidth=5)
 
@@ -339,7 +340,7 @@ class SubMenu:
                               activeforeground='white',
                               activebackground='Sea Green',
                               background='Sea Green1',
-                              foreground='black',
+                              foreground='Black',
                               width=25,
                               font=('FixedSys', 15),
                               borderwidth=5)
@@ -352,11 +353,11 @@ class SubMenu:
                                    activeforeground='white',
                                    activebackground='Sea Green',
                                    background='Sea Green1',
-                                   foreground='black',
+                                   foreground='Black',
                                    width=30,
                                    borderwidth=5)
 
-        self.non_mode_frame = Frame(self.window, background='black', width=25)
+        self.non_mode_frame = Frame(self.window, background='Black', width=25)
 
         self.b_back = Button(self.non_mode_frame,
                              text='Back',
@@ -366,7 +367,7 @@ class SubMenu:
                              activeforeground='white',
                              activebackground='Sea Green',
                              background='Sea Green1',
-                             foreground='black',
+                             foreground='Black',
                              width=12,
                              font=('FixedSys', 15),
                              borderwidth=5)
@@ -379,7 +380,7 @@ class SubMenu:
                                  activeforeground='white',
                                  activebackground='Sea Green',
                                  background='Sea Green1',
-                                 foreground='black',
+                                 foreground='Black',
                                  width=12,
                                  font=('TkFixedFont', 13, 'bold'),
                                  borderwidth=5)
@@ -389,7 +390,7 @@ class SubMenu:
 
         # set the SubMenu window to the correct resolution
         self.window.geometry('700x370')
-        self.window.configure(background='black')
+        self.window.configure(background='Black')
         # center buttons horizontally by giving a weight to all columns except the ones with the button
         self.window.grid_columnconfigure(0, weight=1)
         self.window.grid_columnconfigure(3, weight=1)
@@ -459,7 +460,7 @@ class ColMenu:
                             text='X colors',
                             font=('FixedSys', 20, 'bold'),
                             foreground='Sea Green1',
-                            background='black',
+                            background='Black',
                             borderwidth=3,
                             relief='ridge',
                             takefocus=False),
@@ -467,7 +468,7 @@ class ColMenu:
                             text='O colors',
                             font=('FixedSys', 20, 'bold'),
                             foreground='Sea Green1',
-                            background='black',
+                            background='Black',
                             borderwidth=3,
                             relief='ridge',
                             takefocus=False),
@@ -475,7 +476,7 @@ class ColMenu:
                            text='General',
                            font=('FixedSys', 20, 'bold'),
                            foreground='Sea Green1',
-                           background='black',
+                           background='Black',
                            borderwidth=3,
                            relief='ridge',
                            takefocus=False)
@@ -489,7 +490,7 @@ class ColMenu:
                              activeforeground='white',
                              activebackground='Sea Green',
                              background='Sea Green1',
-                             foreground='black',
+                             foreground='Black',
                              width=25,
                              font=('FixedSys', 15),
                              borderwidth=5)
@@ -514,7 +515,7 @@ class ColMenu:
                     text=feat,
                     font=('FixedSys', 15),
                     foreground='Sea Green1',
-                    background='black',
+                    background='Black',
                     takefocus=False)
                 col_entry = Entry(
                     self.col_frames[plyr],
@@ -522,7 +523,7 @@ class ColMenu:
                     borderwidth=1,
                     font=('FixedSys', 15),
                     cursor='xterm',
-                    foreground='black',
+                    foreground='Black',
                     background=col)
 
                 col_label.grid(row=_, column=0, padx=10)
@@ -698,7 +699,7 @@ class GameMenu:
         self.settings_frame.pack(side='left', expand=True, fill='both')
         self.settings_frame.grid_rowconfigure(10)
         self.board_frame.pack(side='left', expand=True, fill='x')
-        self.turn_hint_frame.grid(columnspan=3, row=0, column=self.board_sz.get() // 2 + 1)
+        self.turn_hint_frame.grid(columnspan=self.board_sz.get(), row=0, column=2)
         self.turn_hint['X'].pack()
         self.turn_hint['O'].pack()
         self.b_back.grid(row=1, column=0, pady=(0, 15))
@@ -769,7 +770,7 @@ class GameMenu:
 
         # Generate new buttons and symbol indicator at frontend
         self.create_boardframe()
-        self.turn_hint_frame.grid(column=self.board_sz.get() // 2 + 1)
+        self.turn_hint_frame.grid(columnspan=self.board_sz.get())
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
         self.toggle_debugger()
 
@@ -852,7 +853,6 @@ class GameMenu:
         self.slot_buttons[prev_input].config(text=self.main_board[prev_input],
                                              disabledforeground=self.colors[self.plyr]['symbol'],
                                              state='disabled')
-        self.debugger.insert('end', f'Player\'s move:{prev_input}\n')
 
     def check_winner_pvp(self):
         # used to check winner after each turn in PVP mode
