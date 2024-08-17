@@ -16,7 +16,8 @@ Ver 7 : Added Tkinter GUI. Rebuild winner checker for HUGE optimization. Changed
 Ver 8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both pruning and land-filling into 1 function. Pruned board and main board now have the same dimension - no additional function is needed to convert slots between the two boards!\n
 Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty slots. Added 'Replay' button. Changed empty slots from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
 Ver 10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
-Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Make AI able to play Snake mode.\n
+Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Capped length to win at 4. Added 'Total Child Count' to debugger.
+Ver 12: Make AI able to play Snake mode.\n
     ''')
 
 
@@ -210,7 +211,7 @@ class MainMenu:
 
 def default_hint():
     messagebox.showinfo('Hint',
-                        'Ah, just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity! Boards larger or equal to 7x7 only needs half length to win!\n\nThe starting player will be X, and the other will be O. No friends? No worries! You can play with my AI:\n\'The First-Gen Tallyman\'.')
+                        'Ah, just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity! Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player will be X, and the other will be O. No friends? No worries! You can play with my AI:\n\'The First-Gen Tallyman\'.')
 
 
 def timed_hint():
@@ -590,7 +591,7 @@ class GameMenu:
         self.main_board = setup_board(self.board_sz.get())
         self.filled_slots_ind = []
         self.slot_buttons = []
-        self.is_debugging = BooleanVar(value=True)  # TODO
+        self.is_debugging = BooleanVar(value=False)
         self.is_game_active = False
 
         self.settings_frame = Frame(self.window)
@@ -690,7 +691,7 @@ class GameMenu:
             self.settings_frame,
             wrap='none',
             height=15,
-            width=25
+            width=27
         )
 
         # set the GameMenu window to the correct resolution
@@ -826,7 +827,7 @@ class GameMenu:
         # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
         self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
                                           disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
-        self.debugger.insert('end', f'PC\'s move:{pc_move}\n')
+        self.debugger.insert('end', f'PC\'s move:\n{pc_move}\n')
 
         return pc_move
 
@@ -1231,7 +1232,7 @@ class GameMenuS(GameMenu):
             GameMenuS(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
 
-ver_no = 'Tic Tac Toe v10'
+ver_no = 'Tic Tac Toe v11'
 
 window = tk.Tk()
 MainMenu(window)

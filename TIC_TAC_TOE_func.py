@@ -1,11 +1,10 @@
-import math
 import random
 import matplotlib.pyplot as plt
 import tkinter as tk
 
 
 def set_win_len(board_sz: int) -> int:
-    return max(3, math.ceil(board_sz/2))
+    return min(board_sz, 4)
 
 
 def set_check_winner_area(board_sz: int, win_len: int) -> list:
@@ -291,9 +290,6 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                     # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
                     # But, we still need the best tie boards so the computer can still make moves while unable to win...
                     # so, we start saving tie boards when there is only a few empty slots left
-                    print('Start including draws in my calculation')
-                    if is_debugging:
-                        debugger.insert(tk.END, 'PC\'s comment:\nStart including draws in my calculation\n')
                     end_moves[2].add(tuple(child_move))
                 else:
                     # if the parent node has no outcome yet, continue branching down
@@ -328,8 +324,13 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         for end_move in end_moves[2]:
             if end_move[-1] not in win_probs:
                 win_probs[end_move[-1]] = 0
+                print('Start considering draws in my calculation')
+                if is_debugging:
+                    debugger.insert(tk.END, 'PC\'s comment:\nStart considering draws in my calculation\n')
 
         print(end_moves)
+        print(f'Total child count: {len(end_moves[0])+len(end_moves[1])+len(end_moves[2])}')
+        debugger.insert(tk.END, f'Total child count:\n{len(end_moves[0])+len(end_moves[1])+len(end_moves[2])}\n')
         print(win_probs)
         if is_debugging:
             plt.clf()
