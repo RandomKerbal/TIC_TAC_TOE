@@ -390,8 +390,6 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                     return True
         return False
 
-    print_board(main_board, board_sz)
-    print(f'Computer [{pc}]\'s turn! Please wait...')
     if prev_input == -1:
         return random.randint(0, board_sz**2 - 1)
     else:

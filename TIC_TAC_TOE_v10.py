@@ -590,7 +590,7 @@ class GameMenu:
         self.main_board = setup_board(self.board_sz.get())
         self.filled_slots_ind = []
         self.slot_buttons = []
-        self.is_debugging = BooleanVar(value=False)
+        self.is_debugging = BooleanVar(value=True)  # TODO
         self.is_game_active = False
 
         self.settings_frame = Frame(self.window)

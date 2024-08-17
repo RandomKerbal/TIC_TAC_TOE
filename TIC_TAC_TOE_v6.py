@@ -52,6 +52,8 @@ if mode == 'pvp':
 elif mode == 'pvcx':
     plyr = 'O'
     # computer's turn if computer starts first
+    print_board(main_board, board_sz)
+    print(f'Computer [X]\'s turn! Please wait...')
     # prev_input = -1 means there is no prev_input yet and the computer will randomly generate a number
     main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
 elif mode == 'pvco' or mode == 'pvc':
@@ -65,6 +67,8 @@ while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
     main_board[prev_input] = plyr
 
     # computer's turn regardless computer or human starts first
+    print_board(main_board, board_sz)
+    print(f'Computer [{opp(plyr)}]\'s turn! Please wait...')
     main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False)] = opp(plyr)
 
     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
