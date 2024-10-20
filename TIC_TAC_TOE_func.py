@@ -22,8 +22,6 @@ def setup_board(board_sz: int) -> list:
     # eg 3x3 board = ['[ ]','[ ]','[ ]'
     #                 '[ ]','[ ]','[ ]'
     #                 '[ ]','[ ]','[ ]', 'initial_move']
-    # OPTIMIZATION STRATEGIES:
-    # the whole board is made up of 1 list, instead of 1 list per row
     main_board = [' ' for _ in range(board_sz**2)]
     main_board.append('_')
 
@@ -43,11 +41,11 @@ def print_board(board: list, board_sz: int) -> None:
         print(str(i + 1) + ' ' * (4 - len(str(i+2))), end='')
     for i in range(board_sz):
         print('\n' + str(i + 1) + ' ' * (3 - len(str(i+1))), end='')
-        for j in range(i*board_sz, (i*board_sz)+board_sz):
-            if board[j] == ' ':
+        for ii in range(i*board_sz, (i*board_sz)+board_sz):
+            if board[ii] == ' ':
                 print('[ ]', end=' ')
             else:
-                print(' ' + board[j], end='  ')
+                print(' ' + board[ii], end='  ')
     print(end='\n')
 
 
@@ -73,19 +71,19 @@ def coord_to_slot(coord: str, main_board: list, board_sz: int) -> int | bool:
     # if the player inputted valid coordinates...
     # take the first number as the column num, the second number as the row num
     # I observed that the slot num = (row num*board len) + column num
-    slot_num = int(coord[:coord.find(',')]) + ((int((coord[coord.find(',') + 1:])) - 1) * board_sz) - 1
+    slot = int(coord[:coord.find(',')]) + ((int((coord[coord.find(',') + 1:])) - 1) * board_sz) - 1
 
     # if the slot number exceeds the board, return False
-    if slot_num + 1 > (board_sz**2):
+    if slot + 1 > (board_sz**2):
         return False
     # if the slot number is negative, return False
-    elif slot_num < 0:
+    elif slot < 0:
         return False
     # if the that slot alr has an X or O, return False
-    elif main_board[slot_num] != ' ':
+    elif main_board[slot] != ' ':
         return False
     else:
-        return slot_num
+        return slot
 
 
 def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner_area: list) -> tuple:
@@ -150,21 +148,20 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
 
 
 # ALL FUNCTIONS BELOW ARE FOR THE AI
-def ask_input(plyr: str, main_board: list, board_sz: int, filled_slots_ind: list, win_len: int, check_winner_area: list) -> int:
+def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_winner_area: list) -> int:
     while check_winner_anywhere(main_board, board_sz, win_len, check_winner_area) == (' ', ' ',):
         print_board(main_board, board_sz)
         player_coord = input(f'Your turn [{plyr}]! Choose your x,y coordinates: ')
-        global slot_num
-        slot_num = coord_to_slot(player_coord, main_board, board_sz)
-        if slot_num is False:
+        global slot
+        slot = coord_to_slot(player_coord, main_board, board_sz)
+        if slot is False:
             print('Invalid Position!')
         else:
-            filled_slots_ind.append(slot_num)
-            return slot_num
+            return slot
     return -1
 
 
-def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, win_len: int, check_winner_area: list, prev_input: int, is_debugging: bool, debugger=None, slot_buttons=None) -> int:
+def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winner_area: list, prev_input: int, is_debugging: bool, debugger=None, slot_buttons=None) -> int:
     # TODO: Possible optimizations: 1. Button to pre-simulate all moves. 2. Simulate all next moves while plyr thinking.
 
     def prune(origin: int) -> list:
@@ -217,8 +214,8 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         # first fill all empty slots with 'N'
         pboard = ['N' if _ == ' ' else _ for _ in main_board]
 
-        global empty_slots_ind
-        empty_slots_ind = []
+        global free_slots
+        free_slots = []
 
         # if the slots in reserved_area are:
         #   1. within the board (0 <= slot_index < len)
@@ -230,16 +227,16 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
             if (0 <= coord[0] < board_sz and 0 <= coord[1] < board_sz) and (pboard[coord[1] * board_sz + coord[0]] == 'N') and count <= 8:
                 slot = coord[1] * board_sz + coord[0]
                 pboard[slot] = ' '
-                empty_slots_ind.append(slot)
+                free_slots.append(slot)
                 if is_debugging:
                     slot_buttons[slot].config(background='Lemon Chiffon2')
                 count += 1
 
         print(f'Player\'s move: {origin}')
         debugger.insert(tk.END, f'Player\'s move:\n{origin}\n')
-        debugger.insert(tk.END, 'Empty slots on PBoard:\n' + str(empty_slots_ind) + '\n')
+        debugger.insert(tk.END, 'Empty slots on PBoard:\n' + str(free_slots) + '\n')
         print_board(pboard, board_sz)
-        print(f'Empty slots: {empty_slots_ind}')
+        print(f'Empty slots: {free_slots}')
 
         return pboard
 
@@ -252,7 +249,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
         child_moves = [
             nxt_plyr
         ]
-        for slot in empty_slots_ind:
+        for slot in free_slots:
             if prev_move[slot] == ' ':
                 child_moves.append(prev_move.copy())
                 child_moves[-1][slot] = nxt_plyr
@@ -286,7 +283,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
                     end_moves[1].add(tuple(child_move))
                 elif winner[0] == opp(pc):
                     end_moves[0].add(tuple(child_move))
-                elif winner[1] == 'tie' and len(empty_slots_ind) <= board_sz+1:
+                elif winner[1] == 'tie' and len(free_slots) <= board_sz+1:
                     # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
                     # But, we still need the best tie boards so the computer can still make moves while unable to win...
                     # so, we start saving tie boards when there is only a few empty slots left
@@ -412,7 +409,6 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
             end_moves = (set(), set(), set())
             sort_childs(sim_childs(pc, pboard))
             fin_move = pick_init_move(pc, weight_init_moves())
-        filled_slots_ind.append(fin_move)
     return int(fin_move)
 
 
@@ -443,7 +439,6 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 #
 # # initialize the board len and how many slots in a row/column/diagonal to win
 # board_sz = int(board_sz)
-# filled_slots_ind = []
 # win_len = set_win_len(board_sz)
 # check_winner_area = set_check_winner_area(board_sz, win_len)
 #
@@ -457,7 +452,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 #     plyr = 'O'
 #     # computer's turn if computer starts first
 #     # prev_input = -1 means there is no prev_input yet and the computer will randomly generate a number
-#     main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
+#     main_board[pc_input(opp(plyr), main_board, board_sz, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
 # elif mode == 'pvco' or mode == 'pvc':
 #     plyr = 'X'
 #
@@ -465,11 +460,11 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 # while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
 #     # human's turn if human starts first
 #     # noinspection PyUnboundLocalVariable
-#     prev_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)
+#     prev_input = ask_input(plyr, main_board, board_sz, win_len, check_winner_area)
 #     main_board[prev_input] = plyr
 #
 #     # computer's turn regardless computer or human starts first
-#     main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False)] = opp(plyr)
+#     main_board[pc_input(opp(plyr), main_board, board_sz, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False)] = opp(plyr)
 #
 #     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
 #     if winner[1] == 'tie':
@@ -490,10 +485,10 @@ def pc_input(pc: str, main_board: list, board_sz: int, filled_slots_ind: list, w
 # # start of the Player versus Player mode
 # while mode == 'pvp':
 #     # player 'X' turn
-#     main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = plyr
+#     main_board[ask_input(plyr, main_board, board_sz, win_len, check_winner_area)] = plyr
 #
 #     # player 'O' turn
-#     main_board[ask_input(opp(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opp(plyr)
+#     main_board[ask_input(opp(plyr), main_board, board_sz, win_len, check_winner_area)] = opp(plyr)
 #
 #     winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
 #     if winner[1] == 'tie':

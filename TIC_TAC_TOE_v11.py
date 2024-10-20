@@ -818,7 +818,7 @@ class GameMenu:
 
     def update_slot_pvc(self, prev_input: int) -> int:
         # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
-        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.filled_slots_ind,
+        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(),
                            min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
                            prev_input, self.is_debugging.get(), self.debugger,
                            self.slot_buttons)
@@ -1178,7 +1178,7 @@ class GameMenuS(GameMenu):
                 pass
 
         # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
-        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.filled_slots_ind,
+        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(),
                            min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
                            self.prev_inputs[opp(self.plyr)][-1], self.is_debugging.get(), self.debugger,
                            self.slot_buttons)
