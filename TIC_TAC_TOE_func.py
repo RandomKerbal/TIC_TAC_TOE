@@ -240,28 +240,69 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
 
         return pboard
 
-    def sim_childs(nxt_plyr: str, prev_move: list) -> list:
+    # def analyze_child(parent: list, parent_plyr: str):
+    #     if (parent.count('O') < win_len) or ('X' not in parent[: board_sz] and 'X' not in parent[: (board_sz**2): board_sz] and 'O' not in parent[: board_sz] and 'O' not in parent[0: (board_sz**2): board_sz]):
+    #         # if the parent node has no outcome yet, continue branching down
+    #         for i in range(len(free_slots)):
+    #             print(free_slots)
+    #             sim_slot = free_slots.pop(i)
+    #             child = parent.copy()
+    #             child[sim_slot] = parent_plyr
+    #             if child[-1] == '_':
+    #                 child[-1] = sim_slot
+    #             analyze_child(child, opp(parent_plyr))
+    #             free_slots.insert(i, sim_slot)
+    #     else:
+    #         winner = check_winner_anywhere(parent, board_sz, win_len, check_winner_area)
+    #         if winner[0] == pc:
+    #             # end_moves saved as ({bad}, {good}, {tie})
+    #             end_moves[1].add(tuple(parent))
+    #             print('good')
+    #         elif winner[0] == opp(pc):
+    #             end_moves[0].add(tuple(parent))
+    #             print('bad')
+    #         elif winner[1] == 'tie' and len(free_slots) <= board_sz+1:
+    #             # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
+    #             # But, we still need the best tie boards so the computer can still make moves while unable to win...
+    #             # so, we start saving tie boards when there is only a few empty slots left
+    #             end_moves[2].add(tuple(parent))
+    #
+    #         else:
+    #             # if the parent node has no outcome yet, continue branching down
+    #             for i in range(len(free_slots)):
+    #                 print(free_slots)
+    #                 sim_slot = free_slots.pop(i)
+    #
+    #                 child = parent.copy()
+    #                 child[sim_slot] = parent_plyr
+    #
+    #                 if child[-1] == '_':
+    #                     child[-1] = sim_slot
+    #                 analyze_child(child, opp(parent_plyr))
+    #
+    #                 free_slots.insert(i, sim_slot)
+
+    def give_birth(nxt_plyr: str, parent: list) -> list:
         # branches a parent node down by 1 layer
-        # given that next player is 'plyr' and the board now looks like 'child_move'...
         # returns a list of all possible moves that the player could play next
         # OPTIMIZATION STRATEGIES:
         # instead of every time checking all slots in the parent node for empty slots for simulation, I give the AI indexes of all slots that r empty
-        child_moves = [
+        children = [
             nxt_plyr
         ]
         for slot in free_slots:
-            if prev_move[slot] == ' ':
-                child_moves.append(prev_move.copy())
-                child_moves[-1][slot] = nxt_plyr
+            if parent[slot] == ' ':
+                children.append(parent.copy())
+                children[-1][slot] = nxt_plyr
 
                 # if the child nodes are the first generation and are played by pc, record the first move as a str at the end of each board
-                if prev_move[-1] == '_':
-                    child_moves[-1][-1] = slot
+                if parent[-1] == '_':
+                    children[-1][-1] = slot
 
-        return child_moves
+        return children
 
-    def sort_childs(child_moves: list):
-        # For each move in 'child_moves', branches it down by 1 layer.
+    def analyze_childs(children: list):
+        # For each child in 'children', branches it down by 1 layer.
         # Sorts the childs by whether the computer wins, looses, or draws. If no results, branches it down again...
         # OPTIMIZATION STRATEGIES:
         # 1. don't go through boards where player already win
@@ -269,28 +310,28 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         # 3. don't go through or save tie boards until when there is only a few empty slots left
         # 4. sets are faster and automatically don't repeat items
 
-        for child_move in child_moves[1:]:
+        for child in children[1:]:
             # OPTIMIZATION STRATEGY:
             # 1. If the number of O is less than the number needed to win, then no one wins (assuming that a player can't win a 3x3 with just 3 moves, a 4x4 with just 4 moves, etc.), so we skip the check_winner().
             # 2. If there are no X/O in the first row and column, then no one wins so we skip the check_winner().
-            if (child_move.count('O') < win_len) or ('X' not in child_move[: board_sz] and 'X' not in child_move[: (board_sz**2): board_sz] and 'O' not in child_move[: board_sz] and 'O' not in child_move[0: (board_sz**2): board_sz]):
-                sort_childs(sim_childs(opp(child_moves[0]), child_move))
+            if (child.count('O') < win_len) or ('X' not in child[: board_sz] and 'X' not in child[: (board_sz**2): board_sz] and 'O' not in child[: board_sz] and 'O' not in child[0: (board_sz**2): board_sz]):
+                analyze_childs(give_birth(opp(children[0]), child))
 
             else:
-                winner = check_winner_anywhere(child_move, board_sz, win_len, check_winner_area)
+                winner = check_winner_anywhere(child, board_sz, win_len, check_winner_area)
                 if winner[0] == pc:
                     # end_moves saved as ({bad}, {good}, {tie})
-                    end_moves[1].add(tuple(child_move))
+                    end_moves[1].add(tuple(child))
                 elif winner[0] == opp(pc):
-                    end_moves[0].add(tuple(child_move))
+                    end_moves[0].add(tuple(child))
                 elif winner[1] == 'tie' and len(free_slots) <= board_sz+1:
                     # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
                     # But, we still need the best tie boards so the computer can still make moves while unable to win...
                     # so, we start saving tie boards when there is only a few empty slots left
-                    end_moves[2].add(tuple(child_move))
+                    end_moves[2].add(tuple(child))
                 else:
                     # if the parent node has no outcome yet, continue branching down
-                    sort_childs(sim_childs(opp(child_moves[0]), child_move))
+                    analyze_childs(give_birth(opp(children[0]), child))
 
     def weight_init_moves() -> dict:
         # recall that each child node saved its first-gen move
@@ -368,16 +409,16 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         # [O] [ ] [X]
         # [ ] [X] [ ]
         # [O] [ ] [O]
-        next_moves = sim_childs(opp(plyr), pboard)
+        next_moves = give_birth(opp(plyr), pboard)
         # simulates the current board with the final move decision 3 times into the future
         # a statistical deathtrap can be identified by checking 3 moves later, whether all the child nodes of a parent node will loose
         for next_move in next_moves[1:]:
             if check_winner_anywhere(next_move, board_sz, win_len, check_winner_area) == (' ', ' ',):
-                next_next_moves = sim_childs(plyr, next_move)
+                next_next_moves = give_birth(plyr, next_move)
                 death_count = 0
                 for next_next_move in next_next_moves[1:]:
                     if check_winner_anywhere(next_next_move, board_sz, board_sz, [0]) == (' ', ' ',):
-                        next_next_next_moves = sim_childs(opp(plyr), next_next_move)
+                        next_next_next_moves = give_birth(opp(plyr), next_next_move)
                         for next_next_next_move in next_next_next_moves[1:]:
                             if check_winner_anywhere(next_next_next_move, board_sz, board_sz, [0])[0] == 'X':
                                 # counts how many child nodes loose
@@ -407,7 +448,8 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
 
         else:
             end_moves = (set(), set(), set())
-            sort_childs(sim_childs(pc, pboard))
+            # analyze_child(pboard, pc)
+            analyze_childs(give_birth(pc, pboard))
             fin_move = pick_init_move(pc, weight_init_moves())
     return int(fin_move)
 
