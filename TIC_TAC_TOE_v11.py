@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
 
-from TIC_TAC_TOE_func import *
+from TIC_TAC_TOE_func_v1 import *
 
 
 def to_changelog():
