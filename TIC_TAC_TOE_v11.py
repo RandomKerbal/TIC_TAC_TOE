@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
 
-from TIC_TAC_TOE_func_v1 import *
+from TIC_TAC_TOE_func import *
 
 
 def to_changelog():
@@ -153,7 +153,7 @@ class MainMenu:
                              borderwidth=5)
 
         self.title_line1.pack(side='top')
-        self.title_label.pack(side='top')
+        self.title_label.pack(side='top', pady=18)
         self.subtitle_label.pack(side='top')
         self.title_line2.pack(side='top')
         self.b_pvc.pack(side='top')
@@ -817,6 +817,7 @@ class GameMenu:
                 self.check_winner_pvc()
 
     def update_slot_pvc(self, prev_input: int) -> int:
+        self.debugger.insert(tk.END, f'Player\'s move:\n\t{prev_input}\n')
         # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
         pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(),
                            min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
@@ -827,7 +828,7 @@ class GameMenu:
         # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
         self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
                                           disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
-        self.debugger.insert('end', f'PC\'s move:\n{pc_move}\n')
+        self.debugger.insert('end', f'PC\'s move:\n\t{pc_move}\n')
 
         return pc_move
 
