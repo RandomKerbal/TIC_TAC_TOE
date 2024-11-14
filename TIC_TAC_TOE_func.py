@@ -1,3 +1,4 @@
+import math
 import random
 import matplotlib.pyplot as plt
 import tkinter as tk
@@ -222,7 +223,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         # then turn them back to '[ ]'
         count = 0
         for coord in reserved_area:
-            if (0 <= coord[0] < board_sz and 0 <= coord[1] < board_sz) and (pboard[coord[1] * board_sz + coord[0]] == 'N') and count <= 8:
+            if (0 <= coord[0] < board_sz and 0 <= coord[1] < board_sz) and (pboard[coord[1] * board_sz + coord[0]] == 'N') and count <= 9:
                 ind = coord[1] * board_sz + coord[0]
                 pboard[ind] = ' '
                 simmable_inds.append(ind)
@@ -303,11 +304,22 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
 
         return False
 
-    def analyze_child(parent: list, parent_plyr: str, parent_origin: int):
+    def analyze_child(parent: list, parent_plyr: str, parent_origin: int) -> bool:
         opp_plyr = opp(parent_plyr)
 
-        if (parent.count('O') < win_len) or ('X' not in parent[: board_sz] and 'X' not in parent[: (board_sz**2): board_sz] and 'O' not in parent[: board_sz] and 'O' not in parent[0: (board_sz**2): board_sz]):
-            # if the parent node has no outcome yet, continue branching down
+        # OPTIMIZATION: I only check for whether the active plyr wins in this state because only the active plyr moved so is possible to win.
+        plyr_win = is_plyr_win(parent, parent_plyr, parent_origin)
+
+        if plyr_win is True and parent_plyr is pc:
+            win_probs[parent[-1]] += len(simmable_inds)+1   # +1 since len(simmable_inds) can be 0
+
+        elif plyr_win is True and parent_plyr is not pc:
+            win_probs[parent[-1]] -= (len(simmable_inds)+1)
+            return False
+
+        elif plyr_win is False and len(simmable_inds) != 0:     # if the parent node has no winner yet, and the tree can still branch, continue branching down.
+            children_won = len(simmable_inds)//2
+
             for i in range(len(simmable_inds)):
                 sim_ind = simmable_inds.pop(i)
 
@@ -315,91 +327,17 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
                 child[sim_ind] = opp_plyr
                 if child[-1] == '_':
                     child[-1] = sim_ind
-
-                analyze_child(child, opp_plyr, sim_ind)
-
-                simmable_inds.insert(i, sim_ind)
-        else:
-            # OPTIMIZATION: I only check for whether the active plyr wins in this state because only the active plyr moved so is possible to win.
-            plyr_win = is_plyr_win(parent, parent_plyr, parent_origin)
-
-            if plyr_win is True and parent_plyr is pc:
-                # end_moves saved as ({bad}, {good}, {tie})
-                end_moves[1].add(tuple(parent))
-
-            elif plyr_win is True and parent_plyr is not pc:
-                end_moves[0].add(tuple(parent))
-
-            elif plyr_win is False and len(simmable_inds) == 0:
-                # if this is in tie, it doesn't affect final win_prob evaluation, so don't save them
-                # But, we still need the best tie boards so the computer can still make moves while unable to win...
-                # so, we start saving tie boards when there is only a few empty indexes left
-                end_moves[2].add(tuple(parent))
-
-            else:
-                # if the parent node has no outcome yet, continue branching down
-                for i in range(len(simmable_inds)):
-                    sim_ind = simmable_inds.pop(i)
-
-                    child = parent.copy()
-                    child[sim_ind] = opp_plyr
-                    if child[-1] == '_':
-                        child[-1] = sim_ind
-
                     analyze_child(child, opp_plyr, sim_ind)
 
-                    simmable_inds.insert(i, sim_ind)
+                elif analyze_child(child, opp_plyr, sim_ind) is False:
+                    if children_won > 1:    # if less than 1/2 of the childs lost, continue countdown
+                        children_won -= 1
+                    elif children_won == 1:   # OPTIMIZATION: if more than 1/2 of the childs lost, this parent kills itself and assume all children loss.
+                        win_probs[parent[-1]] -= math.factorial(len(simmable_inds)//2)
+                        simmable_inds.insert(i, sim_ind)
+                        return False
 
-    def weight_init_moves() -> dict:
-        # recall that each child node saved its first-gen move
-        win_probs = {}  # dict saved as {'initial_move_n': win_probability_of_n}
-
-        # count the frequency of each first-gen move that results in a loosing child node
-        # to punish a first-gen move that results in a loosing child node, its frequency is negative
-        for end_move in end_moves[0]:
-            if end_move[-1] not in win_probs:
-                # we also see how long a first-gen move takes to lose, by counting the num of empty indexes left when it lose
-                # more empty indexes = loss earlier = more risky
-                # less empty indexes = loss later = less risky
-                win_probs[end_move[-1]] = -4 * (1+end_move.count(' '))
-            else:
-                win_probs[end_move[-1]] -= 4 * (1+end_move.count(' '))
-
-        # count the frequency of each first-gen move that results in a winning child node
-        # to reward a first-gen move that results in a winning child node, its frequency is positive
-        for end_move in end_moves[1]:
-            if end_move[-1] not in win_probs:
-                # we also see how long a first-gen move takes to win, by counting the num of empty indexes left when it win
-                win_probs[end_move[-1]] = 2 * end_move.count(' ')
-            else:
-                win_probs[end_move[-1]] += 2 * end_move.count(' ')
-
-        # count the frequency of each first-gen move that results in a draw child node
-        # a first-gen move that results in a draw child node is not punished and not rewarded
-        for end_move in end_moves[2]:
-            if end_move[-1] not in win_probs:
-                win_probs[end_move[-1]] = 0
-                if is_debugging:
-                    debugger.insert(tk.END, 'PC\'s comment:\nStart considering draws in my calculation\n')
-
-        print(end_moves)
-        print(f'Total loose states:\n\t{len(end_moves[0])}')
-        print(f'Total win states:\n\t{len(end_moves[1])}')
-        print(f'Total tie states:\n\t{len(end_moves[2])}')
-        if is_debugging:
-            debugger.insert(tk.END, f'Total loose states:\n\t{len(end_moves[0])}\n')
-            debugger.insert(tk.END, f'Total win states:\n\t{len(end_moves[1])}\n')
-            debugger.insert(tk.END, f'Total tie states:\n\t{len(end_moves[2])}\n')
-            plt.clf()
-            p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
-            plt.bar_label(p, label_type='center')
-            plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
-            plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
-            plt.xlabel('1st-Generation Move')
-            plt.ylabel('Winning Probability')
-            plt.show()
-
-        return win_probs
+                simmable_inds.insert(i, sim_ind)
 
     def pick_init_move(plyr: str, outcomes: dict) -> int:
         # find which first-gen move results in the most winning child nodes
@@ -411,11 +349,10 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
 
         # try putting the final move decision onto the current board to check for any statistical deathtraps
         # statistical deathtraps are only confirmed to exist on 3x3 board
-        pboard_copy = pboard.copy()
-        pboard_copy[move] = plyr
-        # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
-        #TODO:
-        # if board_sz == 3 and check_deathtrap(plyr, pboard_copy) and len(list(outcomes.keys())) > 1:
+        # TODO:
+        # pboard[move] = plyr
+        # # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
+        # if board_sz == 3 and check_deathtrap(plyr, pboard) and len(list(outcomes.keys())) > 1:
         #     print('Deathtrap found! Choosing a new move...')
         #     if is_debugging:
         #         debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
@@ -424,12 +361,10 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         return move
 
     def check_deathtrap(plyr: str, pboard: list) -> bool:
-        # a statistical deathtrap is a first-gen move that appeared to be statistically superior to all other first-gen moves...
-        # ...but it will lead to an outcome like this (computer is X):
+        # a statistical deathtrap is a first-gen move that appeared to be statistically superior to all other first-gen moves, but it will lead to an outcome like this (computer is X):
         # [O] [ ] [X]
         # [ ] [X] [ ]
         # [O] [ ] [O]
-        next_moves = give_birth(opp(plyr), pboard)
         # simulates the current board with the final move decision 3 times into the future
         # a statistical deathtrap can be identified by checking 3 moves later, whether all the child nodes of a parent node will loose
         for next_move in next_moves[1:]:
@@ -466,7 +401,17 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
             fin_move = random.choice([_ for _ in range(board_sz**2) if main_board[_] == ' '])
 
         else:
-            end_moves = (set(), set(), set())
+            win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
             analyze_child(pboard, opp(pc), prev_input)
-            fin_move = pick_init_move(pc, weight_init_moves())
+            # fin_move = pick_init_move(pc, weight_init_moves())
+            fin_move = pick_init_move(pc, win_probs)
+            if is_debugging:
+                plt.clf()
+                p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
+                plt.bar_label(p, label_type='center')
+                plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
+                plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
+                plt.xlabel('1st-Generation Move')
+                plt.ylabel('Winning Probability')
+                plt.show()
     return int(fin_move)
