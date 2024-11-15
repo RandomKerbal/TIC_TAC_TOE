@@ -204,7 +204,7 @@ class MainMenu:
 
     def exit(self):
         messagebox.showinfo('Afterword',
-                            'Thank you for playing TIC-TAC-TOE!\n\nI spend over 132+ hours creating this game all by MYSELF.\n\nIn this project, I designed the AI that finds the highest winning probability, arranged the GUI elements in the most ergonomic way, optimized the algorithms, fixed bugs, and learned tkinter.\n\nHope you enjoyed it!')
+                            'Thank you for playing TIC-TAC-TOE!\n\nI spend over 191+ hours creating this game all by MYSELF.\n\nIn this project, I designed the AI that finds the highest winning probability, arranged the GUI elements in the most ergonomic way, optimized the algorithms, fixed bugs, and learned tkinter.\n\nHope you enjoyed it!')
 
         self.window.destroy()
 
@@ -456,6 +456,14 @@ class ColMenu:
         self.colors = colors
         self.mode = mode
 
+        self.title = Button(self.window,
+                            state='disabled',
+                            takefocus=False,
+                            borderwidth=0,
+                            background='Black',
+                            disabledforeground='Sea Green1',
+                            text='Settings',
+                            font=('FixedSys', 25, 'underline', 'bold'))
         self.col_frames = {
             'X': LabelFrame(self.window,
                             text='X colors',
@@ -496,10 +504,10 @@ class ColMenu:
                              font=('FixedSys', 15),
                              borderwidth=5)
 
-        self.col_frames['X'].grid(row=0, column=1, pady=5)
-        self.col_frames['O'].grid(row=0, column=2, pady=5)
+        self.col_frames['X'].grid(row=0, column=1, pady=(10, 5))
+        self.col_frames['O'].grid(row=0, column=2, pady=(10, 5))
         self.col_frames[''].grid(row=1, column=1, columnspan=2, pady=5)
-        self.b_exit.grid(row=2, column=1, columnspan=2, pady=15)
+        self.b_exit.grid(row=2, column=1, columnspan=2, pady=10)
 
         # self.col_entries is a copy of self.colors, but containing col_entry instead of color str for each feature.
         self.col_entries = {
@@ -1102,7 +1110,7 @@ class GameMenuV(GameMenu):
 
     def delete_moves(self):
         # If (num of moves by X & O so far) + (moves by X & O in this turn) is more than remain_steps*2, the num of moves by X is more than remain_steps. So X's moves start to vanish.
-        if (len(self.prev_inputs) + 2 > self.remain_steps.get() * 2) and self.is_game_active:
+        if (len(self.prev_inputs) > self.remain_steps.get() * 2) and self.is_game_active:
             self.debugger.insert('end', f'Most recent moves:\n{self.prev_inputs}')
             self.main_board[self.prev_inputs[0]] = ' '
             self.slot_buttons[self.prev_inputs[0]].config(text='', background='SystemButtonFace', state='normal')
