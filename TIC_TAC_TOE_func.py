@@ -1,6 +1,8 @@
 import math
 import random
 import matplotlib.pyplot as plt
+import networkx as nx
+from networkx.drawing.nx_agraph import pygraphviz_layout
 import tkinter as tk
 
 
@@ -163,7 +165,10 @@ def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_wi
 
 def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winner_area: list, prev_input: int, is_debugging: bool, debugger=None, ind_buttons=None) -> int:
 
-    def prune(origin: int) -> list:
+    def prune(origin: int):
+        """
+        Limits the indexes that PC can simulate to the 12 empty indexes closest to the origin.
+        """
         # OPTIMIZATIONS:
         #   only reserve empty indexes in the 3x3 area around the origin
         #   If there aren't enough empty indexes:
@@ -209,33 +214,26 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         reserved_area.append((start_col - 1, start_row + 2))
         reserved_area.append((start_col - 1, start_row))
 
-        # Creating the pruned board:
-        # first fill all empty indexes with 'N'
-        pboard = ['N' if _ == ' ' else _ for _ in main_board]
-
+        # simmable_inds records the 12 indexes
         global simmable_inds
         simmable_inds = []
 
         # if the indexes in reserved_area are:
         #   1. within the board (0 <= ind_index < len)
-        #   2. 'N' on the board
-        #   and there aren't enough empty indexes
-        # then turn them back to '[ ]'
-        count = 0
+        #   2. ' ' on the board
+        #   and there aren't enough empty indexes.
+        # then add them back to simmable_inds
+        count = 1
         for coord in reserved_area:
-            if (0 <= coord[0] < board_sz and 0 <= coord[1] < board_sz) and (pboard[coord[1] * board_sz + coord[0]] == 'N') and count <= 9:
+            if (0 <= coord[0] < board_sz and 0 <= coord[1] < board_sz) and (main_board[coord[1] * board_sz + coord[0]] == ' ') and count <= 12:
                 ind = coord[1] * board_sz + coord[0]
-                pboard[ind] = ' '
                 simmable_inds.append(ind)
                 if is_debugging:
                     ind_buttons[ind].config(background='Lemon Chiffon2')
                 count += 1
 
         debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(simmable_inds) + '\n')
-        print_board(pboard, board_sz)
-        print(f'Empty indexes: {simmable_inds}')
-
-        return pboard
+        print(f'\nEmpty indexes: {simmable_inds}')
 
     def is_plyr_win(board: list, plyr: str, origin: int) -> bool:
         half_win_len = win_len // 2
@@ -291,8 +289,8 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         start = origin
         end = origin
 
-        if (origin_row >= half_win_len > origin_col and board[origin - board_sz_neg1 * half_win_len] == plyr) or (
-                origin_row < board_sz - half_win_len <= origin_col and board[origin + board_sz_neg1 * half_win_len] == plyr):
+        if (origin_row >= half_win_len and origin_col < board_sz - half_win_len and board[origin - board_sz_neg1 * half_win_len] == plyr) or (
+                origin_row < board_sz - half_win_len and origin_col >= half_win_len and board[origin + board_sz_neg1 * half_win_len] == plyr):
 
             while (start >= board_sz) and (start % board_sz < board_sz_neg1) and board[start - board_sz_neg1] == plyr:
                 start -= board_sz_neg1
@@ -304,114 +302,157 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
 
         return False
 
-    def analyze_child(parent: list, parent_plyr: str, parent_origin: int) -> bool:
-        opp_plyr = opp(parent_plyr)
+    def is_white(parent: list, parent_plyr: str, parent_origin: int) -> bool:
+        """
+        Finds the path where: i) the PC has at least 1 winning path whenever it's human's turn; ii) the human has 0 winning paths whenever it's PC's turn.
 
-        # OPTIMIZATION: I only check for whether the active plyr wins in this state because only the active plyr moved so is possible to win.
-        plyr_win = is_plyr_win(parent, parent_plyr, parent_origin)
+        Returns True if all children are 'black' -> their parent's player will win -> their parent is 'white'
+            'Black': this node lost for whoever is playing at that layer.
 
-        if plyr_win is True and parent_plyr is pc:
-            win_probs[parent[-1]] += len(simmable_inds)+1   # +1 since len(simmable_inds) can be 0
+        Returns False if any children are 'white' -> their parent's player will lose -> their parent is 'black'
+            'White': this node won for whoever is playing at that layer.
+        """
+        child_plyr = opp(parent_plyr)
 
-        elif plyr_win is True and parent_plyr is not pc:
-            win_probs[parent[-1]] -= (len(simmable_inds)+1)
-            return False
+        for i in range(len(simmable_inds)):
+            sim_ind = simmable_inds.pop(i)
 
-        elif plyr_win is False and len(simmable_inds) != 0:     # if the parent node has no winner yet, and the tree can still branch, continue branching down.
-            children_won = len(simmable_inds)//2
+            child = parent.copy()
+            child[sim_ind] = child_plyr
 
-            for i in range(len(simmable_inds)):
-                sim_ind = simmable_inds.pop(i)
-
-                child = parent.copy()
-                child[sim_ind] = opp_plyr
-                if child[-1] == '_':
-                    child[-1] = sim_ind
-                    analyze_child(child, opp_plyr, sim_ind)
-
-                elif analyze_child(child, opp_plyr, sim_ind) is False:
-                    if children_won > 1:    # if less than 1/2 of the childs lost, continue countdown
-                        children_won -= 1
-                    elif children_won == 1:   # OPTIMIZATION: if more than 1/2 of the childs lost, this parent kills itself and assume all children loss.
-                        win_probs[parent[-1]] -= math.factorial(len(simmable_inds)//2)
-                        simmable_inds.insert(i, sim_ind)
-                        return False
-
+            if is_plyr_win(child, child_plyr, sim_ind) is True or (len(simmable_inds) == 0 and child_plyr == pc) or (len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True):
+                # if a child is white
+                # or if a child is tie (not white) and is at the bottommost layer and the bottommost layer is pc's turn
+                # or if a child is white and is not at the bottommost layer yet
+                white_num[str('Lyr ' + str(len(simmable_inds)))] += 1
                 simmable_inds.insert(i, sim_ind)
+                return False
 
-    def pick_init_move(plyr: str, outcomes: dict) -> int:
-        # find which first-gen move results in the most winning child nodes
-        max_win_prob = max(outcomes.values())
+            simmable_inds.insert(i, sim_ind)
 
-        # moves_pool creates a list of initial moves containing the same highest win_prob to be picked randomly
-        moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
-        move = moves_pool[random.randint(0, len(moves_pool) - 1)]
+        return True
 
-        # try putting the final move decision onto the current board to check for any statistical deathtraps
-        # statistical deathtraps are only confirmed to exist on 3x3 board
-        # TODO:
-        # pboard[move] = plyr
-        # # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
-        # if board_sz == 3 and check_deathtrap(plyr, pboard) and len(list(outcomes.keys())) > 1:
-        #     print('Deathtrap found! Choosing a new move...')
-        #     if is_debugging:
-        #         debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
-        #     outcomes.pop(move)
-        #     move = pick_init_move(plyr, outcomes)
-        return move
+    # def analyze_child(parent: list, parent_plyr: str, parent_origin: int) -> bool:
+    #     child_plyr = opp(parent_plyr)
+    #
+    #     # OPTIMIZATION: I only check for whether the active plyr wins in this state because only the active plyr moved so is possible to win.
+    #     plyr_win = is_plyr_win(parent, parent_plyr, parent_origin)
+    #
+    #     if plyr_win is True and parent_plyr is pc:
+    #         win_probs[parent[-1]] += len(simmable_inds)+1   # +1 since len(simmable_inds) can be 0
+    #
+    #     elif plyr_win is True and parent_plyr is not pc:
+    #         win_probs[parent[-1]] -= (len(simmable_inds)+1)
+    #         return False
+    #
+    #     elif plyr_win is False and len(simmable_inds) != 0:     # if the parent node has no winner yet, and the tree can still branch, continue branching down.
+    #         children_won = len(simmable_inds)//2
+    #
+    #         for i in range(len(simmable_inds)):
+    #             sim_ind = simmable_inds.pop(i)
+    #
+    #             child = parent.copy()
+    #             child[sim_ind] = child_plyr
+    #             if child[-1] == '_':
+    #                 child[-1] = sim_ind
+    #                 analyze_child(child, child_plyr, sim_ind)
+    #
+    #             elif analyze_child(child, child_plyr, sim_ind) is False:
+    #                 if children_won > 1:    # if less than 1/2 of the childs lost, continue countdown
+    #                     children_won -= 1
+    #                 elif children_won == 1:   # OPTIMIZATION: if more than 1/2 of the childs lost, this parent kills itself and assume all children loss.
+    #                     win_probs[parent[-1]] -= math.factorial(len(simmable_inds)//2)
+    #                     simmable_inds.insert(i, sim_ind)
+    #                     return False
+    #
+    #             simmable_inds.insert(i, sim_ind)
 
-    def check_deathtrap(plyr: str, pboard: list) -> bool:
-        # a statistical deathtrap is a first-gen move that appeared to be statistically superior to all other first-gen moves, but it will lead to an outcome like this (computer is X):
-        # [O] [ ] [X]
-        # [ ] [X] [ ]
-        # [O] [ ] [O]
-        # simulates the current board with the final move decision 3 times into the future
-        # a statistical deathtrap can be identified by checking 3 moves later, whether all the child nodes of a parent node will loose
-        for next_move in next_moves[1:]:
-            if check_winner_anywhere(next_move, board_sz, win_len, check_winner_area) == (' ', ' ',):
-                next_next_moves = give_birth(plyr, next_move)
-                death_count = 0
-                for next_next_move in next_next_moves[1:]:
-                    if check_winner_anywhere(next_next_move, board_sz, board_sz, [0]) == (' ', ' ',):
-                        next_next_next_moves = give_birth(opp(plyr), next_next_move)
-                        for next_next_next_move in next_next_next_moves[1:]:
-                            if check_winner_anywhere(next_next_next_move, board_sz, board_sz, [0])[0] == 'X':
-                                # counts how many child nodes loose
-                                death_count += 1
+    # def pick_init_move(plyr: str, outcomes: dict) -> int:
+    #     # find which first-gen move results in the most winning child nodes
+    #     max_win_prob = max(outcomes.values())
+    #
+    #     # moves_pool creates a list of initial moves containing the same highest win_prob to be picked randomly
+    #     moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
+    #     move = moves_pool[random.randint(0, len(moves_pool) - 1)]
+    #
+    #     # try putting the final move decision onto the current board to check for any statistical deathtraps
+    #     # statistical deathtraps are only confirmed to exist on 3x3 board
+    #     main_board_copy = main_board.copy()
+    #     main_board_copy[move] = plyr
+    #     # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
+    #     if board_sz == 3 and check_deathtrap(plyr, main_board_copy) and len(list(outcomes.keys())) > 1:
+    #         print('Deathtrap found! Choosing a new move...')
+    #         if is_debugging:
+    #             debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
+    #         outcomes.pop(move)
+    #         move = pick_init_move(plyr, outcomes)
+    #     return move
 
-                # if all the child nodes loose, the first-gen move is a deathtrap
-                if death_count > len(next_next_moves):
-                    return True
-        return False
+    # def check_deathtrap(plyr: str, board: list) -> bool:
+    #     # a statistical deathtrap is a first-gen move that appeared to be statistically superior to all other first-gen moves, but it will lead to an outcome like this (computer is X):
+    #     # [O] [ ] [X]
+    #     # [ ] [X] [ ]
+    #     # [O] [ ] [O]
+    #     # simulates the current board with the final move decision 3 times into the future
+    #     # a statistical deathtrap can be identified by checking 3 moves later, whether all the child nodes of a parent node will loose
+    #     for next_move in next_moves[1:]:
+    #         if check_winner_anywhere(next_move, board_sz, win_len, check_winner_area) == (' ', ' ',):
+    #             next_next_moves = give_birth(plyr, next_move)
+    #             death_count = 0
+    #             for next_next_move in next_next_moves[1:]:
+    #                 if check_winner_anywhere(next_next_move, board_sz, board_sz, [0]) == (' ', ' ',):
+    #                     next_next_next_moves = give_birth(opp(plyr), next_next_move)
+    #                     for next_next_next_move in next_next_next_moves[1:]:
+    #                         if check_winner_anywhere(next_next_next_move, board_sz, board_sz, [0])[0] == 'X':
+    #                             # counts how many child nodes loose
+    #                             death_count += 1
+    #
+    #             # if all the child nodes loose, the first-gen move is a deathtrap
+    #             if death_count > len(next_next_moves):
+    #                 return True
+    #     return False
 
-    if prev_input == -1:
+    if prev_input == -1:  # if PC starts first
         return random.randint(0, board_sz**2 - 1)
     else:
         # if the board_sz <= 4, prune a 3x3 area around the most recent player input. I cannot prune a 4x4 area as 4x4 has no center ind.
         # if the board_sz >= 5, prune a 5x5 area around the most recent player input
-        pboard = prune(prev_input)
-
-        if ' ' not in pboard:
-            return -1
+        prune(prev_input)
 
         # if the 3x3 grid around the opponent's newest move are full, find the closest empty ind
-        elif ' ' not in pboard:
+        if len(simmable_inds) == 0:
             if is_debugging:
                 debugger.insert(tk.END, 'PC\'s comment:\nNo empty indexes found! Randomly generating next move...')
             fin_move = random.choice([_ for _ in range(board_sz**2) if main_board[_] == ' '])
 
         else:
-            win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
-            analyze_child(pboard, opp(pc), prev_input)
-            # fin_move = pick_init_move(pc, weight_init_moves())
-            fin_move = pick_init_move(pc, win_probs)
-            if is_debugging:
-                plt.clf()
-                p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
-                plt.bar_label(p, label_type='center')
-                plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
-                plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
-                plt.xlabel('1st-Generation Move')
-                plt.ylabel('Winning Probability')
-                plt.show()
-    return int(fin_move)
+            for i in range(len(simmable_inds)):
+                global white_num
+                white_num = {f"Lyr {i}": 0 for i in range(len(simmable_inds)-1, -1, -1)}
+
+                sim_ind = simmable_inds.pop(i)
+
+                child = main_board.copy()
+                child[sim_ind] = pc
+
+                if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
+                    white_num[str('Lyr ' + str(len(simmable_inds)))] += 1
+                    print('Number of white nodes at', sim_ind, ':', white_num)
+                    return sim_ind
+                else:
+                    print('Number of white nodes at', sim_ind, ':', white_num)
+                    simmable_inds.insert(i, sim_ind)
+
+            # win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
+            # analyze_child(main_board, opp(pc), prev_input)
+            # fin_move = pick_init_move(pc, win_probs)
+            # if is_debugging:
+            #     plt.clf()
+            #     p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
+            #     plt.bar_label(p, label_type='center')
+            #     plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
+            #     plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
+            #     plt.xlabel('1st-Generation Move')
+            #     plt.ylabel('Winning Probability')
+            #     plt.show()
+    # return int(fin_move)

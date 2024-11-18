@@ -17,7 +17,8 @@ Ver 8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both prunin
 Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty slots. Added 'Replay' button. Changed empty slots from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
 Ver 10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
 Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Capped length to win at 4. Added 'Total Child Count' to debugger.
-Ver 12: Make AI able to play Snake mode.\n
+Ver 12: Redesign the algorithm to use depth-first search instead of breadth-first-search. Build a specialized, faster winner-checking algo that only checks for whether a specific player wins, instead of checking who wins.\n
+Ver 13: \n
     ''')
 
 
@@ -845,13 +846,16 @@ class GameMenu:
         winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
         if winner[1] == 'tie':
             self.stop_game()
-            messagebox.showinfo('Result', 'Game ended in a draw\n\n"So close...but the AI will NEVER lose!"')
+            if messagebox.askyesno('Outcome', 'Ended in tie!\n\n"You\'ll never win ... not satisfied? Replay!"') is True:
+                self.replay()
         elif winner[0] == opp(self.plyr):
             self.stop_game()
-            messagebox.showinfo('Result', f'Computer wins {winner[1]}\n\n"Humans should\'ve been smarter..."')
+            if messagebox.askyesno('Outcome', f'Computer wins {winner[1]}!\n\n"Shouldn\'t humans be smarter?"') is True:
+                self.replay()
         elif winner[0] == self.plyr:
             self.stop_game()
-            messagebox.showinfo('Result', f'You win {winner[1]}!\n\n"Time to fix more bugs..."')
+            if messagebox.askyesno('Outcome', f'You win {winner[1]}!\n\n"That shouldn\'t happen ... replay?"') is True:
+                self.replay()
 
     def update_slot_pvp(self, prev_input: int):
         # reset tint for pruned area and last pc move
@@ -869,10 +873,10 @@ class GameMenu:
         winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
         if winner[1] == 'tie':
             self.stop_game()
-            messagebox.showinfo('Result', 'Game ended in a draw.')
+            messagebox.showinfo('Outcome', 'Tie game!')
         elif winner != (' ', ' ',):
             self.stop_game()
-            messagebox.showinfo('Result', f'Player \'{winner[0]}\' wins {winner[1]}!')
+            messagebox.showinfo('Outcome', f'Player \'{winner[0]}\' wins {winner[1]}!')
 
         else:
             # If no one wins, disable this plyr's indicator and update next plyr's indicators.
@@ -989,7 +993,7 @@ class GameMenuT(GameMenu):
 
         # If player runs out of time, opponent wins and stop all recursions.
         elif remain_time <= 0.0:
-            messagebox.showinfo('Result', f"Time's up! Player {opp(self.plyr)} wins")
+            messagebox.showinfo('Outcome', f"Time's up! Player {opp(self.plyr)} wins")
             self.stop_game()
             return None
 
