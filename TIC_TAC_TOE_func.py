@@ -164,12 +164,15 @@ def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_wi
     return -1
 
 
-def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input: int, is_debugging: bool, debugger=None, ind_buttons=None) -> int:
+def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, input_origin: int, is_debugging: bool, debugger=None, ind_buttons=None) -> int:
+    half_win_len = win_len // 2
     board_sz_neg1 = board_sz-1
+    bsz_neg_hwl = board_sz - half_win_len
+    max_row_ind = board_sz * board_sz_neg1
 
     def prune(origin: int):
         """
-        Limits the indexes that PC can simulate to the 12 empty indexes that are either: one of the 8 around the origin; or have the highest number of adj indexes with an X/O.
+        Limits the indexes that PC can simulate to the 12 empty indexes that are either: one of the 8 around the origin; or have the highest number of adj indexes with an X/O. Adj index with player's symbol counts as 3.
         """
         # convert origin to coords and clamp between 1 to board_sz-2.
         # Why clamp? -> there must be 8 indexes around the origin.
@@ -198,7 +201,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
                 origin_dx = abs(ind_col - origin_col)
 
                 # I want diagonal indexes to have shorter distance from origin than hor/vert indexes -> higher priority.
-                origin_d = max(origin_dy, origin_dx) - min(origin_dy, origin_dx)/2
+                origin_d = max(origin_dy, origin_dx) - min(origin_dy, origin_dx)/3
 
                 if origin_d <= 1:  # if the index is one of the 8 around the origin (less than 2 units from the origin)
                     simmable_inds.append(ind)
@@ -210,12 +213,15 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
                         new_row = ind_row + adj[0]
                         new_col = ind_col + adj[1]
                         if 0 <= new_row < board_sz and 0 <= new_col < board_sz:
-                            if main_board[new_row*board_sz + new_col] != ' ':
+                            new_ind = new_row*board_sz + new_col
+                            if main_board[new_ind] == opp(pc):
+                                priority += 3
+                            elif main_board[new_ind] == pc:
                                 priority += 1
 
                     ind_priority[(ind, origin_d,)] = priority   # key = (board index, dist_from_origin)
 
-        print(f'Index priority: {ind_priority}')
+        print(f'\nIndex priority: {ind_priority}')
 
         simmable_inds.extend(
             key_val[0][0] for key_val in  # add the keys in sorted order into simmable_inds.
@@ -232,10 +238,9 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
                 ind_buttons[ind].config(background='Lemon Chiffon2')
 
         debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(simmable_inds) + '\n')
-        print(f'\nEmpty indexes: {simmable_inds}')
+        print(f'Empty indexes: {simmable_inds}')
 
     def is_plyr_win(board: list, plyr: str, origin: int) -> bool:
-        half_win_len = win_len // 2
         origin_col = origin % board_sz
         origin_row = origin // board_sz
 
@@ -244,11 +249,11 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
         start = origin
         end = origin
 
-        if (origin_row >= half_win_len and board[origin - board_sz * half_win_len] == plyr) or (origin_row < board_sz - half_win_len and board[origin + board_sz * half_win_len] == plyr):
+        if (origin_row >= half_win_len and board[origin - board_sz * half_win_len] == plyr) or (origin_row < bsz_neg_hwl and board[origin + board_sz * half_win_len] == plyr):
 
             while (start >= board_sz) and board[start - board_sz] == plyr:
                 start -= board_sz
-            while (end < board_sz * board_sz_neg1) and board[end + board_sz] == plyr:
+            while (end < max_row_ind) and board[end + board_sz] == plyr:
                 end += board_sz
 
             if end // board_sz - start // board_sz + 1 >= win_len:
@@ -258,7 +263,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
         start = origin
         end = origin
 
-        if (origin_col >= half_win_len and board[origin - half_win_len] == plyr) or (origin_col < board_sz - half_win_len and board[origin + half_win_len] == plyr):
+        if (origin_col >= half_win_len and board[origin - half_win_len] == plyr) or (origin_col < bsz_neg_hwl and board[origin + half_win_len] == plyr):
 
             while (start % board_sz > 0) and board[start - 1] == plyr:
                 start -= 1
@@ -273,11 +278,11 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
         end = origin
 
         if (origin_row >= half_win_len <= origin_col and board[origin - (board_sz + 1) * half_win_len] == plyr) or (
-                origin_row < board_sz - half_win_len > origin_col and board[origin + (board_sz + 1) * half_win_len] == plyr):
+                origin_row < bsz_neg_hwl > origin_col and board[origin + (board_sz + 1) * half_win_len] == plyr):
 
             while (start >= board_sz) and (start % board_sz > 0) and board[start - (board_sz + 1)] == plyr:
                 start -= (board_sz + 1)
-            while (end < board_sz * board_sz_neg1) and (end % board_sz < board_sz_neg1) and board[end + board_sz + 1] == plyr:
+            while (end < max_row_ind) and (end % board_sz < board_sz_neg1) and board[end + board_sz + 1] == plyr:
                 end += (board_sz + 1)
 
             if (end // board_sz - start // board_sz) + 1 >= win_len:
@@ -287,12 +292,12 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
         start = origin
         end = origin
 
-        if (origin_row >= half_win_len and origin_col < board_sz - half_win_len and board[origin - board_sz_neg1 * half_win_len] == plyr) or (
-                origin_row < board_sz - half_win_len and origin_col >= half_win_len and board[origin + board_sz_neg1 * half_win_len] == plyr):
+        if (origin_row >= half_win_len and origin_col < bsz_neg_hwl and board[origin - board_sz_neg1 * half_win_len] == plyr) or (
+                origin_row < bsz_neg_hwl and origin_col >= half_win_len and board[origin + board_sz_neg1 * half_win_len] == plyr):
 
             while (start >= board_sz) and (start % board_sz < board_sz_neg1) and board[start - board_sz_neg1] == plyr:
                 start -= board_sz_neg1
-            while (end < board_sz * board_sz_neg1) and (end % board_sz > 0) and board[end + board_sz_neg1] == plyr:
+            while (end < max_row_ind) and (end % board_sz > 0) and board[end + board_sz_neg1] == plyr:
                 end += board_sz_neg1
 
             if (end // board_sz - start // board_sz) + 1 >= win_len:
@@ -410,12 +415,12 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input:
     #                 return True
     #     return False
 
-    if prev_input == -1:  # if PC starts first
+    if input_origin == -1:  # if PC starts first
         return random.randint(0, board_sz**2 - 1)
     else:
         # if the board_sz <= 4, prune a 3x3 area around the most recent player input. I cannot prune a 4x4 area as 4x4 has no center ind.
         # if the board_sz >= 5, prune a 5x5 area around the most recent player input
-        prune(prev_input)
+        prune(input_origin)
 
         # if the 3x3 grid around the opponent's newest move are full, find the closest empty ind
         if len(simmable_inds) == 0:
