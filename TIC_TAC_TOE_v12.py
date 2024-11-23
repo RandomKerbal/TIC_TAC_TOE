@@ -7,14 +7,14 @@ from TIC_TAC_TOE_func import *
 def to_changelog():
     messagebox.showinfo('Changelog', '''
 Ver 1 : Added the basics: player vs player mode, infinite board length, winner checker, etc...\n
-Ver 2 : Boards are now stored as single list instead of dictionary. Changes player input from slot number to x,y coordinates. Rebuild the entire code to process this new file format.\n
+Ver 2 : Boards are now stored as single list instead of dictionary. Changes player input from index number to x,y coordinates. Rebuild the entire code to process this new file format.\n
 Ver 3 : Added basic AI. Added console GUI. Make boards that are 7*7 or larger needs only half the board length to win.\n
 Ver 4 : Added board pruning for boards larger than 3x3 to reduce AI calculations. Added some randomization to the moves made by the AI. Restructured the entire AI code for optimization.\n
 Ver 5 : Added deathtrap checker - that's the hardest part of this project! Now the AI is 100% unbeatable for a 3x3 board. Added the option to let AI start first.\n
 Ver 6 : Make board pruning only for boards larger than 5x5. Added land-filling to boards larger than 3x3. Added a matplotlib display for AI's Risk Analysis.\n
 Ver 7 : Added Tkinter GUI. Rebuild winner checker for HUGE optimization. Changed every code to user-def function. Added user-friendly debugging root.\n
-Ver 8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both pruning and land-filling into 1 function. Pruned board and main board now have the same dimension - no additional function is needed to convert slots between the two boards!\n
-Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty slots. Added 'Replay' button. Changed empty slots from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
+Ver 8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both pruning and land-filling into 1 function. Pruned board and main board now have the same dimension - no additional function is needed to convert indexes between the two boards!\n
+Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty indexes. Added 'Replay' button. Changed empty indexes from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
 Ver 10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
 Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Capped length to win at 4. Added 'Total Child Count' to debugger.
 Ver 12: Redesign the algorithm to use depth-first search instead of breadth-first-search. Build a specialized, faster winner-checking algo that only checks for whether a specific player wins, instead of checking who wins.\n
@@ -574,15 +574,15 @@ class GameMenu:
     === Attributes ===\n
     window: Name of window that displays MainMenu.\n
     board_sz: Length of the board.\n
-    check_winner_area = List containing slots where the winning chain will fall on.\n
+    check_winner_area = List containing buttons where the winning chain will fall on.\n
     board_zoom: Magnification of the board.\n
     win_len: How many X in a row/column/diagonal to win.\n
     color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
     mode: pvp = Player versus player; pvc = Player versus pc.\n
     plyr: Player playing in the current turn.\n
     main_board: List containing the board on screen.\n
-    filled_slots_ind: List containing the index of filled slots of main_board.\n
-    slot_buttons: List containing all the buttons that represent slots on the GUI.\n
+    filled_buttons_ind: List containing the index of filled buttons of main_board.\n
+    board_buttons: List containing all the buttons that represent buttons on the GUI.\n
     is_debugging: Show/hide the debugger.\n
     is_game_active: Whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
     """
@@ -598,8 +598,8 @@ class GameMenu:
 
         self.plyr = 'X'
         self.main_board = setup_board(self.board_sz.get())
-        self.filled_slots_ind = []
-        self.slot_buttons = []
+        self.filled_inds = []
+        self.board_buttons = []
         self.is_debugging = BooleanVar(value=False)
         self.is_game_active = False
 
@@ -725,13 +725,13 @@ class GameMenu:
 
         # initialize the board_frame and settings_frame
         self.create_boardframe()
-        # rebinds the close window (X) slot_button in the top right corner
+        # rebinds the close window (X) ind_button in the top right corner
         self.window.protocol('WM_DELETE_WINDOW', self.to_submenu)
 
     def toggle_debugger(self):
         # reset all previous debugging info
-        for button in self.slot_buttons:
-            # if the slot has a number on, it has no X/O
+        for button in self.board_buttons:
+            # if the button has a number on, it has no X/O
             if type(button.cget('text')) == int:
                 button.config(text='')
             if button.cget('background') in [self.colors['']['pruned_area'], self.colors['']['winner_area']]:
@@ -739,20 +739,20 @@ class GameMenu:
 
         if self.is_debugging.get() is True:
             self.debugger.grid(columnspan=3, row=10, column=0, sticky='ns')
-            for slot, button in enumerate(self.slot_buttons):
-                if slot not in self.filled_slots_ind:
-                    button.config(text=slot, foreground='gray')
-                if slot in self.check_winner_area:
+            for ind, button in enumerate(self.board_buttons):
+                if ind not in self.filled_inds:
+                    button.config(text=ind, foreground='gray')
+                if ind in self.check_winner_area:
                     button.config(background=self.colors['']['winner_area'])
         else:
             self.debugger.grid_forget()
-            for button in self.slot_buttons:
+            for button in self.board_buttons:
                 if button.cget('background') == self.colors['']['pc_move']:
                     button.config(background='SystemButtonFace')
                     break
 
     def create_boardframe(self):
-        self.slot_buttons = []
+        self.board_buttons = []
         # create buttons in board_frame
         for row in range(self.board_sz.get()):
             for col in range(self.board_sz.get()):
@@ -761,16 +761,16 @@ class GameMenu:
                     self.board_frame,
                     font=('Helvetica', self.board_zoom.get() * 4, 'bold'),
                     cursor='plus',
-                    command=lambda _=button_num: self.update_slot(_),
+                    command=lambda _=button_num: self.update_ind(_),
                     width=3,
                     borderwidth=5
                 )
-                self.slot_buttons.append(button)
+                self.board_buttons.append(button)
                 button.grid(row=row + 3, column=col + 2)
 
     def adjust_length(self, *args):
         # When I adjust the board length, I must delete the old buttons as I cannot change their position
-        for button in self.slot_buttons:
+        for button in self.board_buttons:
             button.destroy()
 
         # Generate new board and attributes with the correct dimension at backend
@@ -786,8 +786,8 @@ class GameMenu:
 
     def adjust_zoom(self, *args):
         # Update the position of the turn indicator and the scale of the buttons.
-        for slot_button in self.slot_buttons:
-            slot_button.config(font=('Helvetica', self.board_zoom.get() * 4, 'bold'))
+        for ind_button in self.board_buttons:
+            ind_button.config(font=('Helvetica', self.board_zoom.get() * 4, 'bold'))
         self.turn_hint['X'].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
         self.turn_hint['O'].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
 
@@ -800,10 +800,10 @@ class GameMenu:
         self.board_sz_label.config(state='disabled')
         self.pvco_checkbox.config(state='disabled')
         self.replay_button.config(state='normal')
-        self.update_slot_pvc(-1)
+        self.update_ind_pvc(-1)
         self.is_game_active = True
 
-    def update_slot(self, prev_input: int):
+    def update_ind(self, prev_input: int):
         # clear debugger window
         self.debugger.delete('1.0', 'end')
         # If the game is not ongoing before, this is the first move. Change some settings.
@@ -815,28 +815,26 @@ class GameMenu:
             self.is_game_active = True
 
         if self.mode == 'pvp':
-            self.update_slot_pvp(prev_input)
+            self.update_ind_pvp(prev_input)
             self.check_winner_pvp()
 
         elif self.mode == 'pvc':
-            self.update_slot_pvp(prev_input)
+            self.update_ind_pvp(prev_input)
             self.check_winner_pvc()
             if self.is_game_active:
-                self.update_slot_pvc(prev_input)
+                self.update_ind_pvc(prev_input)
                 self.check_winner_pvc()
 
-    def update_slot_pvc(self, prev_input: int) -> int:
+    def update_ind_pvc(self, prev_input: int) -> int:
         self.debugger.insert(tk.END, f'Player\'s move:\n\t{prev_input}\n')
-        # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
-        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(),
-                           min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
-                           prev_input, self.is_debugging.get(), self.debugger,
-                           self.slot_buttons)
-        self.filled_slots_ind.append(pc_move)
+        # win_len must be <= 4 as the pruned area can be 4 buttons wide if player moved at corners.
+        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, prev_input, self.is_debugging.get(), self.debugger, self.board_buttons)
+
+        self.filled_inds.append(pc_move)
         self.main_board[pc_move] = opp(self.plyr)
         # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
-        self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
-                                          disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
+        self.board_buttons[pc_move].config(text=self.main_board[pc_move],
+                                           disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
         self.debugger.insert('end', f'PC\'s move:\n\t{pc_move}\n')
 
         return pc_move
@@ -857,16 +855,16 @@ class GameMenu:
             if messagebox.askyesno('Outcome', f'You win {winner[1]}!\n\n"That shouldn\'t happen ... replay?"') is True:
                 self.replay()
 
-    def update_slot_pvp(self, prev_input: int):
+    def update_ind_pvp(self, prev_input: int):
         # reset tint for pruned area and last pc move
         self.toggle_debugger()
         # update backend board
         self.main_board[prev_input] = self.plyr
-        self.filled_slots_ind.append(prev_input)
+        self.filled_inds.append(prev_input)
         # update frontend board
-        self.slot_buttons[prev_input].config(text=self.main_board[prev_input],
-                                             disabledforeground=self.colors[self.plyr]['symbol'],
-                                             state='disabled')
+        self.board_buttons[prev_input].config(text=self.main_board[prev_input],
+                                              disabledforeground=self.colors[self.plyr]['symbol'],
+                                              state='disabled')
 
     def check_winner_pvp(self):
         # used to check winner after each turn in PVP mode
@@ -886,7 +884,7 @@ class GameMenu:
 
     def stop_game(self):
         self.is_game_active = False
-        for button in self.slot_buttons:
+        for button in self.board_buttons:
             button.config(state='disabled')
 
     def to_submenu(self):
@@ -1009,7 +1007,7 @@ class GameMenuT(GameMenu):
         elif remain_time < 5.0 and remain_time % 1 >= 0.4:
             self.time_entry[self.plyr].config(relief='groove', disabledbackground='yellow')
 
-    def update_slot(self, prev_input: int):
+    def update_ind(self, prev_input: int):
         # If the game is not ongoing before, this is the first move.
         if self.is_game_active is False:
             # If the input time is not valid:
@@ -1026,20 +1024,20 @@ class GameMenuT(GameMenu):
             # If game is started by player, PC must be O. So, hide O's timer.
             self.turn_hint['O'].pack_forget()
 
-            # I put update_slot before countdown in X's first move to prevent X losing 0.1 sec.
-            super().update_slot(prev_input)
+            # I put update_ind() before countdown in X's first move to prevent X losing 0.1 sec.
+            super().update_ind(prev_input)
             self.countdown()
         else:
             self.hint_scale = 0
-            super().update_slot(prev_input)
+            super().update_ind(prev_input)
 
-    # Below, I override update_slot_pvc and check_winner_pvp to include timer switching.
-    # I chose these as: update_slot_pvc is only executed once in PVC; check_winner_pvp is the only func used in PVP and not PVC
-    def update_slot_pvc(self, prev_input):
-        if self.is_game_active is True and len(self.filled_slots_ind) > 1:
+    # Below, I override update_ind_pvc() and check_winner_pvp to include timer switching.
+    # I chose these as: update_ind_pvc() is only executed once in PVC; check_winner_pvp is the only func used in PVP and not PVC
+    def update_ind_pvc(self, prev_input):
+        if self.is_game_active is True and len(self.filled_inds) > 1:
             # this plyr gets bonus time
             self.remain_time[self.plyr].set(str(float(self.remain_time[self.plyr].get()) + 1))
-        super().update_slot_pvc(prev_input)
+        super().update_ind_pvc(prev_input)
 
     def check_winner_pvp(self):
         super().check_winner_pvp()
@@ -1049,7 +1047,7 @@ class GameMenuT(GameMenu):
                                                font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
         self.time_entry[self.plyr].config(relief='sunken', disabledforeground=self.colors[self.plyr]['symbol'], disabledbackground='white')
 
-        if self.is_game_active is True and len(self.filled_slots_ind) > 1:
+        if self.is_game_active is True and len(self.filled_inds) > 1:
             # This plyr gets bonus time. Note: self.plyr is the NEXT plyr
             self.remain_time[opp(self.plyr)].set(str(float(self.remain_time[opp(self.plyr)].get()) + 1))
 
@@ -1117,30 +1115,30 @@ class GameMenuV(GameMenu):
         if (len(self.prev_inputs) > self.remain_steps.get() * 2) and self.is_game_active:
             self.debugger.insert('end', f'Most recent moves:\n{self.prev_inputs}')
             self.main_board[self.prev_inputs[0]] = ' '
-            self.slot_buttons[self.prev_inputs[0]].config(text='', background='SystemButtonFace', state='normal')
-            self.filled_slots_ind.remove(self.prev_inputs[0])
+            self.board_buttons[self.prev_inputs[0]].config(text='', background='SystemButtonFace', state='normal')
+            self.filled_inds.remove(self.prev_inputs[0])
             self.prev_inputs = self.prev_inputs[1:]
             self.toggle_debugger()
 
         # if (num of moves by X & O so far) + (moves by X & O in this turn) is one less before vanishing begins, tint the 3 oldest moves about to vanish.
         if (len(self.prev_inputs) + 2 > self.remain_steps.get() * 2 - 1) and self.show_nxt_vanish_move.get():
-            self.slot_buttons[self.prev_inputs[1]].config(background=self.colors['']['nxt_vanish_move1'])
-            self.slot_buttons[self.prev_inputs[0]].config(background=self.colors['']['nxt_vanish_move0'])
+            self.board_buttons[self.prev_inputs[1]].config(background=self.colors['']['nxt_vanish_move1'])
+            self.board_buttons[self.prev_inputs[0]].config(background=self.colors['']['nxt_vanish_move0'])
 
     def adjust_length(self, *args):
         super().adjust_length(*args)
         self.remain_stps_slider.config(from_=self.win_len, to=self.win_len * 2)
 
-    def update_slot_pvc(self, prev_input: int):
-        pc_move = super().update_slot_pvc(prev_input)
+    def update_ind_pvc(self, prev_input: int):
+        pc_move = super().update_ind_pvc(prev_input)
         self.prev_inputs.append(pc_move)
 
     def check_winner_pvc(self):
         super().check_winner_pvc()
         self.delete_moves()
 
-    def update_slot_pvp(self, prev_input: int):
-        super().update_slot_pvp(prev_input)
+    def update_ind_pvp(self, prev_input: int):
+        super().update_ind_pvp(prev_input)
         self.prev_inputs.append(prev_input)
 
     def check_winner_pvp(self):
@@ -1182,35 +1180,33 @@ class GameMenuS(GameMenu):
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
         self.toggle_debugger()
 
-    def update_slot_pvc(self, prev_input: int) -> int:
+    def update_ind_pvc(self, prev_input: int) -> int:
         is_surrounded = True
 
         # while (next plyr is not stuck) and (both X and O alr placed their first move):
         while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
-            for slot in range(self.board_sz.get()**2):
-                pass    # TODO
+            for ind in range(self.board_sz.get() ** 2):
+                pass  # TODO
 
-        # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
-        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(),
-                           min(self.win_len, 4), set_check_winner_area(self.board_sz.get(), min(self.win_len, 4)),
-                           self.prev_inputs[opp(self.plyr)][-1], self.is_debugging.get(), self.debugger,
-                           self.slot_buttons)
-        self.filled_slots_ind.append(pc_move)
+        # win_len must be <= 4 as the pruned area can be 4 buttons wide if player moved at corners.
+        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, self.prev_inputs[opp(self.plyr)][-1], self.is_debugging.get(), self.debugger, self.board_buttons)
+
+        self.filled_inds.append(pc_move)
         self.main_board[pc_move] = opp(self.plyr)
         # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
-        self.slot_buttons[pc_move].config(text=self.main_board[pc_move],
-                                          disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
+        self.board_buttons[pc_move].config(text=self.main_board[pc_move],
+                                           disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
         self.debugger.insert('end', f'PC\'s move:{pc_move}\n')
 
         return pc_move
 
-    def update_slot_pvp(self, prev_input: int):
-        super().update_slot_pvp(prev_input)
-        self.slot_buttons[prev_input].config(background=self.colors[self.plyr]['snake_head'])
+    def update_ind_pvp(self, prev_input: int):
+        super().update_ind_pvp(prev_input)
+        self.board_buttons[prev_input].config(background=self.colors[self.plyr]['snake_head'])
 
         if len(self.prev_inputs[self.plyr]) > 0:
             # turn the snake's previous head to body color
-            self.slot_buttons[self.prev_inputs[self.plyr][-1]].config(background=self.colors[self.plyr]['snake_body'])
+            self.board_buttons[self.prev_inputs[self.plyr][-1]].config(background=self.colors[self.plyr]['snake_body'])
         self.prev_inputs[self.plyr].append(prev_input)
 
     def check_winner_pvp(self):
@@ -1219,17 +1215,18 @@ class GameMenuS(GameMenu):
         is_surrounded = True
         # while (next plyr is not stuck) and (both X and O alr placed their first move):
         while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
-            for slot in range(self.board_sz.get()**2):
-                # If a slot is in the 3x3 area of the next plyr's last input and has nothing on it, make it pressable. Note: self.plyr is the NEXT plyr
-                if self.prev_inputs[self.plyr][-1] // self.board_sz.get() - 1 <= slot // self.board_sz.get() <= self.prev_inputs[self.plyr][-1] // self.board_sz.get() + 1 and \
-                        self.prev_inputs[self.plyr][-1] % self.board_sz.get() - 1 <= slot % self.board_sz.get() <= self.prev_inputs[self.plyr][-1] % self.board_sz.get() + 1 and self.main_board[slot] == ' ':
-                    self.slot_buttons[slot].config(state='normal', relief='raised')
+            for ind in range(self.board_sz.get() ** 2):
+                # If a button is in the 3x3 area of the next plyr's last input and has nothing on it, make it pressable. Note: self.plyr is the NEXT plyr
+                if self.prev_inputs[self.plyr][-1] // self.board_sz.get() - 1 <= ind // self.board_sz.get() <= self.prev_inputs[self.plyr][-1] // self.board_sz.get() + 1 and \
+                        self.prev_inputs[self.plyr][-1] % self.board_sz.get() - 1 <= ind % self.board_sz.get() <= self.prev_inputs[self.plyr][-1] % self.board_sz.get() + 1 and self.main_board[
+                        ind] == ' ':
+                    self.board_buttons[ind].config(state='normal', relief='raised')
                     is_surrounded = False
-                # If a slot is around the next plyr's last input and has nothing on it, make it unpressable.
-                elif self.main_board[slot] == ' ':
-                    self.slot_buttons[slot].config(state='disabled', relief='sunken')
+                # If a button is around the next plyr's last input and has nothing on it, make it unpressable.
+                elif self.main_board[ind] == ' ':
+                    self.board_buttons[ind].config(state='disabled', relief='sunken')
 
-            # if next plyr is stuck, recursively go back to the last move before stuck and activates surrounding slots
+            # if next plyr is stuck, recursively go back to the last move before stuck and activates surrounding buttons
             if is_surrounded is True:
                 self.prev_inputs[self.plyr] = self.prev_inputs[self.plyr][:-1]
 
