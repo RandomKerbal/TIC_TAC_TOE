@@ -22,11 +22,11 @@ def set_check_winner_area(board_sz: int, win_len: int) -> list:
 
 def setup_board(board_sz: int) -> list:
     # setup board layout
-    # eg 3x3 board = ['[ ]','[ ]','[ ]'
-    #                 '[ ]','[ ]','[ ]'
-    #                 '[ ]','[ ]','[ ]', 'initial_move']
-    main_board = [' ' for _ in range(board_sz**2)]
-    main_board.append('_')
+    # eg 3x3 board = [' ',' ',' '
+    #                 ' ',' ',' '
+    #                 ' ',' ',' ', 'initial_move']
+    main_board = [' '] * (board_sz**2)
+    # main_board.append('_')  # TODO
 
     return main_board
 
@@ -98,8 +98,9 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
     #     NO, NO, NO, NO, NO,
     #     NO, NO, NO, NO, NO,
     #     NO, NO, NO, NO, NO
-    x_win_formation = ['X' for _ in range(win_len)]
-    o_win_formation = ['O' for _ in range(win_len)]
+    x_win_formation = ['X'] * win_len
+    o_win_formation = ['O'] * win_len
+
     # OPTIMIZATION:
     # Instead of checking every ind to find those that r outside the checked area, I give the AI indexes that r outside.
     for origin in check_winner_area:
@@ -163,74 +164,72 @@ def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_wi
     return -1
 
 
-def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winner_area: list, prev_input: int, is_debugging: bool, debugger=None, ind_buttons=None) -> int:
+def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, prev_input: int, is_debugging: bool, debugger=None, ind_buttons=None) -> int:
+    board_sz_neg1 = board_sz-1
 
     def prune(origin: int):
         """
-        Limits the indexes that PC can simulate to the 12 empty indexes closest to the origin.
+        Limits the indexes that PC can simulate to the 12 empty indexes that are either: one of the 8 around the origin; or have the highest number of adj indexes with an X/O.
         """
-        # OPTIMIZATIONS:
-        #   only reserve empty indexes in the 3x3 area around the origin
-        #   If there aren't enough empty indexes:
-        #   ...also reserve empty indexes in the 4 corners of the 5x5 area around the origin (aka diagonal adjacents)
-        #   If there still aren't enough empty indexes:
-        #   ...also reserve 4 empty indexes at the top, bottom, left, & right of the 5x5 area
-        #   If there still still aren't enough empty indexes:
-        #   also reserve rest of the empty indexes in the 5x5 area
+        # convert origin to coords and clamp between 1 to board_sz-2.
+        # Why clamp? -> there must be 8 indexes around the origin.
+        origin_row = max(1, min(origin // board_sz, board_sz-2))
+        origin_col = max(1, min(origin % board_sz, board_sz-2))
 
-        # indexes in the reserved_area are stored as (x_coord, y_coord)
-        reserved_area = []
+        # set up coords of 8 indexes around a center, stored as (x_coord, y_coord)
+        adjacents = (
+            (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
+            (-1, 0),           (1, 0),   # Left, Right
+            (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
+        )
 
-        start_col = max(0, min(origin % board_sz - 1, board_sz - 3))
-        start_row = max(0, min(origin // board_sz - 1, board_sz - 3))
-
-        # add coords of 3x3 area around the origin
-        for row in range(start_row, start_row + 3):
-            for col in range(start_col, start_col + 3):
-                reserved_area.append((col, row))
-
-        # add coords of the 4 diagonal adjacents, in clock-wise order
-        reserved_area.append((start_col - 1, start_row - 1))
-        reserved_area.append((start_col + 3, start_row - 1))
-        reserved_area.append((start_col + 3, start_row + 3))
-        reserved_area.append((start_col - 1, start_row + 3))
-
-        # add coords of the 4 orthogonal adjacents, in clock-wise order
-        reserved_area.append((start_col + 1, start_row - 1))
-        reserved_area.append((start_col + 3, start_row + 1))
-        reserved_area.append((start_col + 1, start_row + 3))
-        reserved_area.append((start_col - 1, start_row + 1))
-
-        # add coords of the rest of the indexes, in clock-wise order
-        # central 3x3 must come before diagonal adjs, and...
-        # diagonal adjs must come before the orthogonal adjs, and...
-        # orthogonal adjs must come before the rest, as items are ignored starting from the back if there alr r enough empty indexes
-        reserved_area.append((start_col, start_row - 1))
-        reserved_area.append((start_col + 2, start_row - 1))
-        reserved_area.append((start_col + 3, start_row))
-        reserved_area.append((start_col + 3, start_row + 2))
-        reserved_area.append((start_col + 2, start_row + 3))
-        reserved_area.append((start_col, start_row + 3))
-        reserved_area.append((start_col - 1, start_row + 2))
-        reserved_area.append((start_col - 1, start_row))
-
-        # simmable_inds records the 12 indexes
+        # stores the 12 indexes
         global simmable_inds
         simmable_inds = []
 
-        # if the indexes in reserved_area are:
-        #   1. within the board (0 <= ind_index < len)
-        #   2. ' ' on the board
-        #   and there aren't enough empty indexes.
-        # then add them back to simmable_inds
-        count = 1
-        for coord in reserved_area:
-            if (0 <= coord[0] < board_sz and 0 <= coord[1] < board_sz) and (main_board[coord[1] * board_sz + coord[0]] == ' ') and count <= 12:
-                ind = coord[1] * board_sz + coord[0]
-                simmable_inds.append(ind)
-                if is_debugging:
-                    ind_buttons[ind].config(background='Lemon Chiffon2')
-                count += 1
+        # for each index, stores the number of adj indexes with an X/O.
+        ind_priority = {}
+
+        for ind, symbol in enumerate(main_board):
+            if symbol == ' ':
+                ind_row = ind // board_sz
+                ind_col = ind % board_sz
+                origin_dy = abs(ind_row - origin_row)
+                origin_dx = abs(ind_col - origin_col)
+
+                # I want diagonal indexes to have shorter distance from origin than hor/vert indexes -> higher priority.
+                origin_d = max(origin_dy, origin_dx) - min(origin_dy, origin_dx)/2
+
+                if origin_d <= 1:  # if the index is one of the 8 around the origin (less than 2 units from the origin)
+                    simmable_inds.append(ind)
+                    continue
+
+                else:  # if the index is not one of the 8 around the origin
+                    priority = 0
+                    for adj in adjacents:  # count how many adj indexes with an X/O
+                        new_row = ind_row + adj[0]
+                        new_col = ind_col + adj[1]
+                        if 0 <= new_row < board_sz and 0 <= new_col < board_sz:
+                            if main_board[new_row*board_sz + new_col] != ' ':
+                                priority += 1
+
+                    ind_priority[(ind, origin_d,)] = priority   # key = (board index, dist_from_origin)
+
+        print(f'Index priority: {ind_priority}')
+
+        simmable_inds.extend(
+            key_val[0][0] for key_val in  # add the keys in sorted order into simmable_inds.
+            sorted(  # sort the ind_priority. Key with higher priority comes first. If keys have same priority: key with shorter distance from origin comes first.
+                ind_priority.items(),
+                key=lambda key_val: (-key_val[1], key_val[0][1])
+            )
+        )
+
+        simmable_inds = simmable_inds[:12]
+
+        if is_debugging:
+            for ind in simmable_inds:
+                ind_buttons[ind].config(background='Lemon Chiffon2')
 
         debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(simmable_inds) + '\n')
         print(f'\nEmpty indexes: {simmable_inds}')
@@ -239,7 +238,6 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         half_win_len = win_len // 2
         origin_col = origin % board_sz
         origin_row = origin // board_sz
-        board_sz_neg1 = board_sz - 1
 
         # check column
         # I put check column as the first function as it is the fastest to complete
@@ -423,7 +421,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         if len(simmable_inds) == 0:
             if is_debugging:
                 debugger.insert(tk.END, 'PC\'s comment:\nNo empty indexes found! Randomly generating next move...')
-            fin_move = random.choice([_ for _ in range(board_sz**2) if main_board[_] == ' '])
+            fin_move = random.choice([i for i, symbol in enumerate(main_board) if symbol == ' '])
 
         else:
             for i in range(len(simmable_inds)):

@@ -99,7 +99,7 @@ class MainMenu:
                                     text='',
                                     font='TkFixedFont',
                                     justify='left')
-        subtitle_text = '   100% Made by CZY         3 Unprecedented Modes!          Unbeatable AI!        '
+        subtitle_text = '   99% Made by CZY          3 Unprecedented Modes!          Unbeatable AI!        '
 
         self.b_pvc = Button(self.window,
                             text='Single Player',
@@ -739,11 +739,11 @@ class GameMenu:
 
         if self.is_debugging.get() is True:
             self.debugger.grid(columnspan=3, row=10, column=0, sticky='ns')
-            for slot in range(len(self.slot_buttons)):
+            for slot, button in enumerate(self.slot_buttons):
                 if slot not in self.filled_slots_ind:
-                    self.slot_buttons[slot].config(text=slot, foreground='gray')
+                    button.config(text=slot, foreground='gray')
                 if slot in self.check_winner_area:
-                    self.slot_buttons[slot].config(background=self.colors['']['winner_area'])
+                    button.config(background=self.colors['']['winner_area'])
         else:
             self.debugger.grid_forget()
             for button in self.slot_buttons:
@@ -1187,8 +1187,8 @@ class GameMenuS(GameMenu):
 
         # while (next plyr is not stuck) and (both X and O alr placed their first move):
         while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
-            for slot in range(self.board_sz.get() ** 2):
-                pass
+            for slot in range(self.board_sz.get()**2):
+                pass    # TODO
 
         # win_len must be <= 4 as the pruned area can be 4 slots wide if player moved at corners.
         pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(),
@@ -1219,7 +1219,7 @@ class GameMenuS(GameMenu):
         is_surrounded = True
         # while (next plyr is not stuck) and (both X and O alr placed their first move):
         while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
-            for slot in range(self.board_sz.get() ** 2):
+            for slot in range(self.board_sz.get()**2):
                 # If a slot is in the 3x3 area of the next plyr's last input and has nothing on it, make it pressable. Note: self.plyr is the NEXT plyr
                 if self.prev_inputs[self.plyr][-1] // self.board_sz.get() - 1 <= slot // self.board_sz.get() <= self.prev_inputs[self.plyr][-1] // self.board_sz.get() + 1 and \
                         self.prev_inputs[self.plyr][-1] % self.board_sz.get() - 1 <= slot % self.board_sz.get() <= self.prev_inputs[self.plyr][-1] % self.board_sz.get() + 1 and self.main_board[slot] == ' ':
