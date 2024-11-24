@@ -320,17 +320,20 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, input_origi
         for i in range(len(simmable_inds)):
             sim_ind = simmable_inds.pop(i)
 
-            child = parent.copy()
+            child = parent
             child[sim_ind] = child_plyr
 
             if is_plyr_win(child, child_plyr, sim_ind) is True or (len(simmable_inds) == 0 and child_plyr == pc) or (len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True):
                 # if a child is white
                 # or if a child is tie (not white) and is at the bottommost layer and the bottommost layer is pc's turn
                 # or if a child is white and is not at the bottommost layer yet
-                white_num[str('Lyr ' + str(len(simmable_inds)))] += 1
+                white_num['Lyr ' + str(len(simmable_inds))] += 1
+
+                child[sim_ind] = ' '
                 simmable_inds.insert(i, sim_ind)
                 return False
 
+            child[sim_ind] = ' '
             simmable_inds.insert(i, sim_ind)
 
         return True
@@ -435,15 +438,17 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, input_origi
 
                 sim_ind = simmable_inds.pop(i)
 
-                child = main_board.copy()
+                child = main_board
                 child[sim_ind] = pc
 
                 if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
-                    white_num[str('Lyr ' + str(len(simmable_inds)))] += 1
+                    white_num['Lyr ' + str(len(simmable_inds))] += 1
                     print('Number of white nodes at', sim_ind, ':', white_num)
                     return sim_ind
                 else:
                     print('Number of white nodes at', sim_ind, ':', white_num)
+
+                    child[sim_ind] = ' '
                     simmable_inds.insert(i, sim_ind)
 
             # win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
