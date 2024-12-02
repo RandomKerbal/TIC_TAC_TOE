@@ -1,4 +1,5 @@
-from tkinter import *
+import random
+import tkinter as tk
 from tkinter import messagebox
 
 from TIC_TAC_TOE_func import *
@@ -18,17 +19,19 @@ Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functio
 Ver 10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
 Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Capped length to win at 4. Added 'Total Child Count' to debugger.
 Ver 12: Redesign the algorithm to use depth-first search instead of breadth-first-search. Build a specialized, faster winner-checking algo that only checks for whether a specific player wins, instead of checking who wins.\n
-Ver 13: \n
+Ver 13: Prunner V2
+Ver 14: Prunner V3, Shayan's Algo.
+Ver 15: GUI Revamp
+Ver 16: \n
     ''')
 
 
 class MainMenu:
     """
-    === Attributes ===\n
-    window: Name of window that displays MainMenu.\n
-    board_sz: Length of the board.\n
-    board_zoom: Magnification of the board.\n
-    color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
+    :ivar window: name of window that displays MainMenu.
+    :ivar board_sz: length of the board.
+    :ivar board_zoom: magnification of the board.
+    :ivar colors: dict containing colors for different features. Sorted into: player X, player O, all.
     """
 
     def __init__(self, window, board_sz: int = 3, board_zoom: int = 5, colors: dict = None):
@@ -49,8 +52,8 @@ class MainMenu:
                 },
                 '': {
                     'pc_move': 'Khaki1',
-                    'winner_area': 'Lavender',
-                    'pruned_area': 'Lemon Chiffon2',
+                    'check_winner_area': 'Lavender',
+                    'simmable_inds': 'Lemon Chiffon2',
                     'nxt_vanish_move0': 'Navajo White',
                     'nxt_vanish_move1': 'Antique White'
                 }
@@ -58,100 +61,100 @@ class MainMenu:
         else:
             self.colors = colors
 
-        self.title_line1 = Label(self.window,
-                                 takefocus=False,
-                                 width=500,
-                                 borderwidth=0,
-                                 background='Black',
-                                 foreground='Sea Green1',
-                                 text='=' * 999,
-                                 font='TkFixedFont')
-        self.title_line2 = Label(self.window,
-                                 takefocus=False,
-                                 width=500,
-                                 borderwidth=0,
-                                 background='Black',
-                                 foreground='Sea Green1',
-                                 text='\n' + '=' * 999,
-                                 font='TkFixedFont')
-        self.title_label = Label(self.window,
-                                 takefocus=False,
-                                 borderwidth=0,
-                                 width=82,
-                                 background='Black',
-                                 foreground='Sea Green1',
-                                 text='''
+        self.title_line1 = tk.Label(self.window,
+                                    takefocus=False,
+                                    width=500,
+                                    borderwidth=0,
+                                    background='Black',
+                                    foreground='Sea Green1',
+                                    text='=' * 999,
+                                    font='TkFixedFont')
+        self.title_line2 = tk.Label(self.window,
+                                    takefocus=False,
+                                    width=500,
+                                    borderwidth=0,
+                                    background='Black',
+                                    foreground='Sea Green1',
+                                    text='\n' + '=' * 999,
+                                    font='TkFixedFont')
+        self.title_label = tk.Label(self.window,
+                                    takefocus=False,
+                                    borderwidth=0,
+                                    width=82,
+                                    background='Black',
+                                    foreground='Sea Green1',
+                                    text='''
 ████████ ██  ██████       ████████  █████   ██████       ████████  ██████  ███████
    ██    ██ ██               ██    ██   ██ ██               ██    ██    ██ ██
    ██    ██ ██      █████    ██    ███████ ██      █████    ██    ██    ██ █████
    ██    ██ ██               ██    ██   ██ ██               ██    ██    ██ ██
    ██    ██  ██████          ██    ██   ██  ██████          ██     ██████  ███████''',
-                                 font='TkFixedFont',
-                                 justify='left',
-                                 anchor='nw')
-
-        self.subtitle_label = Label(self.window,
-                                    takefocus=False,
-                                    borderwidth=0,
-                                    width=500,
-                                    background='Black',
-                                    foreground='Sea Green1',
-                                    text='',
                                     font='TkFixedFont',
-                                    justify='left')
+                                    justify='left',
+                                    anchor='nw')
+
+        self.subtitle_label = tk.Label(self.window,
+                                       takefocus=False,
+                                       borderwidth=0,
+                                       width=500,
+                                       background='Black',
+                                       foreground='Sea Green1',
+                                       text='',
+                                       font='TkFixedFont',
+                                       justify='left')
         subtitle_text = '   99% Made by CZY          3 Unprecedented Modes!          Unbeatable AI!        '
 
-        self.b_pvc = Button(self.window,
-                            text='Single Player',
-                            cursor='hand2',
-                            overrelief='sunken',
-                            command=lambda _='pvc': self.to_submenu(_),
-                            activeforeground='white',
-                            activebackground='Sea Green',
-                            background='Sea Green1',
-                            foreground='Black',
-                            width=500,
-                            font=('FixedSys', 15),
-                            borderwidth=5)
+        self.b_pvc = tk.Button(self.window,
+                               text='Single Player',
+                               cursor='hand2',
+                               overrelief='sunken',
+                               command=lambda _='pvc': self.to_submenu(_),
+                               activeforeground='white',
+                               activebackground='Sea Green',
+                               background='Sea Green1',
+                               foreground='Black',
+                               width=500,
+                               font=('FixedSys', 15),
+                               borderwidth=5)
 
-        self.b_pvp = Button(self.window,
-                            text='Multi Player',
-                            cursor='hand2',
-                            overrelief='sunken',
-                            command=lambda _='pvp': self.to_submenu(_),
-                            activeforeground='white',
-                            activebackground='Sea Green',
-                            background='Sea Green1',
-                            foreground='Black',
-                            width=500,
-                            font=('FixedSys', 15),
-                            borderwidth=5)
+        self.b_pvp = tk.Button(self.window,
+                               text='Multi Player',
+                               cursor='hand2',
+                               overrelief='sunken',
+                               command=lambda _='pvp': self.to_submenu(_),
+                               activeforeground='white',
+                               activebackground='Sea Green',
+                               background='Sea Green1',
+                               foreground='Black',
+                               width=500,
+                               font=('FixedSys', 15),
+                               borderwidth=5)
 
-        self.b_changelog = Button(self.window,
-                                  text='Changelog',
-                                  cursor='hand2',
-                                  overrelief='sunken',
-                                  command=to_changelog,
-                                  activeforeground='white',
-                                  activebackground='Sea Green',
-                                  background='Sea Green1',
-                                  foreground='Black',
-                                  width=500,
-                                  font=('FixedSys', 15),
-                                  borderwidth=5)
+        self.b_changelog = tk.Button(self.window,
+                                     text='Changelog',
+                                     cursor='hand2',
+                                     overrelief='sunken',
+                                     command=to_changelog,
+                                     activeforeground='white',
+                                     activebackground='Sea Green',
+                                     background='Sea Green1',
+                                     foreground='Black',
+                                     width=500,
+                                     font=('FixedSys', 15),
+                                     borderwidth=5)
 
-        self.b_exit = Button(self.window,
-                             text='Exit',
-                             cursor='hand2',
-                             overrelief='sunken',
-                             command=self.exit,
-                             activeforeground='white',
-                             activebackground='Sea Green',
-                             background='Sea Green1',
-                             foreground='Black',
-                             width=500,
-                             font=('FixedSys', 15),
-                             borderwidth=5)
+        self.b_exit = tk.Button(self.window,
+                                text='Exit',
+                                cursor='hand2',
+                                overrelief='sunken',
+                                command=self.exit,
+                                activeforeground='white',
+                                activebackground='Sea Green',
+                                background='Sea Green1',
+                                foreground='Black',
+                                width=500,
+                                font=('FixedSys', 15),
+                                borderwidth=5)
 
         self.title_line1.pack(side='top')
         self.title_label.pack(side='top', pady=18)
@@ -232,13 +235,12 @@ def snake_hint():
 
 class SubMenu:
     """
-    === Attributes ===\n
-    window: Name of window that displays MainMenu.\n
-    board_sz: Length of the board.\n
-    board_zoom: Magnification of the board.\n
-    win_len: How many X in a row/column/diagonal to win.\n
-    color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
-    mode: pvp = Player versus player; pvc = Player versus pc.\n
+    :ivar window: name of window that displays MainMenu.
+    :ivar board_sz: length of the board.
+    :ivar board_zoom: magnification of the board.
+    :ivar win_len: how many X in a row/column/diagonal to win.
+    :ivar colors: dict containing colors for different features. Sorted into: player X, player O, all.
+    :ivar mode: pvp = player versus player; pvc = player versus pc.
     """
 
     def __init__(self, window, board_sz, board_zoom, colors, mode: str):
@@ -250,142 +252,142 @@ class SubMenu:
         self.colors = colors
         self.mode = mode
 
-        self.title = Button(self.window,
-                            state='disabled',
-                            takefocus=False,
-                            borderwidth=0,
-                            background='Black',
-                            disabledforeground='Sea Green1',
-                            text='\nChoose a mode',
-                            font=('FixedSys', 25, 'underline', 'bold'))
+        self.title = tk.Button(self.window,
+                               state='disabled',
+                               takefocus=False,
+                               borderwidth=0,
+                               background='Black',
+                               disabledforeground='Sea Green1',
+                               text='\nChoose a mode',
+                               font=('FixedSys', 25, 'underline', 'bold'))
 
-        self.b_default = Button(self.window,
-                                text='Traditional',
-                                cursor='hand2',
-                                overrelief='sunken',
-                                command=lambda _=self.mode: self.to_gamemenu(_),
-                                activeforeground='white',
-                                activebackground='Sea Green',
-                                background='Sea Green1',
-                                foreground='Black',
-                                width=25,
-                                font=('FixedSys', 15),
-                                borderwidth=5)
-
-        self.b_default_hint = Button(self.window,
-                                     bitmap='question',
-                                     cursor='question_arrow',
-                                     overrelief='sunken',
-                                     command=default_hint,
-                                     activeforeground='white',
-                                     activebackground='Sea Green',
-                                     background='Sea Green1',
-                                     foreground='Black',
-                                     width=30,
-                                     borderwidth=5)
-
-        self.b_timed = Button(self.window,
-                              text='Timed Trial',
-                              cursor='hand2',
-                              overrelief='sunken',
-                              command=lambda _=self.mode: self.to_gamemenu_t(_),
-                              activeforeground='white',
-                              activebackground='Sea Green',
-                              background='Sea Green1',
-                              foreground='Black',
-                              width=25,
-                              font=('FixedSys', 15),
-                              borderwidth=5)
-
-        self.b_timed_hint = Button(self.window,
-                                   bitmap='question',
-                                   cursor='question_arrow',
+        self.b_default = tk.Button(self.window,
+                                   text='Traditional',
+                                   cursor='hand2',
                                    overrelief='sunken',
-                                   command=timed_hint,
+                                   command=lambda _=self.mode: self.to_gamemenu(_),
                                    activeforeground='white',
                                    activebackground='Sea Green',
                                    background='Sea Green1',
                                    foreground='Black',
-                                   width=30,
+                                   width=25,
+                                   font=('FixedSys', 15),
                                    borderwidth=5)
 
-        self.b_vanish = Button(self.window,
-                               text='Vanishing Moves',
-                               cursor='hand2',
-                               overrelief='sunken',
-                               command=lambda _=self.mode: self.to_gamemenu_v(_),
-                               activeforeground='white',
-                               activebackground='Sea Green',
-                               background='Sea Green1',
-                               foreground='Black',
-                               width=25,
-                               font=('FixedSys', 15),
-                               borderwidth=5)
+        self.b_default_hint = tk.Button(self.window,
+                                        bitmap='question',
+                                        cursor='question_arrow',
+                                        overrelief='sunken',
+                                        command=default_hint,
+                                        activeforeground='white',
+                                        activebackground='Sea Green',
+                                        background='Sea Green1',
+                                        foreground='Black',
+                                        width=30,
+                                        borderwidth=5)
 
-        self.b_vanish_hint = Button(self.window,
-                                    bitmap='question',
-                                    cursor='question_arrow',
-                                    overrelief='sunken',
-                                    command=vanish_hint,
-                                    activeforeground='white',
-                                    activebackground='Sea Green',
-                                    background='Sea Green1',
-                                    foreground='Black',
-                                    width=30,
-                                    borderwidth=5)
-
-        self.b_snake = Button(self.window,
-                              text='Snake',
-                              cursor='hand2',
-                              overrelief='sunken',
-                              command=lambda _=self.mode: self.to_gamemenu_s(_),
-                              activeforeground='white',
-                              activebackground='Sea Green',
-                              background='Sea Green1',
-                              foreground='Black',
-                              width=25,
-                              font=('FixedSys', 15),
-                              borderwidth=5)
-
-        self.b_snake_hint = Button(self.window,
-                                   bitmap='question',
-                                   cursor='question_arrow',
-                                   overrelief='sunken',
-                                   command=snake_hint,
-                                   activeforeground='white',
-                                   activebackground='Sea Green',
-                                   background='Sea Green1',
-                                   foreground='Black',
-                                   width=30,
-                                   borderwidth=5)
-
-        self.non_mode_frame = Frame(self.window, background='Black', width=25)
-
-        self.b_back = Button(self.non_mode_frame,
-                             text='Back',
-                             cursor='hand2',
-                             overrelief='sunken',
-                             command=self.to_mainmenu,
-                             activeforeground='white',
-                             activebackground='Sea Green',
-                             background='Sea Green1',
-                             foreground='Black',
-                             width=12,
-                             font=('FixedSys', 15),
-                             borderwidth=5)
-
-        self.b_settings = Button(self.non_mode_frame,
-                                 text=u'\u2699',
+        self.b_timed = tk.Button(self.window,
+                                 text='Timed Trial',
                                  cursor='hand2',
                                  overrelief='sunken',
-                                 command=self.to_settings,
+                                 command=lambda _=self.mode: self.to_gamemenu_t(_),
                                  activeforeground='white',
                                  activebackground='Sea Green',
                                  background='Sea Green1',
                                  foreground='Black',
-                                 width=12,
-                                 font=('TkFixedFont', 13, 'bold'),
+                                 width=25,
+                                 font=('FixedSys', 15),
                                  borderwidth=5)
+
+        self.b_timed_hint = tk.Button(self.window,
+                                      bitmap='question',
+                                      cursor='question_arrow',
+                                      overrelief='sunken',
+                                      command=timed_hint,
+                                      activeforeground='white',
+                                      activebackground='Sea Green',
+                                      background='Sea Green1',
+                                      foreground='Black',
+                                      width=30,
+                                      borderwidth=5)
+
+        self.b_vanish = tk.Button(self.window,
+                                  text='Vanishing Moves',
+                                  cursor='hand2',
+                                  overrelief='sunken',
+                                  command=lambda _=self.mode: self.to_gamemenu_v(_),
+                                  activeforeground='white',
+                                  activebackground='Sea Green',
+                                  background='Sea Green1',
+                                  foreground='Black',
+                                  width=25,
+                                  font=('FixedSys', 15),
+                                  borderwidth=5)
+
+        self.b_vanish_hint = tk.Button(self.window,
+                                       bitmap='question',
+                                       cursor='question_arrow',
+                                       overrelief='sunken',
+                                       command=vanish_hint,
+                                       activeforeground='white',
+                                       activebackground='Sea Green',
+                                       background='Sea Green1',
+                                       foreground='Black',
+                                       width=30,
+                                       borderwidth=5)
+
+        self.b_snake = tk.Button(self.window,
+                                 text='Snake',
+                                 cursor='hand2',
+                                 overrelief='sunken',
+                                 command=lambda _=self.mode: self.to_gamemenu_s(_),
+                                 activeforeground='white',
+                                 activebackground='Sea Green',
+                                 background='Sea Green1',
+                                 foreground='Black',
+                                 width=25,
+                                 font=('FixedSys', 15),
+                                 borderwidth=5)
+
+        self.b_snake_hint = tk.Button(self.window,
+                                      bitmap='question',
+                                      cursor='question_arrow',
+                                      overrelief='sunken',
+                                      command=snake_hint,
+                                      activeforeground='white',
+                                      activebackground='Sea Green',
+                                      background='Sea Green1',
+                                      foreground='Black',
+                                      width=30,
+                                      borderwidth=5)
+
+        self.non_mode_frame = tk.Frame(self.window, background='Black', width=25)
+
+        self.b_back = tk.Button(self.non_mode_frame,
+                                text='Back',
+                                cursor='hand2',
+                                overrelief='sunken',
+                                command=self.to_mainmenu,
+                                activeforeground='white',
+                                activebackground='Sea Green',
+                                background='Sea Green1',
+                                foreground='Black',
+                                width=12,
+                                font=('FixedSys', 15),
+                                borderwidth=5)
+
+        self.b_settings = tk.Button(self.non_mode_frame,
+                                    text=u'\u2699',
+                                    cursor='hand2',
+                                    overrelief='sunken',
+                                    command=self.to_settings,
+                                    activeforeground='white',
+                                    activebackground='Sea Green',
+                                    background='Sea Green1',
+                                    foreground='Black',
+                                    width=12,
+                                    font=('TkFixedFont', 13, 'bold'),
+                                    borderwidth=5)
 
         # disables the close window (X) button in the top right corner
         self.window.protocol('WM_DELETE_WINDOW', lambda _=self: MainMenu.exit(_))
@@ -447,6 +449,9 @@ class SubMenu:
 
 
 class ColMenu:
+    """
+    :ivar window, board_sz, board_zoom, colors, mode: same as SubMenu.
+    """
 
     def __init__(self, window, board_sz, board_zoom, colors, mode):
         self.window = window
@@ -457,53 +462,53 @@ class ColMenu:
         self.colors = colors
         self.mode = mode
 
-        self.title = Button(self.window,
-                            state='disabled',
-                            takefocus=False,
-                            borderwidth=0,
-                            background='Black',
-                            disabledforeground='Sea Green1',
-                            text='Settings',
-                            font=('FixedSys', 25, 'underline', 'bold'))
+        self.title = tk.Button(self.window,
+                               state='disabled',
+                               takefocus=False,
+                               borderwidth=0,
+                               background='Black',
+                               disabledforeground='Sea Green1',
+                               text='Settings',
+                               font=('FixedSys', 25, 'underline', 'bold'))
         self.col_frames = {
-            'X': LabelFrame(self.window,
-                            text='X colors',
-                            font=('FixedSys', 20, 'bold'),
-                            foreground='Sea Green1',
-                            background='Black',
-                            borderwidth=3,
-                            relief='ridge',
-                            takefocus=False),
-            'O': LabelFrame(self.window,
-                            text='O colors',
-                            font=('FixedSys', 20, 'bold'),
-                            foreground='Sea Green1',
-                            background='Black',
-                            borderwidth=3,
-                            relief='ridge',
-                            takefocus=False),
-            '': LabelFrame(self.window,
-                           text='General',
-                           font=('FixedSys', 20, 'bold'),
-                           foreground='Sea Green1',
-                           background='Black',
-                           borderwidth=3,
-                           relief='ridge',
-                           takefocus=False)
+            'X': tk.LabelFrame(self.window,
+                               text='X colors',
+                               font=('FixedSys', 20, 'bold'),
+                               foreground='Sea Green1',
+                               background='Black',
+                               borderwidth=3,
+                               relief='ridge',
+                               takefocus=False),
+            'O': tk.LabelFrame(self.window,
+                               text='O colors',
+                               font=('FixedSys', 20, 'bold'),
+                               foreground='Sea Green1',
+                               background='Black',
+                               borderwidth=3,
+                               relief='ridge',
+                               takefocus=False),
+            '': tk.LabelFrame(self.window,
+                              text='General',
+                              font=('FixedSys', 20, 'bold'),
+                              foreground='Sea Green1',
+                              background='Black',
+                              borderwidth=3,
+                              relief='ridge',
+                              takefocus=False)
         }
 
-        self.b_exit = Button(self.window,
-                             text='Save and Exit',
-                             cursor='hand2',
-                             overrelief='sunken',
-                             command=self.to_submenu,
-                             activeforeground='white',
-                             activebackground='Sea Green',
-                             background='Sea Green1',
-                             foreground='Black',
-                             width=25,
-                             font=('FixedSys', 15),
-                             borderwidth=5)
+        self.b_exit = tk.Button(self.window,
+                                text='Save and Exit',
+                                cursor='hand2',
+                                overrelief='sunken',
+                                command=self.to_submenu,
+                                activeforeground='white',
+                                activebackground='Sea Green',
+                                background='Sea Green1',
+                                foreground='Black',
+                                width=25,
+                                font=('FixedSys', 15),
+                                borderwidth=5)
 
         self.col_frames['X'].grid(row=0, column=1, pady=(10, 5))
         self.col_frames['O'].grid(row=0, column=2, pady=(10, 5))
@@ -520,16 +525,16 @@ class ColMenu:
             _ = 0
             for feat, col in feats.items():
                 _ += 1
-                col_label = Label(
+                col_label = tk.Label(
                     self.col_frames[plyr],
                     text=feat,
                     font=('FixedSys', 15),
                     foreground='Sea Green1',
                     background='Black',
                     takefocus=False)
-                col_entry = Entry(
+                col_entry = tk.Entry(
                     self.col_frames[plyr],
-                    textvariable=StringVar(value=col),
+                    textvariable=tk.StringVar(value=col),
                     borderwidth=1,
                     font=('FixedSys', 15),
                     cursor='xterm',
@@ -541,7 +546,6 @@ class ColMenu:
                 # make the key release event update bg of textbox
                 col_entry.bind('<KeyRelease>', lambda event, _p=plyr, _f=feat: self.update_col(_p, _f))
                 self.col_entries[plyr][feat] = col_entry
-        self.col_entries['']['pruned_area'].config(state='disabled', cursor='no')
 
     def update_col(self, plyr: str, feat: str):
         try:
@@ -571,20 +575,15 @@ class ColMenu:
 
 class GameMenu:
     """
-    === Attributes ===\n
-    window: Name of window that displays MainMenu.\n
-    board_sz: Length of the board.\n
-    check_winner_area = List containing buttons where the winning chain will fall on.\n
-    board_zoom: Magnification of the board.\n
-    win_len: How many X in a row/column/diagonal to win.\n
-    color: Dict containing colors for different features. Sorted into: player X, player O, all.\n
-    mode: pvp = Player versus player; pvc = Player versus pc.\n
-    plyr: Player playing in the current turn.\n
-    main_board: List containing the board on screen.\n
-    filled_buttons_ind: List containing the index of filled buttons of main_board.\n
-    board_buttons: List containing all the buttons that represent buttons on the GUI.\n
-    is_debugging: Show/hide the debugger.\n
-    is_game_active: Whether the game is ongoing. Returns True from the moment the first player moved until there's a winner, else False.\n
+    :ivar window, board_sz, board_zoom, colors, mode: same as SubMenu.
+    :ivar check_winner_area: list containing buttons where the winning chain will fall on.
+    :ivar win_len: how many X in a row/column/diagonal to win.
+    :ivar plyr: player playing in the current turn.
+    :ivar main_board: list containing the board on screen.
+    :ivar simmable_inds: list containing the 12 indexes PC is allowed to simulate.
+    :ivar filled_inds: list containing the indexes that are filled on main_board, in chronological order. Left element = earlier; right element = later.
+    :ivar board_buttons: list containing all the buttons that represent buttons on the GUI.
+    :ivar is_debugging: show/hide the debugger.
     """
 
     def __init__(self, window, board_sz, board_zoom, colors, mode: str):
@@ -598,35 +597,37 @@ class GameMenu:
 
         self.plyr = 'X'
         self.main_board = setup_board(self.board_sz.get())
+        self.simmable_inds = []
         self.filled_inds = []
         self.board_buttons = []
-        self.is_debugging = BooleanVar(value=False)
-        self.is_game_active = False
+        self.is_debugging = tk.BooleanVar(value=False)
 
-        self.settings_frame = Frame(self.window)
-        self.board_frame = Frame(self.window)
-        self.turn_hint_frame = Frame(self.board_frame, background='SystemButtonFace')
+        self.settings_frame = tk.Frame(self.window)
+        self.board_frame = tk.Frame(self.window)
+        self.turn_hint_frame = tk.Frame(self.board_frame, background='SystemButtonFace')
         self.turn_hint = {
-            'X': Label(
+            'X': tk.Label(
                 self.turn_hint_frame,
                 text='X turn',
                 font=('Helvetica', self.board_zoom.get() * 2, 'bold'),
                 foreground=self.colors['X']['symbol'],
+                background='white',
                 width=13,
                 borderwidth=5,
                 relief='ridge',
                 takefocus=False),
-            'O': Label(
+            'O': tk.Label(
                 self.turn_hint_frame,
                 text='O turn',
                 font=('Helvetica', self.board_zoom.get() * 2, 'bold'),
                 foreground=self.colors['O']['symbol'],
+                background='white',
                 width=13,
                 borderwidth=5,
                 relief='ridge',
                 takefocus=False)
         }
-        self.b_back = Button(
+        self.b_back = tk.Button(
             self.settings_frame,
             text='Back',
             cursor='hand2',
@@ -636,7 +637,7 @@ class GameMenu:
             width=5,
             borderwidth=5
         )
-        self.replay_button = Button(
+        self.replay_button = tk.Button(
             self.settings_frame,
             text='Replay',
             cursor='hand2',
@@ -647,11 +648,11 @@ class GameMenu:
             width=5,
             borderwidth=5
         )
-        self.board_sz_label = Label(
+        self.board_sz_label = tk.Label(
             self.settings_frame,
             text='\nBoard Length'
         )
-        self.board_sz_slider = Scale(
+        self.board_sz_slider = tk.Scale(
             self.settings_frame,
             orient='horizontal',
             variable=self.board_sz,
@@ -662,15 +663,15 @@ class GameMenu:
         )
         # Set up a trace to update the number and pos of buttons on the grid whenever the value changes
         self.trace1 = self.board_sz.trace_add('write', self.adjust_length)
-        self.board_sz_tip = Label(
+        self.board_sz_tip = tk.Label(
             self.settings_frame,
             text='Amount in a row to win: ' + str(self.win_len)
         )
-        self.board_zoom_label = Label(
+        self.board_zoom_label = tk.Label(
             self.settings_frame,
             text='\nZoom'
         )
-        self.board_zoom_slider = Scale(
+        self.board_zoom_slider = tk.Scale(
             self.settings_frame,
             orient='horizontal',
             variable=self.board_zoom,
@@ -681,14 +682,14 @@ class GameMenu:
         )
         # Set up a trace to update scale of buttons on the grid whenever the value changes
         self.trace2 = self.board_zoom.trace_add('write', self.adjust_zoom)
-        self.pvco_checkbox = Checkbutton(
+        self.pvco_checkbox = tk.Checkbutton(
             self.settings_frame,
             text='Computer starts first',
             height=2,
             cursor='hand2',
             command=self.pvc_first
         )
-        self.debug_checkbox = Checkbutton(
+        self.debug_checkbox = tk.Checkbutton(
             self.settings_frame,
             text='Show debugging data (may\nimpact performance)',
             height=2,
@@ -696,7 +697,7 @@ class GameMenu:
             variable=self.is_debugging,
             command=self.toggle_debugger
         )
-        self.debugger = Text(
+        self.debugger = tk.Text(
             self.settings_frame,
             wrap='none',
             height=15,
@@ -729,27 +730,35 @@ class GameMenu:
         self.window.protocol('WM_DELETE_WINDOW', self.to_submenu)
 
     def toggle_debugger(self):
-        # reset all previous debugging info
-        for button in self.board_buttons:
-            # if the button has a number on, it has no X/O
-            if type(button.cget('text')) == int:
-                button.config(text='')
-            if button.cget('background') in [self.colors['']['pruned_area'], self.colors['']['winner_area']]:
-                button.config(background='SystemButtonFace')
-
-        if self.is_debugging.get() is True:
+        if self.is_debugging.get() is True:  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
             self.debugger.grid(columnspan=3, row=10, column=0, sticky='ns')
-            for ind, button in enumerate(self.board_buttons):
-                if ind not in self.filled_inds:
+
+            simmable_inds_col = self.colors['']['simmable_inds']
+            check_winner_area_col = self.colors['']['check_winner_area']
+
+            for ind, symbol in enumerate(self.main_board):
+                if symbol == ' ':
+                    button = self.board_buttons[ind]
                     button.config(text=ind, foreground='gray')
+
+                    if ind in self.simmable_inds:
+                        button.config(background=simmable_inds_col)
+                        continue  # if alr in simmable_inds, do not apply check_winner_area_col
+
                 if ind in self.check_winner_area:
-                    button.config(background=self.colors['']['winner_area'])
+                    self.board_buttons[ind].config(background=check_winner_area_col)
+
         else:
             self.debugger.grid_forget()
-            for button in self.board_buttons:
-                if button.cget('background') == self.colors['']['pc_move']:
-                    button.config(background='SystemButtonFace')
-                    break
+
+            prev_input = self.filled_inds[-1] if self.filled_inds else None  # filled_inds can be empty after game ends
+
+            for ind, symbol in enumerate(self.main_board):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
+                if symbol == ' ':
+                    self.board_buttons[ind].config(text='', background='SystemButtonFace')
+
+                elif ind in self.check_winner_area and ind != prev_input:  # if not empty but in check_winner_area and not the most recent pc move
+                    self.board_buttons[ind].config(background='SystemButtonFace')
 
     def create_boardframe(self):
         self.board_buttons = []
@@ -757,7 +766,7 @@ class GameMenu:
         for row in range(self.board_sz.get()):
             for col in range(self.board_sz.get()):
                 button_num = row * self.board_sz.get() + col
-                button = Button(
+                button = tk.Button(
                     self.board_frame,
                     font=('Helvetica', self.board_zoom.get() * 4, 'bold'),
                     cursor='plus',
@@ -791,105 +800,148 @@ class GameMenu:
         self.turn_hint['X'].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
         self.turn_hint['O'].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
 
-    def pvc_first(self):
-        self.mode = 'pvc'
-        self.plyr = 'O'
-        self.turn_hint['X'].config(foreground='SystemDisabledText')
-        self.turn_hint['O'].config(foreground=self.colors['O']['symbol'])
+    def lock_settings(self):
         self.board_sz_slider.config(state='disabled')
         self.board_sz_label.config(state='disabled')
-        self.pvco_checkbox.config(state='disabled')
         self.replay_button.config(state='normal')
-        self.update_ind_pvc(-1)
-        self.is_game_active = True
+        self.pvco_checkbox.config(state='disabled')
+
+        # disable X's indicator
+        self.turn_hint['X'].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
+
+        # enable O's indicator
+        self.turn_hint['O'].config(foreground=self.colors['O']['symbol'], background='white', relief='ridge')
+
+    def pvc_first(self):
+        self.plyr = 'O'
+        self.lock_settings()
+        self.update_ind_pc(None)
 
     def update_ind(self, prev_input: int):
-        # clear debugger window
-        self.debugger.delete('1.0', 'end')
-        # If the game is not ongoing before, this is the first move. Change some settings.
-        if self.is_game_active is False:
-            self.board_sz_slider.config(state='disabled')
-            self.board_sz_label.config(state='disabled')
-            self.replay_button.config(state='normal')
-            self.pvco_checkbox.config(state='disabled')
-            self.is_game_active = True
+        self.update_ind_plyr(prev_input)
 
         if self.mode == 'pvp':
-            self.update_ind_pvp(prev_input)
-            self.check_winner_pvp()
+
+            if len(self.filled_inds) > 1:  # if both players alr moved once
+                self.check_winner_pvp()
+
+            else:  # if this is the first move
+                self.plyr = opp(self.plyr)
+                self.lock_settings()
 
         elif self.mode == 'pvc':
-            self.update_ind_pvp(prev_input)
-            self.check_winner_pvc()
-            if self.is_game_active:
-                self.update_ind_pvc(prev_input)
-                self.check_winner_pvc()
 
-    def update_ind_pvc(self, prev_input: int) -> int:
-        self.debugger.insert(tk.END, f'Player\'s move:\n\t{prev_input}\n')
-        # win_len must be <= 4 as the pruned area can be 4 buttons wide if player moved at corners.
-        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, prev_input, self.is_debugging.get(), self.debugger, self.board_buttons)
+            if len(self.filled_inds) > 1:
+                self.board_buttons[self.filled_inds[-2]].config(background='SystemButtonFace')  # unhighlight previous pc move
+                for ind in self.simmable_inds:
+                    self.board_buttons[ind].config(background='SystemButtonFace')  # unhighlight simmable_inds from the previous turn
+
+                if self.check_winner_pvc(self.plyr) is False:
+                    self.update_ind_pc(prev_input)
+                    self.check_winner_pvc(opp(self.plyr))
+
+            else:
+                self.lock_settings()
+
+                self.update_ind_pc(prev_input)
+                self.check_winner_pvc(opp(self.plyr))
+
+    def update_ind_pc(self, prev_input: int | None):
+        self.debugger.insert(tk.END, f'Player\'s move:  {prev_input}\n')
+
+        # initialize pc_move
+        if prev_input is not None:  # if PC start second
+
+            self.simmable_inds = prune(self.main_board, self.board_sz.get(), self.plyr, prev_input)
+            self.debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(self.simmable_inds) + '\n')
+
+            pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, prev_input, self.simmable_inds, self.is_debugging.get(), self.debugger)
+            if pc_move is None:
+                self.stop_game()
+                messagebox.showinfo('Outcome', 'Computer resigns.\n\nPC: "I have already computed my inevitable fate ..."')
+
+        else:  # if PC starts first
+            pc_move = random.randint(0, self.board_sz.get() ** 2 - 1)
 
         self.filled_inds.append(pc_move)
         self.main_board[pc_move] = opp(self.plyr)
-        # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
-        self.board_buttons[pc_move].config(text=self.main_board[pc_move],
+        self.board_buttons[pc_move].config(text=opp(self.plyr),
                                            disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
-        self.debugger.insert('end', f'PC\'s move:\n\t{pc_move}\n')
+        self.toggle_debugger()  # highlight new simmable_inds
 
-        return pc_move
+        self.debugger.insert('end', f'PC\'s move:  {pc_move}\n\n')
 
-    def check_winner_pvc(self):
-        # used to check winner after each turn in PVC mode
+    def check_winner_pvc(self, cur_plyr: str) -> bool:
+        """
+        Check winner after each turn in PVC mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
+        :return: whether the game has an outcome
+        """
         winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
         if winner[1] == 'tie':
             self.stop_game()
-            if messagebox.askyesno('Outcome', 'Ended in tie!\n\n"You\'ll never win ... not satisfied? Replay!"') is True:
+            if messagebox.askyesno('Outcome', 'Ended in tie.\n\nPC: "You\'ll never win ... not satisfied? Replay!"') is True:
                 self.replay()
+            return True
+
         elif winner[0] == opp(self.plyr):
             self.stop_game()
-            if messagebox.askyesno('Outcome', f'Computer wins {winner[1]}!\n\n"Shouldn\'t humans be smarter?"') is True:
+            if messagebox.askyesno('Outcome', f'Computer wins {winner[1]}!\n\nPC: "Shouldn\'t humans be smarter?"') is True:
                 self.replay()
+            return True
+
         elif winner[0] == self.plyr:
             self.stop_game()
-            if messagebox.askyesno('Outcome', f'You win {winner[1]}!\n\n"That shouldn\'t happen ... replay?"') is True:
+            if messagebox.askyesno('Outcome', f'You win {winner[1]}!\n\nPC: "NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!"') is True:
                 self.replay()
+            return True
 
-    def update_ind_pvp(self, prev_input: int):
-        # reset tint for pruned area and last pc move
-        self.toggle_debugger()
+        else:
+            self.turn_hint[cur_plyr].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
+            self.turn_hint[opp(cur_plyr)].config(foreground=self.colors[opp(cur_plyr)]['symbol'], background='white', relief='ridge')
+
+            self.window.update_idletasks()
+            return False
+
+    def update_ind_plyr(self, prev_input: int):
         # update backend board
         self.main_board[prev_input] = self.plyr
         self.filled_inds.append(prev_input)
+
         # update frontend board
         self.board_buttons[prev_input].config(text=self.main_board[prev_input],
                                               disabledforeground=self.colors[self.plyr]['symbol'],
                                               state='disabled')
 
-    def check_winner_pvp(self):
-        # used to check winner after each turn in PVP mode
+    def check_winner_pvp(self) -> bool:
+        """
+        Check winner after each turn in PVP mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
+        :return: whether the game has an outcome
+        """
         winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
         if winner[1] == 'tie':
             self.stop_game()
-            messagebox.showinfo('Outcome', 'Tie game!')
+            messagebox.showinfo('Outcome', 'Ended in a tie.')
+            return True
+
         elif winner != (' ', ' ',):
             self.stop_game()
             messagebox.showinfo('Outcome', f'Player \'{winner[0]}\' wins {winner[1]}!')
+            return True
 
         else:
-            # If no one wins, disable this plyr's indicator and update next plyr's indicators.
             self.turn_hint[self.plyr].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
-            self.turn_hint[opp(self.plyr)].config(foreground=self.colors[opp(self.plyr)]['symbol'], background='white', relief='ridge')
             self.plyr = opp(self.plyr)
+            self.turn_hint[self.plyr].config(foreground=self.colors[self.plyr]['symbol'], background='white', relief='ridge')
+            return False
 
     def stop_game(self):
-        self.is_game_active = False
+        self.filled_inds = []
         for button in self.board_buttons:
             button.config(state='disabled')
 
     def to_submenu(self):
         if messagebox.askyesno('Confirmation', 'Are you sure you want to quit?\n\nYou will loose all your progress.'):
-            self.is_game_active = False
+            self.filled_inds = []
             self.board_sz.trace_remove('write', self.trace1)
             self.board_sz.trace_remove('write', self.trace2)
             for widget in self.window.winfo_children():
@@ -900,7 +952,7 @@ class GameMenu:
     def replay(self):
         if messagebox.askyesno('Confirmation',
                                'Are you sure you want to restart?\n\nYou will loose all your progress.'):
-            self.is_game_active = False
+            self.filled_inds = []
             self.board_sz.trace_remove('write', self.trace1)
             self.board_sz.trace_remove('write', self.trace2)
             for widget in self.window.winfo_children():
@@ -911,16 +963,17 @@ class GameMenu:
 
 class GameMenuT(GameMenu):
     """
-    === Attributes ===\n
-    remain_time: Dict containing how much time does each player still have.\n
-    hint_scale: Used to animate the inflate of timer at the start of each turn.\n
+    :ivar window, board_sz, board_zoom, colors, mode: same as SubMenu.
+    :ivar remain_time: dict containing how much time does each player still have.
+    :ivar hint_scale: used to animate the inflate of timer at the start of each turn.
     """
 
+    # noinspection PyTypeChecker
     def __init__(self, window, board_sz, board_zoom, colors, mode: str):
         super().__init__(window, board_sz, board_zoom, colors, mode)
         self.remain_time = {
-            'X': StringVar(value='10'),
-            'O': StringVar(value='10')
+            'X': tk.StringVar(value='10'),
+            'O': tk.StringVar(value='10')
         }
         self.hint_scale = 0
         self.next_countdown = None
@@ -929,41 +982,43 @@ class GameMenuT(GameMenu):
         self.turn_hint['X'].destroy()
         self.turn_hint['O'].destroy()
         self.turn_hint = {
-            'X': LabelFrame(self.turn_hint_frame,
-                            text='X turn',
-                            font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
-                            foreground=self.colors['X']['symbol'],
-                            borderwidth=5,
-                            relief='ridge',
-                            takefocus=False),
-            'O': LabelFrame(self.turn_hint_frame,
-                            text='O turn',
-                            font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
-                            foreground=self.colors['O']['symbol'],
-                            borderwidth=5,
-                            relief='ridge',
-                            takefocus=False)
+            'X': tk.LabelFrame(self.turn_hint_frame,
+                               text='X turn',
+                               font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
+                               foreground=self.colors['X']['symbol'],
+                               borderwidth=5,
+                               relief='ridge',
+                               takefocus=False),
+            'O': tk.LabelFrame(self.turn_hint_frame,
+                               text='O turn',
+                               font=('Helvetica', self.board_zoom.get() * 2 + 1, 'bold'),
+                               foreground=self.colors['O']['symbol'],
+                               borderwidth=5,
+                               relief='ridge',
+                               takefocus=False)
         }
         self.time_entry = {
-            'X': Entry(self.turn_hint['X'],
-                       width=4,
-                       borderwidth=1,
-                       font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
-                       foreground=self.colors['X']['symbol'],
-                       disabledforeground=self.colors['X']['symbol'],
-                       disabledbackground='white',
-                       justify='center',
-                       textvariable=self.remain_time['X']),
-            'O': Entry(self.turn_hint['O'],
-                       width=4,
-                       borderwidth=1,
-                       font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
-                       foreground=self.colors['O']['symbol'],
-                       disabledforeground=self.colors['O']['symbol'],
-                       disabledbackground='white',
-                       justify='center',
-                       textvariable=self.remain_time['O'])
+            'X': tk.Entry(self.turn_hint['X'],
+                          width=4,
+                          borderwidth=1,
+                          font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
+                          foreground=self.colors['X']['symbol'],
+                          disabledforeground=self.colors['X']['symbol'],
+                          disabledbackground='white',
+                          justify='center',
+                          textvariable=self.remain_time['X']),
+            'O': tk.Entry(self.turn_hint['O'],
+                          width=4,
+                          borderwidth=1,
+                          font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'),
+                          foreground=self.colors['O']['symbol'],
+                          disabledforeground=self.colors['O']['symbol'],
+                          disabledbackground='white',
+                          justify='center',
+                          textvariable=self.remain_time['O'])
         }
+        self.trace3 = self.remain_time['X'].trace_add('write', lambda *args: self.validate_timer('X', *args))
+        self.trace4 = self.remain_time['O'].trace_add('write', lambda *args: self.validate_timer('O', *args))
 
         self.turn_hint['X'].pack(side='left')
         self.turn_hint['O'].pack(side='left')
@@ -972,97 +1027,121 @@ class GameMenuT(GameMenu):
 
     def adjust_zoom(self, *args):
         super().adjust_zoom()
+
         self.time_entry['X'].config(font=('Helvetica', self.board_zoom.get() * 3 + 1, 'bold'))
         self.time_entry['O'].config(font=('Helvetica', self.board_zoom.get() * 3 + 1, 'bold'))
+
+    def lock_settings(self):
+        super().lock_settings()
+
+        self.time_entry['X'].config(state='disabled')
+        self.time_entry['O'].config(state='disabled')
+
+        # disable X's timer
+        self.time_entry['X'].config(relief='flat', disabledforeground='SystemDisabledText',
+                                    disabledbackground='SystemButtonFace',
+                                    font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
+
+        # enable O's timer
+        self.time_entry['O'].config(relief='sunken', disabledforeground=self.colors['O']['symbol'], disabledbackground='white')
+
+        self.countdown()
+
+    def validate_timer(self, key, *args):
+        try:
+            # Try to convert the value of the key to a float
+            float(self.remain_time[key].get())
+        except ValueError:
+            # Show a messagebox and reset the value if conversion fails
+            messagebox.askretrycancel('Warning', f'Please enter a decimal number for {key}!')
+            self.remain_time[key].set('10')
 
     def countdown(self):
         remain_time = float(self.remain_time[self.plyr].get())
 
-        # If (time's not up) and (game has started and no one wins yet):
-        if remain_time > 0.0 and self.is_game_active is True:
+        if remain_time > 0.0:
             # animate inflate of the current plyr's timer
-            self.time_entry[self.plyr].config(font=('Courier', self.board_zoom.get() * 3 + 1 + self.hint_scale, 'bold'))
             self.hint_scale = min(self.hint_scale + 2, 3)
+            self.time_entry[self.plyr].config(font=('Courier', self.board_zoom.get() * 3 + 1 + self.hint_scale, 'bold'))
 
-            # Decrease the remain_time value by 0.1 every 100ms and display only 1 deci point using round().
-            # I didn't decrease by 1 every 1000ms (1sec) as the timer delayed update when switching turns.
+            # decrease the remain_time value by 0.1 every 100ms and display only 1 deci point using round().
+            # DO NOT decrease by 1 every 1000ms (1sec) as the timer slows down the whole app.
             self.remain_time[self.plyr].set(str(round(remain_time - 0.1, 1)))
             self.next_countdown = self.window.after(100, self.countdown)
 
-        # If player runs out of time, opponent wins and stop all recursions.
-        elif remain_time <= 0.0:
-            messagebox.showinfo('Outcome', f"Time's up! Player {opp(self.plyr)} wins")
+            self.window.update_idletasks()
+
+            # If X has under 5 secs left, flash the timer.
+            if remain_time < 5.0 and remain_time % 1 < 0.4:
+                self.time_entry[self.plyr].config(relief='sunken', disabledbackground='white')
+            elif remain_time < 5.0 and remain_time % 1 >= 0.4:
+                self.time_entry[self.plyr].config(relief='groove', disabledbackground='yellow')
+
+        # if player runs out of time, opponent wins and stop all recursions.
+        else:
+            messagebox.showinfo('Outcome', f"Time's up! Player {opp(self.plyr)} wins!")
             self.stop_game()
             return None
 
-        # If X is not playing this turn or the game has ended, stop X's countdown and flash.
-        else:
-            self.time_entry[self.plyr].config(relief='sunken', disabledforeground=self.colors[self.plyr]['symbol'],
-                                              disabledbackground='white')
-            return None
+    def check_winner_pvc(self, cur_plyr) -> bool:
+        """
+        Modified to include disabling timer entry, switching timer and adding bonus time.
+        """
+        if super().check_winner_pvc(cur_plyr) is False:
+            # grey out current plyr's timer, colorize next plyr's timer.
+            self.time_entry[cur_plyr].config(relief='flat', disabledforeground='SystemDisabledText',
+                                             disabledbackground='SystemButtonFace',
+                                             font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
+            self.time_entry[opp(cur_plyr)].config(relief='sunken', disabledforeground=self.colors[opp(cur_plyr)]['symbol'], disabledbackground='white')
 
-        # If X has under 5 secs left, flash the timer.
-        if remain_time < 5.0 and remain_time % 1 < 0.4:
-            self.time_entry[self.plyr].config(relief='sunken', disabledbackground='white')
-        elif remain_time < 5.0 and remain_time % 1 >= 0.4:
-            self.time_entry[self.plyr].config(relief='groove', disabledbackground='yellow')
+            self.remain_time[cur_plyr].set(str(float(self.remain_time[cur_plyr].get()) + 1))
+            return False
 
-    def update_ind(self, prev_input: int):
-        # If the game is not ongoing before, this is the first move.
-        if self.is_game_active is False:
-            # If the input time is not valid:
-            if not self.remain_time['X'].get().isdigit() or not self.remain_time['O'].get().isdigit():
-                messagebox.askretrycancel('Warning', f'Please enter a decimal number!')
-                return None
-            # If the input time is valid:
-            self.board_sz_slider.config(state='disabled')
-            self.board_sz_label.config(state='disabled')
-            self.replay_button.config(state='normal')
-            self.pvco_checkbox.config(state='disabled')
-            self.time_entry['X'].config(state='disabled')
-            self.time_entry['O'].config(state='disabled')
-            # If game is started by player, PC must be O. So, hide O's timer.
-            self.turn_hint['O'].pack_forget()
+    def check_winner_pvp(self) -> bool:
+        """
+        Modified to include disabling timer entry, switching timer and adding bonus time.
+        """
+        if super().check_winner_pvp() is False:  # changes self.plyr to next plyr
+            # grey out current plyr's timer, colorize next plyr's timer.
+            self.time_entry[opp(self.plyr)].config(relief='flat', disabledforeground='SystemDisabledText',
+                                                   disabledbackground='SystemButtonFace',
+                                                   font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
+            self.time_entry[self.plyr].config(relief='sunken', disabledforeground=self.colors[self.plyr]['symbol'], disabledbackground='white')
 
-            # I put update_ind() before countdown in X's first move to prevent X losing 0.1 sec.
-            super().update_ind(prev_input)
-            self.countdown()
-        else:
-            self.hint_scale = 0
-            super().update_ind(prev_input)
-
-    # Below, I override update_ind_pvc() and check_winner_pvp to include timer switching.
-    # I chose these as: update_ind_pvc() is only executed once in PVC; check_winner_pvp is the only func used in PVP and not PVC
-    def update_ind_pvc(self, prev_input):
-        if self.is_game_active is True and len(self.filled_inds) > 1:
-            # this plyr gets bonus time
-            self.remain_time[self.plyr].set(str(float(self.remain_time[self.plyr].get()) + 1))
-        super().update_ind_pvc(prev_input)
-
-    def check_winner_pvp(self):
-        super().check_winner_pvp()
-        # Grey out this plyr's timer, colorize next plyr's timer.
-        self.time_entry[opp(self.plyr)].config(relief='flat', disabledforeground='SystemDisabledText',
-                                               disabledbackground='SystemButtonFace',
-                                               font=('Courier', self.board_zoom.get() * 3 + 1, 'bold'))
-        self.time_entry[self.plyr].config(relief='sunken', disabledforeground=self.colors[self.plyr]['symbol'], disabledbackground='white')
-
-        if self.is_game_active is True and len(self.filled_inds) > 1:
-            # This plyr gets bonus time. Note: self.plyr is the NEXT plyr
+            # current plyr gets bonus time
             self.remain_time[opp(self.plyr)].set(str(float(self.remain_time[opp(self.plyr)].get()) + 1))
+            return False
 
-    def pvc_first(self):
-        self.turn_hint['X'].pack_forget()
-        self.time_entry['O'].config(state='disabled')
-        super().pvc_first()
-        self.countdown()
+    def stop_game(self):
+        super().stop_game()
+
+        # stop player's countdown and timer flash
+        self.window.after_cancel(self.next_countdown)
+
+    def to_submenu(self):
+        if messagebox.askyesno('Confirmation', 'Are you sure you want to quit?\n\nYou will loose all your progress.'):
+            self.filled_inds = []
+            self.board_sz.trace_remove('write', self.trace1)
+            self.board_sz.trace_remove('write', self.trace2)
+            self.remain_time['X'].trace_remove('write', self.trace3)
+            self.remain_time['O'].trace_remove('write', self.trace4)
+
+            # stops the next queued countdown()
+            self.window.after_cancel(self.next_countdown)
+            for widget in self.window.winfo_children():
+                widget.destroy()
+
+            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
                                'Are you sure you want to restart?\n\nYou will loose all your progress.'):
-            self.is_game_active = False
+            self.filled_inds = []
             self.board_sz.trace_remove('write', self.trace1)
             self.board_sz.trace_remove('write', self.trace2)
+            self.remain_time['X'].trace_remove('write', self.trace3)
+            self.remain_time['O'].trace_remove('write', self.trace4)
+
             # stops the next queued countdown()
             self.window.after_cancel(self.next_countdown)
             for widget in self.window.winfo_children():
@@ -1073,23 +1152,21 @@ class GameMenuT(GameMenu):
 
 class GameMenuV(GameMenu):
     """
-    === Attributes ===\n
-    prev_inputs: A list containing the l most recent moves on the board, in chronological order. Leftmost element = earliest move. Rightmost element = latest move.\n
-    remain_steps: How many steps into the future will an X/O last.\n
-    show_nxt_vanish_move: Show/hide which move is going to vanish in the next turn.
+    :ivar window, board_sz, board_zoom, colors, mode: same as SubMenu.
+    :ivar remain_steps: how many steps into the future will an X/O last.
+    :ivar show_nxt_vanish_move: show/hide which move is going to vanish in the next turn.
     """
 
     def __init__(self, window, board_sz, board_zoom, colors, mode: str):
         super().__init__(window, board_sz, board_zoom, colors, mode)
-        self.prev_inputs = []
-        self.remain_steps = IntVar()
-        self.show_nxt_vanish_move = BooleanVar(value=False)
+        self.remain_steps = tk.IntVar()
+        self.show_nxt_vanish_move = tk.BooleanVar(value=False)
 
-        self.remain_stps_label = Label(
+        self.remain_stps_label = tk.Label(
             self.settings_frame,
             text='\nRemain for'
         )
-        self.remain_stps_slider = Scale(
+        self.remain_count_slider = tk.Scale(
             self.settings_frame,
             orient='horizontal',
             variable=self.remain_steps,
@@ -1098,59 +1175,52 @@ class GameMenuV(GameMenu):
             to=self.win_len * 2,
             cursor='sb_h_double_arrow'
         )
-        self.nxt_vanish_checkbox = Checkbutton(
+        self.nxt_vanish_checkbox = tk.Checkbutton(
             self.settings_frame,
             text='Show next vanishing moves',
             cursor='hand2',
             variable=self.show_nxt_vanish_move,
-            command=self.delete_moves
+            command=self.del_moves
         )
 
         self.remain_stps_label.grid(row=2, column=1)
-        self.remain_stps_slider.grid(row=2, column=2)
+        self.remain_count_slider.grid(row=2, column=2)
         self.nxt_vanish_checkbox.grid(columnspan=2, row=3, column=1)
 
-    def delete_moves(self):
-        # If (num of moves by X & O so far) + (moves by X & O in this turn) is more than remain_steps*2, the num of moves by X is more than remain_steps. So X's moves start to vanish.
-        if (len(self.prev_inputs) > self.remain_steps.get() * 2) and self.is_game_active:
-            self.debugger.insert('end', f'Most recent moves:\n{self.prev_inputs}')
-            self.main_board[self.prev_inputs[0]] = ' '
-            self.board_buttons[self.prev_inputs[0]].config(text='', background='SystemButtonFace', state='normal')
-            self.filled_inds.remove(self.prev_inputs[0])
-            self.prev_inputs = self.prev_inputs[1:]
-            self.toggle_debugger()
+    def del_moves(self):
+        # if half of the total num of moves by X + O > remain_steps, X's moves start to vanish.
+        if len(self.filled_inds) / 2 > self.remain_steps.get():
+            self.debugger.insert('end', f'Vanish order:\n{self.filled_inds}')
 
-        # if (num of moves by X & O so far) + (moves by X & O in this turn) is one less before vanishing begins, tint the 3 oldest moves about to vanish.
-        if (len(self.prev_inputs) + 2 > self.remain_steps.get() * 2 - 1) and self.show_nxt_vanish_move.get():
-            self.board_buttons[self.prev_inputs[1]].config(background=self.colors['']['nxt_vanish_move1'])
-            self.board_buttons[self.prev_inputs[0]].config(background=self.colors['']['nxt_vanish_move0'])
+            vanish_ind = self.filled_inds.pop(0)
+
+            self.main_board[vanish_ind] = ' '
+            self.board_buttons[vanish_ind].config(text='', background='SystemButtonFace', state='normal')
+
+        # if half of the total num of moves by X + O is one less before vanishing begins, tint the 2 oldest moves about to vanish.
+        if self.show_nxt_vanish_move.get() is True and len(self.filled_inds) / 2 >= self.remain_steps.get():
+            self.board_buttons[self.filled_inds[1]].config(background=self.colors['']['nxt_vanish_move1'])
+            self.board_buttons[self.filled_inds[0]].config(background=self.colors['']['nxt_vanish_move0'])
 
     def adjust_length(self, *args):
         super().adjust_length(*args)
-        self.remain_stps_slider.config(from_=self.win_len, to=self.win_len * 2)
+        self.remain_count_slider.config(from_=self.win_len, to=self.win_len * 2)
 
-    def update_ind_pvc(self, prev_input: int):
-        pc_move = super().update_ind_pvc(prev_input)
-        self.prev_inputs.append(pc_move)
+    def check_winner_pvc(self, cur_plyr) -> bool:
+        self.del_moves()
+        return super().check_winner_pvc(cur_plyr)
 
-    def check_winner_pvc(self):
-        super().check_winner_pvc()
-        self.delete_moves()
-
-    def update_ind_pvp(self, prev_input: int):
-        super().update_ind_pvp(prev_input)
-        self.prev_inputs.append(prev_input)
-
-    def check_winner_pvp(self):
-        super().check_winner_pvp()
-        self.delete_moves()
+    def check_winner_pvp(self) -> bool:
+        self.del_moves()
+        return super().check_winner_pvp()
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
                                'Are you sure you want to restart?\n\nYou will loose all your progress.'):
-            self.is_game_active = False
+            self.filled_inds = []
             self.board_sz.trace_remove('write', self.trace1)
             self.board_sz.trace_remove('write', self.trace2)
+
             for widget in self.window.winfo_children():
                 widget.destroy()
 
@@ -1159,8 +1229,8 @@ class GameMenuV(GameMenu):
 
 class GameMenuS(GameMenu):
     """
-    === Attributes ===\n
-    prev_inputs: Dict containing 2 lists: one containing all the moves made by X in chronological order, the other containing O's. Leftmost element = earliest move. Rightmost element = latest move.\n
+    :ivar window, board_sz, board_zoom, colors, mode: same as SubMenu.
+    :ivar prev_inputs: dict containing 2 lists: one containing all the moves made by X in chronological order, the other containing O's. Leftmost element = earliest move. Rightmost element = latest move.
     """
 
     def __init__(self, window, board_sz, board_zoom, colors, mode: str):
@@ -1175,74 +1245,74 @@ class GameMenuS(GameMenu):
 
     def adjust_length(self, *args):
         super().adjust_length(*args)
+
         self.win_len = self.board_sz.get()
         self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
-        self.toggle_debugger()
+        self.toggle_debugger()  # highlight new changed check_winner_area
 
-    def update_ind_pvc(self, prev_input: int) -> int:
-        is_surrounded = True
+    def update_ind_pc(self, prev_input: int) -> int:
+        pass
 
-        # while (next plyr is not stuck) and (both X and O alr placed their first move):
-        while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
-            for ind in range(self.board_sz.get() ** 2):
-                pass  # TODO
+    def update_ind_plyr(self, prev_input: int):
+        super().update_ind_plyr(prev_input)
 
-        # win_len must be <= 4 as the pruned area can be 4 buttons wide if player moved at corners.
-        pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, self.prev_inputs[opp(self.plyr)][-1], self.is_debugging.get(), self.debugger, self.board_buttons)
-
-        self.filled_inds.append(pc_move)
-        self.main_board[pc_move] = opp(self.plyr)
-        # Update frontend board. If player = O, PC = opponent(O). If player = X, PC = opponent(X).
-        self.board_buttons[pc_move].config(text=self.main_board[pc_move],
-                                           disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
-        self.debugger.insert('end', f'PC\'s move:{pc_move}\n')
-
-        return pc_move
-
-    def update_ind_pvp(self, prev_input: int):
-        super().update_ind_pvp(prev_input)
         self.board_buttons[prev_input].config(background=self.colors[self.plyr]['snake_head'])
-
         if len(self.prev_inputs[self.plyr]) > 0:
             # turn the snake's previous head to body color
             self.board_buttons[self.prev_inputs[self.plyr][-1]].config(background=self.colors[self.plyr]['snake_body'])
+
         self.prev_inputs[self.plyr].append(prev_input)
 
-    def check_winner_pvp(self):
-        super().check_winner_pvp()
-        # I override check_winner_pvp to include code switching snake head
-        is_surrounded = True
-        # while (next plyr is not stuck) and (both X and O alr placed their first move):
-        while is_surrounded is True and len(self.prev_inputs['X']) + len(self.prev_inputs['O']) > 1 and self.is_game_active is True:
-            for ind in range(self.board_sz.get() ** 2):
-                # If a button is in the 3x3 area of the next plyr's last input and has nothing on it, make it pressable. Note: self.plyr is the NEXT plyr
-                if self.prev_inputs[self.plyr][-1] // self.board_sz.get() - 1 <= ind // self.board_sz.get() <= self.prev_inputs[self.plyr][-1] // self.board_sz.get() + 1 and \
-                        self.prev_inputs[self.plyr][-1] % self.board_sz.get() - 1 <= ind % self.board_sz.get() <= self.prev_inputs[self.plyr][-1] % self.board_sz.get() + 1 and self.main_board[
-                        ind] == ' ':
-                    self.board_buttons[ind].config(state='normal', relief='raised')
-                    is_surrounded = False
-                # If a button is around the next plyr's last input and has nothing on it, make it unpressable.
-                elif self.main_board[ind] == ' ':
-                    self.board_buttons[ind].config(state='disabled', relief='sunken')
+    def check_winner_pvp(self) -> bool:
+        """
+        Modified to:
+         1. give snake a new head when the old head stuck.
+         2. disable the adj cells from the previous turn and enable the adj cells for the next turn.
+        """
+        if super().check_winner_pvp() is False:  # changes self.plyr to next player
 
-            # if next plyr is stuck, recursively go back to the last move before stuck and activates surrounding buttons
-            if is_surrounded is True:
-                self.prev_inputs[self.plyr] = self.prev_inputs[self.plyr][:-1]
+            relative_adj = {
+                (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
+                (-1, 0), (1, 0),  # Left, Right
+                (-1, 1), (0, 1), (1, 1)  # Bottom-left, Bottom-right
+            }
 
-    def replay(self):
-        if messagebox.askyesno('Confirmation',
-                               'Are you sure you want to restart?\n\nYou will loose all your progress.'):
-            self.is_game_active = False
-            self.board_sz.trace_remove('write', self.trace1)
-            self.board_sz.trace_remove('write', self.trace2)
-            for widget in self.window.winfo_children():
-                widget.destroy()
+            def gen_adj(row: int, col: int) -> set:
+                """
+                (generate adjacents)
+                :return: set containing the valid indexes of the adjacents around the previous input of opponent.
+                """
+                absolute_adj = set()
 
-            GameMenuS(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+                for dir_x, dir_y in relative_adj:
+                    adj_row = row + dir_y
+                    adj_col = col + dir_x
+
+                    if 0 <= adj_row < self.board_sz.get() and 0 <= adj_col < self.board_sz.get():
+                        adj_ind = adj_row * self.board_sz.get() + adj_col
+
+                        if self.main_board[adj_ind] == ' ':
+                            self.board_buttons[adj_ind].config(state='normal', relief='raised')
+                            absolute_adj.add(adj_ind)
+
+                if not absolute_adj:  # if absolute_adj is empty, next player is stuck
+                    self.prev_inputs[self.plyr].pop()
+                    prev_input = self.prev_inputs[self.plyr][-1]
+                    absolute_adj = gen_adj(prev_input // self.board_sz.get(), prev_input % self.board_sz.get())  # recursion for the previous-previous input
+
+                return absolute_adj
+
+            prev_input = self.prev_inputs[self.plyr][-1]
+            absolute_adj = gen_adj(prev_input // self.board_sz.get(), prev_input % self.board_sz.get())
+
+            for ind in set(range(self.board_sz.get() ** 2)).difference(self.filled_inds, absolute_adj):  # is empty and not in absolute_adj
+                self.board_buttons[ind].config(state='disabled', relief='sunken')
+
+            return False
 
 
-ver_no = 'Tic Tac Toe v11'
+ver_no = 'Tic Tac Toe v16'
 
 window = tk.Tk()
 MainMenu(window)

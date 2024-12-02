@@ -1,21 +1,20 @@
-import math
-import random
 import matplotlib.pyplot as plt
 import networkx as nx
 from networkx.drawing.nx_agraph import pygraphviz_layout
-import tkinter as tk
 
 
 def set_win_len(board_sz: int) -> int:
     return min(board_sz, 4)
 
 
-def set_check_winner_area(board_sz: int, win_len: int) -> list:
-    check_winner_area = []
-    for ind in range(board_sz**2):
-        # if (the ind row is l dist away from the bottom row) and (the ind column is l dist away from the rightmost column)
-        if (ind < board_sz**2 - board_sz*(win_len-1)) and (ind % board_sz <= board_sz-win_len):
-            check_winner_area.append(ind)
+def set_check_winner_area(board_sz: int, win_len: int) -> set:
+    """
+    Returns all indexes that are both wl dist away from the bottommost row and wl dist away from the rightmost column.
+    """
+    check_winner_area = set()
+    for row in range(board_sz - win_len + 1):
+        for col in range(board_sz - win_len + 1):
+            check_winner_area.add(row * board_sz + col)
 
     return check_winner_area
 
@@ -31,7 +30,7 @@ def setup_board(board_sz: int) -> list:
     return main_board
 
 
-def print_board(board: list, board_sz: int) -> None:
+def print_board(board: list, board_sz: int):
     # print the board
     # eg 3x3 board:
     #     1   2   3
@@ -77,7 +76,7 @@ def coord_to_ind(coord: str, main_board: list, board_sz: int) -> int | bool:
     ind = int(coord[:coord.find(',')]) + ((int((coord[coord.find(',') + 1:])) - 1) * board_sz) - 1
 
     # if the ind number exceeds the board, return False
-    if ind + 1 > (board_sz**2):
+    if ind + 1 > board_sz**2:
         return False
     # if the ind number is negative, return False
     elif ind < 0:
@@ -89,7 +88,7 @@ def coord_to_ind(coord: str, main_board: list, board_sz: int) -> int | bool:
         return ind
 
 
-def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner_area: list) -> tuple:
+def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner_area: set) -> tuple: # TODO
     # Different from check_winner(), check_winner_anywhere() is used when the rows, columns, and diagonals could be anywhere and not just fixed to the edge of the board.
     # Because the checked_area's origin is its top left corner, the distance from the origin to the bottom right corner of board must be larger than the checked area.
     # For a 5x5 and 4x4 checked area, the origin cannot be at:
@@ -151,7 +150,7 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
 
 
 # ALL FUNCTIONS BELOW ARE FOR THE AI
-def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_winner_area: list) -> int:
+def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_winner_area: set) -> int:
     while check_winner_anywhere(main_board, board_sz, win_len, check_winner_area) == (' ', ' ',):
         print_board(main_board, board_sz)
         player_coord = input(f'Your turn [{plyr}]! Choose your x,y coordinates: ')
@@ -164,81 +163,156 @@ def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_wi
     return -1
 
 
-def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, input_origin: int, is_debugging: bool, debugger=None, ind_buttons=None) -> int:
+def prune(board: list, board_sz: int, opp: str, origin: int) -> list:
+    """
+    Limits the indexes that PC can simulate to the 12 empty indexes that are:
+        1. adjacent to the origin, else
+        2. at the ends of any lines formed by player, else
+        3. the closest to the origin
+    """
+    # convert origin to coords and clamp between 1 to board_sz-2.
+    # Why clamp? -> there must be 8 indexes around the origin.
+    origin_row = max(1, min(origin // board_sz, board_sz-2))
+    origin_col = max(1, min(origin % board_sz, board_sz-2))
+
+    # set up coords of 8 indexes around a center, stored as (x_coord, y_coord)
+    adjacents = (
+        (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
+        (-1, 0),           (1, 0),   # Left, Right
+        (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
+    )
+
+    # stores the 12 indexes
+    simmable_inds = []
+
+    ind_priority = {}
+
+    for ind, symbol in enumerate(board):
+        if symbol == ' ':
+            row = ind // board_sz
+            col = ind % board_sz
+            origin_dy = abs(row - origin_row)
+            origin_dx = abs(col - origin_col)
+
+            origin_d = max(origin_dy, origin_dx)
+
+            if origin_d <= 1:  # if the index is one of the 8 around the origin
+                simmable_inds.append(ind)
+                continue
+
+            else:
+                ind_priority[ind] = ind_priority.get(ind, 0) - origin_d
+
+                for dir_x, dir_y in adjacents:
+                    fwd1_row = row + dir_y
+                    fwd1_col = col + dir_x
+
+                    if 0 <= fwd1_row < board_sz and 0 <= fwd1_col < board_sz and board[fwd1_row * board_sz + fwd1_col] == opp:
+
+                        ind_priority[ind] += board_sz
+
+                        fwd2_row = fwd1_row + dir_y
+                        fwd2_col = fwd1_col + dir_x
+
+                        if 0 <= fwd2_row < board_sz and 0 <= fwd2_col < board_sz and board[fwd2_row * board_sz + fwd2_col] == opp:
+
+                            back1_row = row - dir_y
+                            back1_col = col - dir_x
+                            back1_ind = back1_row * board_sz + back1_col
+
+                            if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz and board[back1_ind] == ' ':
+
+                                ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_sz
+
+    print(f'\nIndex priority: {ind_priority}')
+
+    simmable_inds.extend(
+        sorted(ind_priority, key=ind_priority.get, reverse=True)
+    )
+
+    simmable_inds = simmable_inds[:12]
+
+    print(f'Empty indexes: {simmable_inds}')
+
+    return simmable_inds
+
+# def prune():
+#     """
+#     Limits the indexes that PC can simulate to the 12 empty indexes that are either: one of the 8 around the origin; or have the highest number of adj indexes with an X/O. Adj index with player's symbol counts as 3.
+#     """
+#
+#     # convert origin to coords and clamp between 1 to board_sz-2.
+#     # Why clamp? -> there must be 8 indexes around the origin.
+#     origin_row = max(1, min(origin // board_sz, board_sz-2))
+#     origin_col = max(1, min(origin % board_sz, board_sz-2))
+#
+#     # set up coords of 8 indexes around a center, stored as (x_coord, y_coord)
+#     adjacents = (
+#         (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
+#         (-1, 0),           (1, 0),   # Left, Right
+#         (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
+#     )
+#
+#     # stores the 12 indexes
+#     global simmable_inds
+#     simmable_inds = []
+#
+#     # for each index, stores the number of adj indexes with an X/O.
+#     ind_priority = {}
+#
+#     for ind, symbol in enumerate(main_board):
+#         if symbol == ' ':
+#             ind_row = ind // board_sz
+#             ind_col = ind % board_sz
+#             origin_dy = abs(ind_row - origin_row)
+#             origin_dx = abs(ind_col - origin_col)
+#
+#             # I want diagonal indexes to have shorter distance from origin than hor/vert indexes -> higher priority.
+#             origin_d = max(origin_dy, origin_dx) - min(origin_dy, origin_dx)/3
+#
+#             if origin_d <= 1:  # if the index is one of the 8 around the origin
+#                 simmable_inds.append(ind)
+#                 continue
+#
+#             else:  # if the index is not one of the 8 around the origin
+#                 priority = 0
+#                 for adj_x, adj_y in adjacents:  # count how many adj indexes with an X/O
+#                     new_row = ind_row + adj_y
+#                     new_col = ind_col + adj_x
+#                     if 0 <= new_row < board_sz and 0 <= new_col < board_sz:
+#                         new_ind = new_row*board_sz + new_col
+#                         if main_board[new_ind] == opp(pc):
+#                             priority += 3
+#                         elif main_board[new_ind] == pc:
+#                             priority += 1
+#
+#                 ind_priority[(ind, origin_d,)] = priority   # key = (board index, dist_from_origin)
+#
+#     print(f'\nIndex priority: {ind_priority}')
+#
+#     simmable_inds.extend(
+#         key_val[0][0] for key_val in  # add the keys in sorted order into simmable_inds.
+#         sorted(  # sort the ind_priority. Key with higher priority comes first. If keys have same priority: key with shorter distance from origin comes first.
+#             ind_priority.items(),
+#             key=lambda key_val: (-key_val[1], key_val[0][1])
+#         )
+#     )
+#
+#     simmable_inds = simmable_inds[:12]
+#
+#     if is_debugging:
+#         for sim_ind in simmable_inds:
+#             ind_buttons[sim_ind].config(background='Lemon Chiffon2')
+#
+#     debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(simmable_inds) + '\n')
+#     print(f'Empty indexes: {simmable_inds}')
+
+
+def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool, debugger=None) -> int:
     half_win_len = win_len // 2
     board_sz_neg1 = board_sz-1
     bsz_neg_hwl = board_sz - half_win_len
     max_row_ind = board_sz * board_sz_neg1
-
-    def prune(origin: int):
-        """
-        Limits the indexes that PC can simulate to the 12 empty indexes that are either: one of the 8 around the origin; or have the highest number of adj indexes with an X/O. Adj index with player's symbol counts as 3.
-        """
-        # convert origin to coords and clamp between 1 to board_sz-2.
-        # Why clamp? -> there must be 8 indexes around the origin.
-        origin_row = max(1, min(origin // board_sz, board_sz-2))
-        origin_col = max(1, min(origin % board_sz, board_sz-2))
-
-        # set up coords of 8 indexes around a center, stored as (x_coord, y_coord)
-        adjacents = (
-            (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
-            (-1, 0),           (1, 0),   # Left, Right
-            (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
-        )
-
-        # stores the 12 indexes
-        global simmable_inds
-        simmable_inds = []
-
-        # for each index, stores the number of adj indexes with an X/O.
-        ind_priority = {}
-
-        for ind, symbol in enumerate(main_board):
-            if symbol == ' ':
-                ind_row = ind // board_sz
-                ind_col = ind % board_sz
-                origin_dy = abs(ind_row - origin_row)
-                origin_dx = abs(ind_col - origin_col)
-
-                # I want diagonal indexes to have shorter distance from origin than hor/vert indexes -> higher priority.
-                origin_d = max(origin_dy, origin_dx) - min(origin_dy, origin_dx)/3
-
-                if origin_d <= 1:  # if the index is one of the 8 around the origin (less than 2 units from the origin)
-                    simmable_inds.append(ind)
-                    continue
-
-                else:  # if the index is not one of the 8 around the origin
-                    priority = 0
-                    for adj in adjacents:  # count how many adj indexes with an X/O
-                        new_row = ind_row + adj[0]
-                        new_col = ind_col + adj[1]
-                        if 0 <= new_row < board_sz and 0 <= new_col < board_sz:
-                            new_ind = new_row*board_sz + new_col
-                            if main_board[new_ind] == opp(pc):
-                                priority += 3
-                            elif main_board[new_ind] == pc:
-                                priority += 1
-
-                    ind_priority[(ind, origin_d,)] = priority   # key = (board index, dist_from_origin)
-
-        print(f'\nIndex priority: {ind_priority}')
-
-        simmable_inds.extend(
-            key_val[0][0] for key_val in  # add the keys in sorted order into simmable_inds.
-            sorted(  # sort the ind_priority. Key with higher priority comes first. If keys have same priority: key with shorter distance from origin comes first.
-                ind_priority.items(),
-                key=lambda key_val: (-key_val[1], key_val[0][1])
-            )
-        )
-
-        simmable_inds = simmable_inds[:12]
-
-        if is_debugging:
-            for ind in simmable_inds:
-                ind_buttons[ind].config(background='Lemon Chiffon2')
-
-        debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(simmable_inds) + '\n')
-        print(f'Empty indexes: {simmable_inds}')
 
     def is_plyr_win(board: list, plyr: str, origin: int) -> bool:
         origin_col = origin % board_sz
@@ -317,8 +391,8 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, input_origi
         """
         child_plyr = opp(parent_plyr)
 
-        for i in range(len(simmable_inds)):
-            sim_ind = simmable_inds.pop(i)
+        for i, sim_ind in enumerate(simmable_inds):
+            del simmable_inds[i]
 
             child = parent
             child[sim_ind] = child_plyr
@@ -418,49 +492,35 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, input_origi
     #                 return True
     #     return False
 
-    if input_origin == -1:  # if PC starts first
-        return random.randint(0, board_sz**2 - 1)
-    else:
-        # if the board_sz <= 4, prune a 3x3 area around the most recent player input. I cannot prune a 4x4 area as 4x4 has no center ind.
-        # if the board_sz >= 5, prune a 5x5 area around the most recent player input
-        prune(input_origin)
+    for i, sim_ind in enumerate(simmable_inds):
+        global white_num
+        white_num = {f"Lyr {i}": 0 for i in range(len(simmable_inds)-1, -1, -1)}
 
-        # if the 3x3 grid around the opponent's newest move are full, find the closest empty ind
-        if len(simmable_inds) == 0:
-            if is_debugging:
-                debugger.insert(tk.END, 'PC\'s comment:\nNo empty indexes found! Randomly generating next move...')
-            fin_move = random.choice([i for i, symbol in enumerate(main_board) if symbol == ' '])
+        del simmable_inds[i]
 
+        child = main_board
+        child[sim_ind] = pc
+
+        if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
+            white_num['Lyr ' + str(len(simmable_inds))] += 1
+            print('Number of white nodes at', sim_ind, ':', white_num)
+            return sim_ind
         else:
-            for i in range(len(simmable_inds)):
-                global white_num
-                white_num = {f"Lyr {i}": 0 for i in range(len(simmable_inds)-1, -1, -1)}
+            print('Number of white nodes at', sim_ind, ':', white_num)
 
-                sim_ind = simmable_inds.pop(i)
+            child[sim_ind] = ' '
+            simmable_inds.insert(i, sim_ind)
 
-                child = main_board
-                child[sim_ind] = pc
-
-                if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
-                    white_num['Lyr ' + str(len(simmable_inds))] += 1
-                    print('Number of white nodes at', sim_ind, ':', white_num)
-                    return sim_ind
-                else:
-                    print('Number of white nodes at', sim_ind, ':', white_num)
-
-                    child[sim_ind] = ' '
-                    simmable_inds.insert(i, sim_ind)
-
-            # win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
-            # analyze_child(main_board, opp(pc), prev_input)
-            # fin_move = pick_init_move(pc, win_probs)
-            # if is_debugging:
-            #     plt.clf()
-            #     p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
-            #     plt.bar_label(p, label_type='center')
-            #     plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
-            #     plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
-            #     plt.xlabel('1st-Generation Move')
-            #     plt.ylabel('Winning Probability')
-            #     plt.show()
+    # win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
+    # analyze_child(main_board, opp(pc), prev_input)
+    # fin_move = pick_init_move(pc, win_probs)
+    # if is_debugging:
+    #     plt.clf()
+    #     p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
+    #     plt.bar_label(p, label_type='center')
+    #     plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
+    #     plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
+    #     plt.xlabel('1st-Generation Move')
+    #     plt.ylabel('Winning Probability')
+    #     plt.show()
     # return int(fin_move)
