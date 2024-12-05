@@ -52,7 +52,6 @@ class MainMenu:
                 },
                 '': {
                     'pc_move': 'Khaki1',
-                    'check_winner_area': 'Lavender',
                     'simmable_inds': 'Lemon Chiffon2',
                     'nxt_vanish_move0': 'Navajo White',
                     'nxt_vanish_move1': 'Antique White'
@@ -247,7 +246,6 @@ class SubMenu:
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
-        self.check_winner_area = set_check_winner_area(board_sz.get(), self.win_len)
         self.board_zoom = board_zoom
         self.colors = colors
         self.mode = mode
@@ -457,7 +455,6 @@ class ColMenu:
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
-        self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_zoom = board_zoom
         self.colors = colors
         self.mode = mode
@@ -576,7 +573,6 @@ class ColMenu:
 class GameMenu:
     """
     :ivar window, board_sz, board_zoom, colors, mode: same as SubMenu.
-    :ivar check_winner_area: list containing buttons where the winning chain will fall on.
     :ivar win_len: how many X in a row/column/diagonal to win.
     :ivar plyr: player playing in the current turn.
     :ivar main_board: list containing the board on screen.
@@ -590,7 +586,6 @@ class GameMenu:
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
-        self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_zoom = board_zoom
         self.mode = mode
         self.colors = colors
@@ -733,32 +728,22 @@ class GameMenu:
         if self.is_debugging.get() is True:  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
             self.debugger.grid(columnspan=3, row=10, column=0, sticky='ns')
 
-            simmable_inds_col = self.colors['']['simmable_inds']
-            check_winner_area_col = self.colors['']['check_winner_area']
-
             for ind, symbol in enumerate(self.main_board):
                 if symbol == ' ':
                     button = self.board_buttons[ind]
                     button.config(text=ind, foreground='gray')
 
                     if ind in self.simmable_inds:
-                        button.config(background=simmable_inds_col)
-                        continue  # if alr in simmable_inds, do not apply check_winner_area_col
-
-                if ind in self.check_winner_area:
-                    self.board_buttons[ind].config(background=check_winner_area_col)
+                        button.config(background=self.colors['']['simmable_inds'])
 
         else:
             self.debugger.grid_forget()
-
-            prev_input = self.filled_inds[-1] if self.filled_inds else None  # filled_inds can be empty after game ends
 
             for ind, symbol in enumerate(self.main_board):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
                 if symbol == ' ':
                     self.board_buttons[ind].config(text='', background='SystemButtonFace')
 
-                elif ind in self.check_winner_area and ind != prev_input:  # if not empty but in check_winner_area and not the most recent pc move
-                    self.board_buttons[ind].config(background='SystemButtonFace')
+        self.window.update_idletasks()  # refresh GUI
 
     def create_boardframe(self):
         self.board_buttons = []
@@ -785,7 +770,6 @@ class GameMenu:
         # Generate new board and attributes with the correct dimension at backend
         self.main_board = setup_board(self.board_sz.get())
         self.win_len = set_win_len(self.board_sz.get())
-        self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
 
         # Generate new buttons and symbol indicator at frontend
         self.create_boardframe()
@@ -822,8 +806,8 @@ class GameMenu:
 
         if self.mode == 'pvp':
 
-            if len(self.filled_inds) > 1:  # if both players alr moved once
-                self.check_winner_pvp()
+            if len(self.filled_inds) > 1:  # if both players alr moved once and there is no outcome
+                self.check_winner_pvp(prev_input)
 
             else:  # if this is the first move
                 self.plyr = opp(self.plyr)
@@ -836,15 +820,15 @@ class GameMenu:
                 for ind in self.simmable_inds:
                     self.board_buttons[ind].config(background='SystemButtonFace')  # unhighlight simmable_inds from the previous turn
 
-                if self.check_winner_pvc(self.plyr) is False:
+                if self.check_winner_pvc(prev_input, self.plyr) is False:
                     self.update_ind_pc(prev_input)
-                    self.check_winner_pvc(opp(self.plyr))
+                    self.check_winner_pvc(self.filled_inds[-1], opp(self.plyr))  # filled_inds[-1] is pc's latest move
 
             else:
                 self.lock_settings()
 
                 self.update_ind_pc(prev_input)
-                self.check_winner_pvc(opp(self.plyr))
+                self.check_winner_pvc(prev_input, opp(self.plyr))
 
     def update_ind_pc(self, prev_input: int | None):
         self.debugger.insert(tk.END, f'Player\'s move:  {prev_input}\n')
@@ -854,11 +838,13 @@ class GameMenu:
 
             self.simmable_inds = prune(self.main_board, self.board_sz.get(), self.plyr, prev_input)
             self.debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(self.simmable_inds) + '\n')
+            self.toggle_debugger()  # highlight new simmable_inds
 
             pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, prev_input, self.simmable_inds, self.is_debugging.get(), self.debugger)
             if pc_move is None:
                 self.stop_game()
                 messagebox.showinfo('Outcome', 'Computer resigns.\n\nPC: "I have already computed my inevitable fate ..."')
+                return
 
         else:  # if PC starts first
             pc_move = random.randint(0, self.board_sz.get() ** 2 - 1)
@@ -867,40 +853,39 @@ class GameMenu:
         self.main_board[pc_move] = opp(self.plyr)
         self.board_buttons[pc_move].config(text=opp(self.plyr),
                                            disabledforeground=self.colors[opp(self.plyr)]['symbol'], background=self.colors['']['pc_move'], state='disabled')
-        self.toggle_debugger()  # highlight new simmable_inds
 
         self.debugger.insert('end', f'PC\'s move:  {pc_move}\n\n')
 
-    def check_winner_pvc(self, cur_plyr: str) -> bool:
+    def check_winner_pvc(self, prev_input: int, cur_plyr: str) -> bool:
         """
         Check winner after each turn in PVC mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
         :return: whether the game has an outcome
         """
-        winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
-        if winner[1] == 'tie':
+        formation = plyr_win_formation(self.main_board, self.board_sz.get(), self.win_len, cur_plyr, prev_input)
+        if formation is not None:
             self.stop_game()
-            if messagebox.askyesno('Outcome', 'Ended in tie.\n\nPC: "You\'ll never win ... not satisfied? Replay!"') is True:
-                self.replay()
-            return True
 
-        elif winner[0] == opp(self.plyr):
-            self.stop_game()
-            if messagebox.askyesno('Outcome', f'Computer wins {winner[1]}!\n\nPC: "Shouldn\'t humans be smarter?"') is True:
-                self.replay()
-            return True
+            if cur_plyr == self.plyr:  # if someone won and the current turn is human
+                if messagebox.askyesno('Outcome', f'You win {formation}!\n\nPC: "NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!"') is True:
+                    self.replay()
+                return True
 
-        elif winner[0] == self.plyr:
-            self.stop_game()
-            if messagebox.askyesno('Outcome', f'You win {winner[1]}!\n\nPC: "NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!"') is True:
-                self.replay()
-            return True
+            else:  # if someone won and the current turn is pc
+                if messagebox.askyesno('Outcome', f'Computer wins {formation}!\n\nPC: "Shouldn\'t humans be smarter?"') is True:
+                    self.replay()
+                return True
 
         else:
-            self.turn_hint[cur_plyr].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
-            self.turn_hint[opp(cur_plyr)].config(foreground=self.colors[opp(cur_plyr)]['symbol'], background='white', relief='ridge')
+            if len(self.filled_inds) == self.board_sz.get() ** 2:  # if no one win and the whole board is filled
+                self.stop_game()
+                if messagebox.askyesno('Outcome', 'Ended in tie.\n\nPC: "You\'ll never win ... not satisfied? Replay!"') is True:
+                    self.replay()
+                return True
 
-            self.window.update_idletasks()
-            return False
+            else:  # if no one win and the whole board is not filled
+                self.turn_hint[cur_plyr].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
+                self.turn_hint[opp(cur_plyr)].config(foreground=self.colors[opp(cur_plyr)]['symbol'], background='white', relief='ridge')
+                return False
 
     def update_ind_plyr(self, prev_input: int):
         # update backend board
@@ -912,27 +897,28 @@ class GameMenu:
                                               disabledforeground=self.colors[self.plyr]['symbol'],
                                               state='disabled')
 
-    def check_winner_pvp(self) -> bool:
+    def check_winner_pvp(self, prev_input: int) -> bool:
         """
         Check winner after each turn in PVP mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
         :return: whether the game has an outcome
         """
-        winner = check_winner_anywhere(self.main_board, self.board_sz.get(), self.win_len, self.check_winner_area)
-        if winner[1] == 'tie':
+        formation = plyr_win_formation(self.main_board, self.board_sz.get(), self.win_len, self.plyr, prev_input)
+        if formation is not None:
             self.stop_game()
-            messagebox.showinfo('Outcome', 'Ended in a tie.')
-            return True
-
-        elif winner != (' ', ' ',):
-            self.stop_game()
-            messagebox.showinfo('Outcome', f'Player \'{winner[0]}\' wins {winner[1]}!')
+            messagebox.showinfo('Outcome', f'Player \'{self.plyr}\' wins {formation}!')
             return True
 
         else:
-            self.turn_hint[self.plyr].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
-            self.plyr = opp(self.plyr)
-            self.turn_hint[self.plyr].config(foreground=self.colors[self.plyr]['symbol'], background='white', relief='ridge')
-            return False
+            if len(self.filled_inds) == self.board_sz.get() ** 2:  # if no one win and the whole board is filled
+                self.stop_game()
+                messagebox.showinfo('Outcome', 'Ended in a tie.')
+                return True
+
+            else:  # if no one win and the whole board is not filled
+                self.turn_hint[self.plyr].config(foreground='SystemDisabledText', background='SystemButtonFace', relief='flat')
+                self.plyr = opp(self.plyr)
+                self.turn_hint[self.plyr].config(foreground=self.colors[self.plyr]['symbol'], background='white', relief='ridge')
+                return False
 
     def stop_game(self):
         self.filled_inds = []
@@ -1047,7 +1033,7 @@ class GameMenuT(GameMenu):
 
         self.countdown()
 
-    def validate_timer(self, key, *args):
+    def validate_timer(self, key: str, *args):
         try:
             # Try to convert the value of the key to a float
             float(self.remain_time[key].get())
@@ -1083,11 +1069,11 @@ class GameMenuT(GameMenu):
             self.stop_game()
             return None
 
-    def check_winner_pvc(self, cur_plyr) -> bool:
+    def check_winner_pvc(self, prev_input: int, cur_plyr: str) -> bool:
         """
         Modified to include disabling timer entry, switching timer and adding bonus time.
         """
-        if super().check_winner_pvc(cur_plyr) is False:
+        if super().check_winner_pvc(prev_input, cur_plyr) is False:
             # grey out current plyr's timer, colorize next plyr's timer.
             self.time_entry[cur_plyr].config(relief='flat', disabledforeground='SystemDisabledText',
                                              disabledbackground='SystemButtonFace',
@@ -1097,11 +1083,11 @@ class GameMenuT(GameMenu):
             self.remain_time[cur_plyr].set(str(float(self.remain_time[cur_plyr].get()) + 1))
             return False
 
-    def check_winner_pvp(self) -> bool:
+    def check_winner_pvp(self, prev_input: int) -> bool:
         """
         Modified to include disabling timer entry, switching timer and adding bonus time.
         """
-        if super().check_winner_pvp() is False:  # changes self.plyr to next plyr
+        if super().check_winner_pvp(prev_input) is False:  # changes self.plyr to next plyr
             # grey out current plyr's timer, colorize next plyr's timer.
             self.time_entry[opp(self.plyr)].config(relief='flat', disabledforeground='SystemDisabledText',
                                                    disabledbackground='SystemButtonFace',
@@ -1206,13 +1192,13 @@ class GameMenuV(GameMenu):
         super().adjust_length(*args)
         self.remain_count_slider.config(from_=self.win_len, to=self.win_len * 2)
 
-    def check_winner_pvc(self, cur_plyr) -> bool:
+    def check_winner_pvc(self, prev_input: int, cur_plyr: str) -> bool:
         self.del_moves()
-        return super().check_winner_pvc(cur_plyr)
+        return super().check_winner_pvc(prev_input, cur_plyr)
 
-    def check_winner_pvp(self) -> bool:
+    def check_winner_pvp(self, prev_input: int) -> bool:
         self.del_moves()
-        return super().check_winner_pvp()
+        return super().check_winner_pvp(prev_input)
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
@@ -1240,16 +1226,13 @@ class GameMenuS(GameMenu):
             'O': []
         }
         self.win_len = self.board_sz.get()
-        self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
 
     def adjust_length(self, *args):
         super().adjust_length(*args)
 
         self.win_len = self.board_sz.get()
-        self.check_winner_area = set_check_winner_area(self.board_sz.get(), self.win_len)
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
-        self.toggle_debugger()  # highlight new changed check_winner_area
 
     def update_ind_pc(self, prev_input: int) -> int:
         pass
@@ -1264,18 +1247,19 @@ class GameMenuS(GameMenu):
 
         self.prev_inputs[self.plyr].append(prev_input)
 
-    def check_winner_pvp(self) -> bool:
+    def check_winner_pvp(self, prev_input: int) -> bool:
         """
         Modified to:
          1. give snake a new head when the old head stuck.
          2. disable the adj cells from the previous turn and enable the adj cells for the next turn.
         """
-        if super().check_winner_pvp() is False:  # changes self.plyr to next player
+        if super().check_winner_pvp(prev_input) is False:  # changes self.plyr to next player
 
+            # setup coords (x_coord, y_coord) of 8 indexes around a center
             relative_adj = {
                 (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
-                (-1, 0), (1, 0),  # Left, Right
-                (-1, 1), (0, 1), (1, 1)  # Bottom-left, Bottom-right
+                (-1, 0),           (1, 0),  # Left, Right
+                (-1, 1),  (0, 1),  (1, 1)  # Bottom-left, Bottom-right
             }
 
             def gen_adj(row: int, col: int) -> set:

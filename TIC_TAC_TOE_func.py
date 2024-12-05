@@ -9,7 +9,7 @@ def set_win_len(board_sz: int) -> int:
 
 def set_check_winner_area(board_sz: int, win_len: int) -> set:
     """
-    Returns all indexes that are both wl dist away from the bottommost row and wl dist away from the rightmost column.
+    :return: check_winner_area (set containing a win_len**2 area of indexes in the top left corner of board)
     """
     check_winner_area = set()
     for row in range(board_sz - win_len + 1):
@@ -52,130 +52,101 @@ def print_board(board: list, board_sz: int):
 
 
 def opp(original: str) -> str:
-    # changes player X to O, O to X
-    if original == 'O':
-        return 'X'
-    else:
-        return 'O'
+    """
+    (opponent)
+
+    Returns X when input O, O when input X.
+    """
+    return 'X' if original == 'O' else 'O'
 
 
-def coord_to_ind(coord: str, main_board: list, board_sz: int) -> int | bool:
-    # converts the x,y coordinates inputted by player to ind number
-    # eg ind num of 3x3 board
-    # [0] [1] [2]
-    # [3] [4] [5]
-    # [6] [7] [8]
+def plyr_win_formation(board: list, board_sz: int, win_len: int, plyr: str, origin: int) -> str | None:
+    half_win_len = win_len // 2
+    board_sz_sub1 = board_sz-1
+    board_sz_add1 = board_sz+1
+    bsz_sub_hwl = board_sz - half_win_len
+    max_row_ind = board_sz * board_sz_sub1
 
-    # if player inputs gibberish, return False
-    if (coord[:coord.find(',')].isdigit() is False) or (coord[coord.find(',') + 1:].isdigit() is False):
-        return False
+    origin_col = origin % board_sz
+    origin_row = origin // board_sz
 
-    # if the player inputted valid coordinates...
-    # take the first number as the column num, the second number as the row num
-    # I observed that the ind num = (row num*board len) + column num
-    ind = int(coord[:coord.find(',')]) + ((int((coord[coord.find(',') + 1:])) - 1) * board_sz) - 1
+    # check column
+    # I put check column as the first function as it is the fastest to complete
+    start = origin
+    end = origin
 
-    # if the ind number exceeds the board, return False
-    if ind + 1 > board_sz**2:
-        return False
-    # if the ind number is negative, return False
-    elif ind < 0:
-        return False
-    # if the that ind alr has an X or O, return False
-    elif main_board[ind] != ' ':
-        return False
-    else:
-        return ind
+    if (origin_row >= half_win_len and board[origin - board_sz * half_win_len] == plyr) or (origin_row < bsz_sub_hwl and board[origin + board_sz * half_win_len] == plyr):
 
+        while (start >= board_sz) and board[start - board_sz] == plyr:
+            start -= board_sz
+        while (end < max_row_ind) and board[end + board_sz] == plyr:
+            end += board_sz
 
-def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner_area: set) -> tuple: # TODO
-    # Different from check_winner(), check_winner_anywhere() is used when the rows, columns, and diagonals could be anywhere and not just fixed to the edge of the board.
-    # Because the checked_area's origin is its top left corner, the distance from the origin to the bottom right corner of board must be larger than the checked area.
-    # For a 5x5 and 4x4 checked area, the origin cannot be at:
-    #     0,  1,  NO, NO, NO,
-    #     5,  6,  NO, NO, NO,
-    #     NO, NO, NO, NO, NO,
-    #     NO, NO, NO, NO, NO,
-    #     NO, NO, NO, NO, NO
-    x_win_formation = ['X'] * win_len
-    o_win_formation = ['O'] * win_len
+        if end // board_sz - start // board_sz + 1 >= win_len:
+            return 'vertically'
 
-    # OPTIMIZATION:
-    # Instead of checking every ind to find those that r outside the checked area, I give the AI indexes that r outside.
-    for origin in check_winner_area:
-        # OPTIMIZATIONS:
-        # 1. Use 'not in' as it is faster than .count()
-        # 2. Returns the result as a tuple instead of list.
-        # 3. Check the diagonals before the orthogonals. This does not need for loops.
-        # if the top left corner has an X and the diagonal top left to down right is filled with X, then X wins.
-        if board[origin] == 'X' and board[origin: origin + board_sz * win_len: board_sz + 1] == x_win_formation:
-            return 'X', 'from top left to down right',
-        # if the top left corner has an O and the diagonal top left to down right is filled with O, then O wins.
-        elif board[origin] == 'O' and board[origin: origin + board_sz * win_len: board_sz + 1] == o_win_formation:
-            return 'O', 'from top left to down right',
+    # check row
+    start = origin
+    end = origin
 
-        # if the top right corner has an X and the diagonal top right to down left is filled with X, then X wins.
-        elif board[origin + win_len - 1] == 'X' and board[
-                                                    origin + win_len - 1: origin + board_sz * win_len - 1: board_sz - 1] == x_win_formation:
-            return 'X', 'from top right to down left',
-        # if the top right corner has an O and the diagonal top right to down left is filled with O, then O wins.
-        elif board[origin + win_len - 1] == 'O' and board[
-                                                    origin + win_len - 1: origin + board_sz * win_len - 1: board_sz - 1] == o_win_formation:
-            return 'O', 'from top right to down left',
+    if (origin_col >= half_win_len and board[origin - half_win_len] == plyr) or (origin_col < bsz_sub_hwl and board[origin + half_win_len] == plyr):
 
-        else:
-            # 4. Instead of using 2 loops for column and row, use only 1 loop that moves one column left and one row down together.
-            for count in range(0, win_len):
-                # for every X/O in the first row, check if its column is filled with either X/O
-                if board[origin + count] != ' ':
-                    # if board[checker's current pos: l dist to the right]
-                    if board[origin + count: origin + board_sz * win_len: board_sz] == x_win_formation:
-                        return 'X', 'vertically',
-                    elif board[origin + count: origin + board_sz * win_len: board_sz] == o_win_formation:
-                        return 'O', 'vertically',
+        while (start % board_sz > 0) and board[start - 1] == plyr:
+            start -= 1
+        while (end % board_sz < board_sz_sub1) and board[end + 1] == plyr:
+            end += 1
 
-                # for every X/O in the first column, check if its row is filled with either X/O
-                if board[count * board_sz + origin] != ' ':
-                    # if board[checker's current pos: l dist downwards]
-                    if board[count * board_sz + origin: count * board_sz + origin + win_len] == x_win_formation:
-                        return 'X', 'horizontally',
-                    elif board[count * board_sz + origin: count * board_sz + origin + win_len] == o_win_formation:
-                        return 'O', 'horizontally',
+        if end - start + 1 >= win_len:
+            return 'horizontally'
 
-            # If no one wins yet and no empty ind left, the game is a draw.
-            if ' ' not in board:
-                return ' ', 'tie',
-    # If no one wins yet but there are empty indexes, game continues.
-    return ' ', ' ',
+    # check top left to down right
+    start = origin
+    end = origin
+
+    if (origin_row >= half_win_len <= origin_col and board[origin - board_sz_add1 * half_win_len] == plyr) or (
+            origin_row < bsz_sub_hwl > origin_col and board[origin + board_sz_add1 * half_win_len] == plyr):
+
+        while (start >= board_sz) and (start % board_sz > 0) and board[start - board_sz_add1] == plyr:
+            start -= board_sz_add1
+        while (end < max_row_ind) and (end % board_sz < board_sz_sub1) and board[end + board_sz_add1] == plyr:
+            end += board_sz_add1
+
+        if (end // board_sz - start // board_sz) + 1 >= win_len:
+            return 'from top left to down right'
+
+    # check top right to down left
+    start = origin
+    end = origin
+
+    if (origin_row >= half_win_len and origin_col < bsz_sub_hwl and board[origin - board_sz_sub1 * half_win_len] == plyr) or (
+            origin_row < bsz_sub_hwl and origin_col >= half_win_len and board[origin + board_sz_sub1 * half_win_len] == plyr):
+
+        while (start >= board_sz) and (start % board_sz < board_sz_sub1) and board[start - board_sz_sub1] == plyr:
+            start -= board_sz_sub1
+        while (end < max_row_ind) and (end % board_sz > 0) and board[end + board_sz_sub1] == plyr:
+            end += board_sz_sub1
+
+        if (end // board_sz - start // board_sz + 1) >= win_len:
+            return 'from top right to down left'
+
+    return None
 
 
 # ALL FUNCTIONS BELOW ARE FOR THE AI
-def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_winner_area: set) -> int:
-    while check_winner_anywhere(main_board, board_sz, win_len, check_winner_area) == (' ', ' ',):
-        print_board(main_board, board_sz)
-        player_coord = input(f'Your turn [{plyr}]! Choose your x,y coordinates: ')
-        global ind
-        ind = coord_to_ind(player_coord, main_board, board_sz)
-        if ind is False:
-            print('Invalid Position!')
-        else:
-            return ind
-    return -1
-
-
 def prune(board: list, board_sz: int, opp: str, origin: int) -> list:
     """
-    Limits the indexes that PC can simulate to the 12 empty indexes that are:
-        1. adjacent to the origin, else
-        2. at the ends of any lines formed by player, else
-        3. the closest to the origin
+    Limits indexes that PC can simulate to the 12 empty indexes with the highest priority.
+    Assigns priority to indexes accordingly:
+        1. index is adjacent to the origin -> highest priority.
+        2. index is 1 of the 2 at each ends of each line formed by player -> within the middle priorities; varies with dist to origin and the number of connected lines.
+        3. index has adjacent player cell -> within the lowest priorities; varies with dist to origin and the number of adjacent player cells.
+    :return: simmable_inds
     """
-    # convert origin to coords and clamp between 1 to board_sz-2.
-    # Why clamp? -> there must be 8 indexes around the origin.
+    # convert origin to coords and clamp between 1 to board_sz-2 -> ensure all adjacents are inside board.
     origin_row = max(1, min(origin // board_sz, board_sz-2))
     origin_col = max(1, min(origin % board_sz, board_sz-2))
 
-    # set up coords of 8 indexes around a center, stored as (x_coord, y_coord)
+    # setup coords (x_coord, y_coord) of 8 indexes around a center
     adjacents = (
         (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
         (-1, 0),           (1, 0),   # Left, Right
@@ -185,44 +156,47 @@ def prune(board: list, board_sz: int, opp: str, origin: int) -> list:
     # stores the 12 indexes
     simmable_inds = []
 
+    # key = index, value = priority
     ind_priority = {}
 
     for ind, symbol in enumerate(board):
         if symbol == ' ':
             row = ind // board_sz
             col = ind % board_sz
-            origin_dy = abs(row - origin_row)
-            origin_dx = abs(col - origin_col)
 
-            origin_d = max(origin_dy, origin_dx)
+            origin_d = max(abs(row - origin_row), abs(col - origin_col))  # Chebyshev distance
 
-            if origin_d <= 1:  # if the index is one of the 8 around the origin
+            if origin_d <= 1:  # if the index is adjacent the origin
                 simmable_inds.append(ind)
                 continue
 
             else:
-                ind_priority[ind] = ind_priority.get(ind, 0) - origin_d
+                ind_priority[ind] = ind_priority.get(ind, 0) - origin_d  # set distance-dependent base priority
 
                 for dir_x, dir_y in adjacents:
                     fwd1_row = row + dir_y
                     fwd1_col = col + dir_x
 
-                    if 0 <= fwd1_row < board_sz and 0 <= fwd1_col < board_sz and board[fwd1_row * board_sz + fwd1_col] == opp:
+                    if 0 <= fwd1_row < board_sz and 0 <= fwd1_col < board_sz and board[fwd1_row * board_sz + fwd1_col] == opp:  # if ind has an adjacent player cell
 
-                        ind_priority[ind] += board_sz
+                        ind_priority[ind] += board_sz  # +board_sz ensures the furthest index with 1 adjacent player cell has higher priority than the closest lone index
 
                         fwd2_row = fwd1_row + dir_y
                         fwd2_col = fwd1_col + dir_x
 
-                        if 0 <= fwd2_row < board_sz and 0 <= fwd2_col < board_sz and board[fwd2_row * board_sz + fwd2_col] == opp:
+                        if 0 <= fwd2_row < board_sz and 0 <= fwd2_col < board_sz and board[fwd2_row * board_sz + fwd2_col] == opp:  # if ind is at the end of a line formed by player
 
                             back1_row = row - dir_y
                             back1_col = col - dir_x
                             back1_ind = back1_row * board_sz + back1_col
 
-                            if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz and board[back1_ind] == ' ':
+                            if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz and board[back1_ind] == ' ':  # if the 2nd index at the end of the line formed by player is valid
 
-                                ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_sz
+                                ind_priority[ind] += 8
+                                # +8 ensures any index connected to 1 line formed by player has higher priority than an index fully surrounded by player cells.
+                                # Why not +board_sz+8 -> +board_sz was done 2 if statements outside.
+
+                                ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_sz + 8
 
     print(f'\nIndex priority: {ind_priority}')
 
@@ -236,85 +210,25 @@ def prune(board: list, board_sz: int, opp: str, origin: int) -> list:
 
     return simmable_inds
 
-# def prune():
-#     """
-#     Limits the indexes that PC can simulate to the 12 empty indexes that are either: one of the 8 around the origin; or have the highest number of adj indexes with an X/O. Adj index with player's symbol counts as 3.
-#     """
-#
-#     # convert origin to coords and clamp between 1 to board_sz-2.
-#     # Why clamp? -> there must be 8 indexes around the origin.
-#     origin_row = max(1, min(origin // board_sz, board_sz-2))
-#     origin_col = max(1, min(origin % board_sz, board_sz-2))
-#
-#     # set up coords of 8 indexes around a center, stored as (x_coord, y_coord)
-#     adjacents = (
-#         (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
-#         (-1, 0),           (1, 0),   # Left, Right
-#         (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
-#     )
-#
-#     # stores the 12 indexes
-#     global simmable_inds
-#     simmable_inds = []
-#
-#     # for each index, stores the number of adj indexes with an X/O.
-#     ind_priority = {}
-#
-#     for ind, symbol in enumerate(main_board):
-#         if symbol == ' ':
-#             ind_row = ind // board_sz
-#             ind_col = ind % board_sz
-#             origin_dy = abs(ind_row - origin_row)
-#             origin_dx = abs(ind_col - origin_col)
-#
-#             # I want diagonal indexes to have shorter distance from origin than hor/vert indexes -> higher priority.
-#             origin_d = max(origin_dy, origin_dx) - min(origin_dy, origin_dx)/3
-#
-#             if origin_d <= 1:  # if the index is one of the 8 around the origin
-#                 simmable_inds.append(ind)
-#                 continue
-#
-#             else:  # if the index is not one of the 8 around the origin
-#                 priority = 0
-#                 for adj_x, adj_y in adjacents:  # count how many adj indexes with an X/O
-#                     new_row = ind_row + adj_y
-#                     new_col = ind_col + adj_x
-#                     if 0 <= new_row < board_sz and 0 <= new_col < board_sz:
-#                         new_ind = new_row*board_sz + new_col
-#                         if main_board[new_ind] == opp(pc):
-#                             priority += 3
-#                         elif main_board[new_ind] == pc:
-#                             priority += 1
-#
-#                 ind_priority[(ind, origin_d,)] = priority   # key = (board index, dist_from_origin)
-#
-#     print(f'\nIndex priority: {ind_priority}')
-#
-#     simmable_inds.extend(
-#         key_val[0][0] for key_val in  # add the keys in sorted order into simmable_inds.
-#         sorted(  # sort the ind_priority. Key with higher priority comes first. If keys have same priority: key with shorter distance from origin comes first.
-#             ind_priority.items(),
-#             key=lambda key_val: (-key_val[1], key_val[0][1])
-#         )
-#     )
-#
-#     simmable_inds = simmable_inds[:12]
-#
-#     if is_debugging:
-#         for sim_ind in simmable_inds:
-#             ind_buttons[sim_ind].config(background='Lemon Chiffon2')
-#
-#     debugger.insert(tk.END, 'Empty indexes after prunning:\n' + str(simmable_inds) + '\n')
-#     print(f'Empty indexes: {simmable_inds}')
-
 
 def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool, debugger=None) -> int:
+    board_sz_sub1 = board_sz-1
+    board_sz_add1 = board_sz+1
     half_win_len = win_len // 2
-    board_sz_neg1 = board_sz-1
-    bsz_neg_hwl = board_sz - half_win_len
-    max_row_ind = board_sz * board_sz_neg1
+    bsz_sub_hwl = board_sz - half_win_len
+    max_row_ind = board_sz * board_sz_sub1
 
     def is_plyr_win(board: list, plyr: str, origin: int) -> bool:
+        """
+        :param board: same as board in pc_input
+        :param origin: latest move made on the board
+        :param plyr: player who made the move at 'origin'
+        """
+        # OPTIMIZATION:
+        # 1. only checks for the row/col/diagonals connected to the origin
+        # 2. no need to check opponent's formations, as opponent cannot make move this turn (cannot be the winner)
+        # 3. pre-calculate once: half_win_len, board_sz_sub1, board_sz_add1, bsz_sub_hwl, max_row_ind, origin_col, origin_row
+
         origin_col = origin % board_sz
         origin_row = origin // board_sz
 
@@ -323,7 +237,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int
         start = origin
         end = origin
 
-        if (origin_row >= half_win_len and board[origin - board_sz * half_win_len] == plyr) or (origin_row < bsz_neg_hwl and board[origin + board_sz * half_win_len] == plyr):
+        if (origin_row >= half_win_len and board[origin - board_sz * half_win_len] == plyr) or (origin_row < bsz_sub_hwl and board[origin + board_sz * half_win_len] == plyr):
 
             while (start >= board_sz) and board[start - board_sz] == plyr:
                 start -= board_sz
@@ -337,42 +251,42 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int
         start = origin
         end = origin
 
-        if (origin_col >= half_win_len and board[origin - half_win_len] == plyr) or (origin_col < bsz_neg_hwl and board[origin + half_win_len] == plyr):
+        if (origin_col >= half_win_len and board[origin - half_win_len] == plyr) or (origin_col < bsz_sub_hwl and board[origin + half_win_len] == plyr):
 
             while (start % board_sz > 0) and board[start - 1] == plyr:
                 start -= 1
-            while (end % board_sz < board_sz_neg1) and board[end + 1] == plyr:
+            while (end % board_sz < board_sz_sub1) and board[end + 1] == plyr:
                 end += 1
 
             if end - start + 1 >= win_len:
                 return True
 
-        # check up left to down right
+        # check top left to down right
         start = origin
         end = origin
 
-        if (origin_row >= half_win_len <= origin_col and board[origin - (board_sz + 1) * half_win_len] == plyr) or (
-                origin_row < bsz_neg_hwl > origin_col and board[origin + (board_sz + 1) * half_win_len] == plyr):
+        if (origin_row >= half_win_len <= origin_col and board[origin - board_sz_add1 * half_win_len] == plyr) or (
+                origin_row < bsz_sub_hwl > origin_col and board[origin + board_sz_add1 * half_win_len] == plyr):
 
-            while (start >= board_sz) and (start % board_sz > 0) and board[start - (board_sz + 1)] == plyr:
-                start -= (board_sz + 1)
-            while (end < max_row_ind) and (end % board_sz < board_sz_neg1) and board[end + board_sz + 1] == plyr:
-                end += (board_sz + 1)
+            while (start >= board_sz) and (start % board_sz > 0) and board[start - board_sz_add1] == plyr:
+                start -= board_sz_add1
+            while (end < max_row_ind) and (end % board_sz < board_sz_sub1) and board[end + board_sz_add1] == plyr:
+                end += board_sz_add1
 
             if (end // board_sz - start // board_sz) + 1 >= win_len:
                 return True
 
-        # check up right to down left
+        # check top right to down left
         start = origin
         end = origin
 
-        if (origin_row >= half_win_len and origin_col < bsz_neg_hwl and board[origin - board_sz_neg1 * half_win_len] == plyr) or (
-                origin_row < bsz_neg_hwl and origin_col >= half_win_len and board[origin + board_sz_neg1 * half_win_len] == plyr):
+        if (origin_row >= half_win_len and origin_col < bsz_sub_hwl and board[origin - board_sz_sub1 * half_win_len] == plyr) or (
+                origin_row < bsz_sub_hwl and origin_col >= half_win_len and board[origin + board_sz_sub1 * half_win_len] == plyr):
 
-            while (start >= board_sz) and (start % board_sz < board_sz_neg1) and board[start - board_sz_neg1] == plyr:
-                start -= board_sz_neg1
-            while (end < max_row_ind) and (end % board_sz > 0) and board[end + board_sz_neg1] == plyr:
-                end += board_sz_neg1
+            while (start >= board_sz) and (start % board_sz < board_sz_sub1) and board[start - board_sz_sub1] == plyr:
+                start -= board_sz_sub1
+            while (end < max_row_ind) and (end % board_sz > 0) and board[end + board_sz_sub1] == plyr:
+                end += board_sz_sub1
 
             if (end // board_sz - start // board_sz) + 1 >= win_len:
                 return True
@@ -381,12 +295,16 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int
 
     def is_white(parent: list, parent_plyr: str, parent_origin: int) -> bool:
         """
-        Finds the path where: i) the PC has at least 1 winning path whenever it's human's turn; ii) the human has 0 winning paths whenever it's PC's turn.
+        :param parent: the board at the parent node
+        :param parent_origin: latest move made on board 'parent'
+        :param parent_plyr: the plyr who made the move 'parent_origin' on the board 'parent'
+        | Finds the path where:
+            i) the PC has at least 1 winning path whenever it's human's turn
+            ii) the human has 0 winning paths whenever it's PC's turn
 
-        Returns True if all children are 'black' -> their parent's player will win -> their parent is 'white'
+        Returns True if all children are 'black' -> their parent's player will win -> their parent is 'white'. Returns False if any children are 'white' -> their parent's player will lose -> their parent is 'black'.
             'Black': this node lost for whoever is playing at that layer.
 
-        Returns False if any children are 'white' -> their parent's player will lose -> their parent is 'black'
             'White': this node won for whoever is playing at that layer.
         """
         child_plyr = opp(parent_plyr)
