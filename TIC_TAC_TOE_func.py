@@ -1,22 +1,23 @@
+import random
 import matplotlib.pyplot as plt
 import networkx as nx
 from networkx.drawing.nx_agraph import pygraphviz_layout
 
 
 def set_win_len(board_sz: int) -> int:
-    return min(board_sz, 4)
+    return board_sz//4 + 3
 
 
-def set_check_winner_area(board_sz: int, win_len: int) -> set:
-    """
-    :return: check_winner_area (set containing a win_len**2 area of indexes in the top left corner of board)
-    """
-    check_winner_area = set()
-    for row in range(board_sz - win_len + 1):
-        for col in range(board_sz - win_len + 1):
-            check_winner_area.add(row * board_sz + col)
-
-    return check_winner_area
+# def set_check_winner_area(board_sz: int, win_len: int) -> set:
+#     """
+#     :return: check_winner_area (set containing a win_len**2 area of indexes in the top left corner of board)
+#     """
+#     check_winner_area = set()
+#     for row in range(board_sz - win_len + 1):
+#         for col in range(board_sz - win_len + 1):
+#             check_winner_area.add(row * board_sz + col)
+#
+#     return check_winner_area
 
 
 def setup_board(board_sz: int) -> list:
@@ -51,16 +52,28 @@ def print_board(board: list, board_sz: int):
     print(end='\n')
 
 
-def opp(original: str) -> str:
+def opp(original: int) -> int:
     """
     (opponent)
 
-    Returns X when input O, O when input X.
+    Returns 1 when input 2; 2 when input 1.
     """
-    return 'X' if original == 'O' else 'O'
+    return 3-original
 
 
-def plyr_win_formation(board: list, board_sz: int, win_len: int, plyr: str, origin: int) -> str | None:
+def get_symbol(base3: int) -> str:
+    """
+    Converts a symbol from base3 to readable character.
+    """
+    if base3 == 1:
+        return 'X'
+    elif base3 == 2:
+        return 'O'
+    elif base3 == 0:
+        return ' '
+
+
+def plyr_win_formation(board: list, board_sz: int, win_len: int, plyr: int, origin: int) -> str | None:
     half_win_len = win_len // 2
     board_sz_sub1 = board_sz-1
     board_sz_add1 = board_sz+1
@@ -133,7 +146,7 @@ def plyr_win_formation(board: list, board_sz: int, win_len: int, plyr: str, orig
 
 
 # ALL FUNCTIONS BELOW ARE FOR THE AI
-def prune(board: list, board_sz: int, opp: str, origin: int) -> list:
+def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
     """
     Limits indexes that PC can simulate to the 12 empty indexes with the highest priority.
     Assigns priority to indexes accordingly:
@@ -206,28 +219,28 @@ def prune(board: list, board_sz: int, opp: str, origin: int) -> list:
 
     simmable_inds = simmable_inds[:12]
 
-    print(f'Empty indexes: {simmable_inds}')
+    print(f'Simulatable indexes: {simmable_inds}')
 
     return simmable_inds
 
 
-def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool, debugger=None) -> int:
+def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool) -> int:
     board_sz_sub1 = board_sz-1
     board_sz_add1 = board_sz+1
     half_win_len = win_len // 2
     bsz_sub_hwl = board_sz - half_win_len
     max_row_ind = board_sz * board_sz_sub1
 
-    def is_plyr_win(board: list, plyr: str, origin: int) -> bool:
+    def is_plyr_win(board: list, plyr: int, origin: int) -> bool:
         """
         :param board: same as board in pc_input
         :param origin: latest move made on the board
         :param plyr: player who made the move at 'origin'
         """
         # OPTIMIZATION:
-        # 1. only checks for the row/col/diagonals connected to the origin
-        # 2. no need to check opponent's formations, as opponent cannot make move this turn (cannot be the winner)
-        # 3. pre-calculate once: half_win_len, board_sz_sub1, board_sz_add1, bsz_sub_hwl, max_row_ind, origin_col, origin_row
+        # 1. only check for the row/col/diagonals connected to the origin
+        # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
+        # 3. pre-calculate only once: half_win_len, board_sz_sub1, board_sz_add1, bsz_sub_hwl, max_row_ind, origin_col, origin_row
 
         origin_col = origin % board_sz
         origin_row = origin // board_sz
@@ -293,7 +306,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int
 
         return False
 
-    def is_white(parent: list, parent_plyr: str, parent_origin: int) -> bool:
+    def is_white(parent: list, parent_plyr: int, parent_origin: int) -> bool:
         """
         :param parent: the board at the parent node
         :param parent_origin: latest move made on board 'parent'
@@ -330,61 +343,169 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int
 
         return True
 
-    # def analyze_child(parent: list, parent_plyr: str, parent_origin: int) -> bool:
-    #     child_plyr = opp(parent_plyr)
-    #
-    #     # OPTIMIZATION: I only check for whether the active plyr wins in this state because only the active plyr moved so is possible to win.
-    #     plyr_win = is_plyr_win(parent, parent_plyr, parent_origin)
-    #
-    #     if plyr_win is True and parent_plyr is pc:
-    #         win_probs[parent[-1]] += len(simmable_inds)+1   # +1 since len(simmable_inds) can be 0
-    #
-    #     elif plyr_win is True and parent_plyr is not pc:
-    #         win_probs[parent[-1]] -= (len(simmable_inds)+1)
-    #         return False
-    #
-    #     elif plyr_win is False and len(simmable_inds) != 0:     # if the parent node has no winner yet, and the tree can still branch, continue branching down.
-    #         children_won = len(simmable_inds)//2
-    #
-    #         for i in range(len(simmable_inds)):
-    #             sim_ind = simmable_inds.pop(i)
-    #
-    #             child = parent.copy()
-    #             child[sim_ind] = child_plyr
-    #             if child[-1] == '_':
-    #                 child[-1] = sim_ind
-    #                 analyze_child(child, child_plyr, sim_ind)
-    #
-    #             elif analyze_child(child, child_plyr, sim_ind) is False:
-    #                 if children_won > 1:    # if less than 1/2 of the childs lost, continue countdown
-    #                     children_won -= 1
-    #                 elif children_won == 1:   # OPTIMIZATION: if more than 1/2 of the childs lost, this parent kills itself and assume all children loss.
-    #                     win_probs[parent[-1]] -= math.factorial(len(simmable_inds)//2)
-    #                     simmable_inds.insert(i, sim_ind)
-    #                     return False
-    #
-    #             simmable_inds.insert(i, sim_ind)
+    for i, sim_ind in enumerate(simmable_inds):
+        global white_num
+        white_num = {f"Lyr {i}": 0 for i in range(len(simmable_inds)-1, -1, -1)}
 
-    # def pick_init_move(plyr: str, outcomes: dict) -> int:
-    #     # find which first-gen move results in the most winning child nodes
-    #     max_win_prob = max(outcomes.values())
-    #
-    #     # moves_pool creates a list of initial moves containing the same highest win_prob to be picked randomly
-    #     moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
-    #     move = moves_pool[random.randint(0, len(moves_pool) - 1)]
-    #
-    #     # try putting the final move decision onto the current board to check for any statistical deathtraps
-    #     # statistical deathtraps are only confirmed to exist on 3x3 board
-    #     main_board_copy = main_board.copy()
-    #     main_board_copy[move] = plyr
-    #     # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
-    #     if board_sz == 3 and check_deathtrap(plyr, main_board_copy) and len(list(outcomes.keys())) > 1:
-    #         print('Deathtrap found! Choosing a new move...')
-    #         if is_debugging:
-    #             debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
-    #         outcomes.pop(move)
-    #         move = pick_init_move(plyr, outcomes)
-    #     return move
+        del simmable_inds[i]
+
+        child = main_board
+        child[sim_ind] = pc
+
+        if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
+            white_num['Lyr ' + str(len(simmable_inds))] += 1
+            print('Number of white nodes at', sim_ind, ':', white_num)
+
+            simmable_inds.insert(i, sim_ind)
+
+            return sim_ind
+        else:
+            print('Number of white nodes at', sim_ind, ':', white_num)
+
+            child[sim_ind] = ' '
+            simmable_inds.insert(i, sim_ind)
+
+
+def pc_input_v1(pc: int, main_board: list, board_sz: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool) -> int:
+    board_sz_sub1 = board_sz-1
+    board_sz_add1 = board_sz+1
+    half_win_len = win_len // 2
+    bsz_sub_hwl = board_sz - half_win_len
+    max_row_ind = board_sz * board_sz_sub1
+
+    def is_plyr_win(board: list, plyr: int, origin: int) -> bool:
+        """
+        :param board: same as board in pc_input
+        :param origin: latest move made on the board
+        :param plyr: player who made the move at 'origin'
+        """
+        # OPTIMIZATION:
+        # 1. only check for the row/col/diagonals connected to the origin
+        # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
+        # 3. pre-calculate only once: half_win_len, board_sz_sub1, board_sz_add1, bsz_sub_hwl, max_row_ind, origin_col, origin_row
+
+        origin_col = origin % board_sz
+        origin_row = origin // board_sz
+
+        # check column
+        # I put check column as the first function as it is the fastest to complete
+        start = origin
+        end = origin
+
+        if (origin_row >= half_win_len and board[origin - board_sz * half_win_len] == plyr) or (origin_row < bsz_sub_hwl and board[origin + board_sz * half_win_len] == plyr):
+
+            while (start >= board_sz) and board[start - board_sz] == plyr:
+                start -= board_sz
+            while (end < max_row_ind) and board[end + board_sz] == plyr:
+                end += board_sz
+
+            if end // board_sz - start // board_sz + 1 >= win_len:
+                return True
+
+        # check row
+        start = origin
+        end = origin
+
+        if (origin_col >= half_win_len and board[origin - half_win_len] == plyr) or (origin_col < bsz_sub_hwl and board[origin + half_win_len] == plyr):
+
+            while (start % board_sz > 0) and board[start - 1] == plyr:
+                start -= 1
+            while (end % board_sz < board_sz_sub1) and board[end + 1] == plyr:
+                end += 1
+
+            if end - start + 1 >= win_len:
+                return True
+
+        # check top left to down right
+        start = origin
+        end = origin
+
+        if (origin_row >= half_win_len <= origin_col and board[origin - board_sz_add1 * half_win_len] == plyr) or (
+                origin_row < bsz_sub_hwl > origin_col and board[origin + board_sz_add1 * half_win_len] == plyr):
+
+            while (start >= board_sz) and (start % board_sz > 0) and board[start - board_sz_add1] == plyr:
+                start -= board_sz_add1
+            while (end < max_row_ind) and (end % board_sz < board_sz_sub1) and board[end + board_sz_add1] == plyr:
+                end += board_sz_add1
+
+            if (end // board_sz - start // board_sz) + 1 >= win_len:
+                return True
+
+        # check top right to down left
+        start = origin
+        end = origin
+
+        if (origin_row >= half_win_len and origin_col < bsz_sub_hwl and board[origin - board_sz_sub1 * half_win_len] == plyr) or (
+                origin_row < bsz_sub_hwl and origin_col >= half_win_len and board[origin + board_sz_sub1 * half_win_len] == plyr):
+
+            while (start >= board_sz) and (start % board_sz < board_sz_sub1) and board[start - board_sz_sub1] == plyr:
+                start -= board_sz_sub1
+            while (end < max_row_ind) and (end % board_sz > 0) and board[end + board_sz_sub1] == plyr:
+                end += board_sz_sub1
+
+            if (end // board_sz - start // board_sz) + 1 >= win_len:
+                return True
+
+        return False
+
+    def analyze_child(parent: list, parent_plyr: int, parent_origin: int) -> bool:
+
+        is_win = is_plyr_win(parent, parent_plyr, parent_origin)
+
+        if is_win is True:
+            if parent_plyr is pc:
+                win_probs[parent[-1]] += len(simmable_inds)+1   # +1 since len(simmable_inds) can be 0
+                return True
+
+            else:  # if parent_plyr is not pc
+                win_probs[parent[-1]] -= (len(simmable_inds)+1)
+                return False
+
+        elif is_win is False and len(simmable_inds) != 0:     # if this node has no winner and not tie yet, continue branching down.
+            child_plyr = opp(parent_plyr)
+            win_child_count = len(simmable_inds)//2
+
+            for i, sim_ind in enumerate(simmable_inds):
+                del simmable_inds[i]
+
+                child = parent
+                child[sim_ind] = child_plyr
+
+                # if child[-1] == '_':
+                #     child[-1] = sim_ind
+                #     analyze_child(child, child_plyr, sim_ind)
+
+                # elif analyze_child(child, child_plyr, sim_ind) is False:
+                #     if child_win_count > 1:    # if less than 1/2 of the childs lost, continue countdown
+                #         child_win_count -= 1
+                #     elif child_win_count == 1:   # OPTIMIZATION: if more than 1/2 of the childs lost, this parent kills itself and assume all children loss.
+                #         win_probs[parent[-1]] -= math.factorial(len(simmable_inds)//2)
+                #         simmable_inds.insert(i, sim_ind)
+                #         return False
+
+                child[sim_ind] = ' '
+                simmable_inds.insert(i, sim_ind)
+
+    def pick_init_move(plyr: str, outcomes: dict) -> int:
+        # find which first-gen move results in the most winning child nodes
+        max_win_prob = max(outcomes.values())
+
+        # moves_pool creates a list of initial moves containing the same highest win_prob to be picked randomly
+        moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
+        move = moves_pool[random.randint(0, len(moves_pool) - 1)]
+
+        # try putting the final move decision onto the current board to check for any statistical deathtraps
+        # statistical deathtraps are only confirmed to exist on 3x3 board
+        main_board_copy = main_board.copy()
+        main_board_copy[move] = plyr
+        # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
+        # if board_sz == 3 and check_deathtrap(plyr, main_board_copy) and len(list(outcomes.keys())) > 1:
+        #     print('Deathtrap found! Choosing a new move...')
+        #     if is_debugging:
+        #         debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
+        #     outcomes.pop(move)
+        #     move = pick_init_move(plyr, outcomes)
+        return move
 
     # def check_deathtrap(plyr: str, board: list) -> bool:
     #     # a statistical deathtrap is a first-gen move that appeared to be statistically superior to all other first-gen moves, but it will lead to an outcome like this (computer is X):
@@ -410,35 +531,16 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, origin: int
     #                 return True
     #     return False
 
-    for i, sim_ind in enumerate(simmable_inds):
-        global white_num
-        white_num = {f"Lyr {i}": 0 for i in range(len(simmable_inds)-1, -1, -1)}
-
-        del simmable_inds[i]
-
-        child = main_board
-        child[sim_ind] = pc
-
-        if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
-            white_num['Lyr ' + str(len(simmable_inds))] += 1
-            print('Number of white nodes at', sim_ind, ':', white_num)
-            return sim_ind
-        else:
-            print('Number of white nodes at', sim_ind, ':', white_num)
-
-            child[sim_ind] = ' '
-            simmable_inds.insert(i, sim_ind)
-
-    # win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
-    # analyze_child(main_board, opp(pc), prev_input)
-    # fin_move = pick_init_move(pc, win_probs)
-    # if is_debugging:
-    #     plt.clf()
-    #     p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
-    #     plt.bar_label(p, label_type='center')
-    #     plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
-    #     plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
-    #     plt.xlabel('1st-Generation Move')
-    #     plt.ylabel('Winning Probability')
-    #     plt.show()
-    # return int(fin_move)
+    win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
+    analyze_child(main_board, opp(pc), prev_input)
+    fin_move = pick_init_move(pc, win_probs)
+    if is_debugging:
+        plt.clf()
+        p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
+        plt.bar_label(p, label_type='center')
+        plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
+        plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
+        plt.xlabel('1st-Generation Move')
+        plt.ylabel('Winning Probability')
+        plt.show()
+    return int(fin_move)
