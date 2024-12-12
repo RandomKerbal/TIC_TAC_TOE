@@ -8,25 +8,12 @@ def set_win_len(board_sz: int) -> int:
     return board_sz//4 + 3
 
 
-# def set_check_winner_area(board_sz: int, win_len: int) -> set:
-#     """
-#     :return: check_winner_area (set containing a win_len**2 area of indexes in the top left corner of board)
-#     """
-#     check_winner_area = set()
-#     for row in range(board_sz - win_len + 1):
-#         for col in range(board_sz - win_len + 1):
-#             check_winner_area.add(row * board_sz + col)
-#
-#     return check_winner_area
-
-
 def setup_board(board_sz: int) -> list:
     # setup board layout
-    # eg 3x3 board = [' ',' ',' '
-    #                 ' ',' ',' '
-    #                 ' ',' ',' ', 'initial_move']
-    main_board = [' '] * (board_sz**2)
-    # main_board.append('_')  # TODO
+    # eg 3x3 board = [0, 0, 0
+    #                 0, 0, 0
+    #                 0, 0, 0]
+    main_board = [0] * (board_sz**2)
 
     return main_board
 
@@ -45,7 +32,7 @@ def print_board(board: list, board_sz: int):
     for i in range(board_sz):
         print('\n' + str(i + 1) + ' ' * (3 - len(str(i+1))), end='')
         for ii in range(i*board_sz, (i*board_sz)+board_sz):
-            if board[ii] == ' ':
+            if board[ii] == 0:
                 print('[ ]', end=' ')
             else:
                 print(' ' + board[ii], end='  ')
@@ -173,7 +160,7 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
     ind_priority = {}
 
     for ind, symbol in enumerate(board):
-        if symbol == ' ':
+        if symbol == 0:
             row = ind // board_sz
             col = ind % board_sz
 
@@ -203,7 +190,7 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
                             back1_col = col - dir_x
                             back1_ind = back1_row * board_sz + back1_col
 
-                            if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz and board[back1_ind] == ' ':  # if the 2nd index at the end of the line formed by player is valid
+                            if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz and board[back1_ind] == 0:  # if the 2nd index at the end of the line formed by player is valid
 
                                 ind_priority[ind] += 8
                                 # +8 ensures any index connected to 1 line formed by player has higher priority than an index fully surrounded by player cells.
@@ -211,7 +198,7 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
 
                                 ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_sz + 8
 
-    print(f'\nIndex priority: {ind_priority}')
+    print(f'\nIndex Priority: {ind_priority}')
 
     simmable_inds.extend(
         sorted(ind_priority, key=ind_priority.get, reverse=True)
@@ -219,7 +206,7 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
 
     simmable_inds = simmable_inds[:12]
 
-    print(f'Simulatable indexes: {simmable_inds}')
+    print(f'Simulatable Indexes: {simmable_inds}')
 
     return simmable_inds
 
@@ -334,11 +321,11 @@ def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int
                 # or if a child is white and is not at the bottommost layer yet
                 white_num['Lyr ' + str(len(simmable_inds))] += 1
 
-                child[sim_ind] = ' '
+                child[sim_ind] = 0
                 simmable_inds.insert(i, sim_ind)
                 return False
 
-            child[sim_ind] = ' '
+            child[sim_ind] = 0
             simmable_inds.insert(i, sim_ind)
 
         return True
@@ -362,7 +349,7 @@ def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int
         else:
             print('Number of white nodes at', sim_ind, ':', white_num)
 
-            child[sim_ind] = ' '
+            child[sim_ind] = 0
             simmable_inds.insert(i, sim_ind)
 
 
@@ -372,6 +359,8 @@ def pc_input_v1(pc: int, main_board: list, board_sz: int, win_len: int, origin: 
     half_win_len = win_len // 2
     bsz_sub_hwl = board_sz - half_win_len
     max_row_ind = board_sz * board_sz_sub1
+
+    simmable_inds = simmable_inds[:9]  # CZY AI is only capable of simulating 9 indexes
 
     def is_plyr_win(board: list, plyr: int, origin: int) -> bool:
         """
@@ -448,99 +437,99 @@ def pc_input_v1(pc: int, main_board: list, board_sz: int, win_len: int, origin: 
 
         return False
 
-    def analyze_child(parent: list, parent_plyr: int, parent_origin: int) -> bool:
+    def recur(parent: list, pc: int, parent_origin: int) -> bool:
 
-        is_win = is_plyr_win(parent, parent_plyr, parent_origin)
+        is_win = is_plyr_win(parent, pc, parent_origin)
 
-        if is_win is True:
-            if parent_plyr is pc:
-                win_probs[parent[-1]] += len(simmable_inds)+1   # +1 since len(simmable_inds) can be 0
-                return True
-
-            else:  # if parent_plyr is not pc
-                win_probs[parent[-1]] -= (len(simmable_inds)+1)
-                return False
+        if is_win is True:  # this layer is always pc
+            win_probs[init_ind] += len(simmable_inds) + 1   # +1 because len(simmable_inds) can be 0
 
         elif is_win is False and len(simmable_inds) != 0:     # if this node has no winner and not tie yet, continue branching down.
-            child_plyr = opp(parent_plyr)
-            win_child_count = len(simmable_inds)//2
+            plyr = opp(pc)
 
             for i, sim_ind in enumerate(simmable_inds):
                 del simmable_inds[i]
 
                 child = parent
-                child[sim_ind] = child_plyr
+                child[sim_ind] = plyr
 
-                # if child[-1] == '_':
-                #     child[-1] = sim_ind
-                #     analyze_child(child, child_plyr, sim_ind)
+                is_win = is_plyr_win(child, plyr, sim_ind)
 
-                # elif analyze_child(child, child_plyr, sim_ind) is False:
-                #     if child_win_count > 1:    # if less than 1/2 of the childs lost, continue countdown
-                #         child_win_count -= 1
-                #     elif child_win_count == 1:   # OPTIMIZATION: if more than 1/2 of the childs lost, this parent kills itself and assume all children loss.
-                #         win_probs[parent[-1]] -= math.factorial(len(simmable_inds)//2)
-                #         simmable_inds.insert(i, sim_ind)
-                #         return False
+                if is_win is True:  # this layer is always player
+                    win_probs[init_ind] -= (len(simmable_inds) + 1)
 
-                child[sim_ind] = ' '
+                    child[sim_ind] = 0
+                    simmable_inds.insert(i, sim_ind)
+                    return False
+
+                elif is_win is False and len(simmable_inds) != 0:
+
+                    if parent_origin == init_ind:  # if this is the first recursion
+                        all_child_lost = True
+
+                    for ii, sim_ind_ii in enumerate(simmable_inds):
+                        del simmable_inds[ii]
+
+                        child_ii = child
+                        child_ii[sim_ind_ii] = pc
+
+                        if recur(child_ii, pc, sim_ind_ii) is None and parent_origin == init_ind:
+                            all_child_lost = False
+
+                            child[sim_ind_ii] = 0
+                            simmable_inds.insert(ii, sim_ind_ii)
+                            break  # OPTIMIZATION ?
+
+                        child[sim_ind_ii] = 0
+                        simmable_inds.insert(ii, sim_ind_ii)
+
+                    if parent_origin == init_ind is True and all_child_lost is True:
+                        del win_probs[init_ind]
+                        print(f'Deathtrap Found: Index {init_ind}')
+
+                        child[sim_ind] = 0
+                        simmable_inds.insert(i, sim_ind)
+                        return False
+
+                child[sim_ind] = 0
                 simmable_inds.insert(i, sim_ind)
 
-    def pick_init_move(plyr: str, outcomes: dict) -> int:
-        # find which first-gen move results in the most winning child nodes
+    def pick_init_move(plyr: int, outcomes: dict) -> int:
+        # find which init_ind results in the most winning child nodes
         max_win_prob = max(outcomes.values())
 
-        # moves_pool creates a list of initial moves containing the same highest win_prob to be picked randomly
+        # moves_pool creates a list of init_inds containing the same highest win_prob to be picked randomly
         moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
         move = moves_pool[random.randint(0, len(moves_pool) - 1)]
 
-        # try putting the final move decision onto the current board to check for any statistical deathtraps
-        # statistical deathtraps are only confirmed to exist on 3x3 board
-        main_board_copy = main_board.copy()
-        main_board_copy[move] = plyr
-        # if (the board l is 3) and (deathtrap is present) and (there are still other moves to play other than this move):
-        # if board_sz == 3 and check_deathtrap(plyr, main_board_copy) and len(list(outcomes.keys())) > 1:
-        #     print('Deathtrap found! Choosing a new move...')
-        #     if is_debugging:
-        #         debugger.insert(tk.END, 'PC\'s comment:\nDeathtrap found! Choosing a new move...\n')
-        #     outcomes.pop(move)
-        #     move = pick_init_move(plyr, outcomes)
         return move
 
-    # def check_deathtrap(plyr: str, board: list) -> bool:
-    #     # a statistical deathtrap is a first-gen move that appeared to be statistically superior to all other first-gen moves, but it will lead to an outcome like this (computer is X):
-    #     # [O] [ ] [X]
-    #     # [ ] [X] [ ]
-    #     # [O] [ ] [O]
-    #     # simulates the current board with the final move decision 3 times into the future
-    #     # a statistical deathtrap can be identified by checking 3 moves later, whether all the child nodes of a parent node will loose
-    #     for next_move in next_moves[1:]:
-    #         if check_winner_anywhere(next_move, board_sz, win_len, check_winner_area) == (' ', ' ',):
-    #             next_next_moves = give_birth(plyr, next_move)
-    #             death_count = 0
-    #             for next_next_move in next_next_moves[1:]:
-    #                 if check_winner_anywhere(next_next_move, board_sz, board_sz, [0]) == (' ', ' ',):
-    #                     next_next_next_moves = give_birth(opp(plyr), next_next_move)
-    #                     for next_next_next_move in next_next_next_moves[1:]:
-    #                         if check_winner_anywhere(next_next_next_move, board_sz, board_sz, [0])[0] == 'X':
-    #                             # counts how many child nodes loose
-    #                             death_count += 1
-    #
-    #             # if all the child nodes loose, the first-gen move is a deathtrap
-    #             if death_count > len(next_next_moves):
-    #                 return True
-    #     return False
+    win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'init_move': win_probability}
 
-    win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'initial_move_n': win_probability_of_n}
-    analyze_child(main_board, opp(pc), prev_input)
+    for i, sim_ind in enumerate(simmable_inds):
+        global init_ind
+        init_ind = sim_ind
+
+        del simmable_inds[i]
+
+        child = main_board
+        child[sim_ind] = pc
+
+        recur(child, pc, sim_ind)
+
+        child[sim_ind] = 0
+        simmable_inds.insert(i, sim_ind)
+
     fin_move = pick_init_move(pc, win_probs)
+
     if is_debugging:
         plt.clf()
         p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
         plt.bar_label(p, label_type='center')
         plt.locator_params(axis='x', nbins=board_sz * win_len + 1)  # sets the tick interval of graph
-        plt.title('Computer\'s Risk Analysis of each 1st-Gen Move')
-        plt.xlabel('1st-Generation Move')
+        plt.title('Computer\'s Risk Analysis of each Initial Move')
+        plt.xlabel('Initial Move')
         plt.ylabel('Winning Probability')
         plt.show()
-    return int(fin_move)
+
+    return fin_move

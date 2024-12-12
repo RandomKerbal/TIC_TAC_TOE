@@ -1,4 +1,3 @@
-import random
 import tkinter as tk
 from tkinter import messagebox
 
@@ -34,10 +33,11 @@ class MainMenu:
     :ivar colors: list containing 3 dicts: list[0] stores colors for general features; list[1] stores colors for X features; list[2] stores colors for O features.
     """
 
-    def __init__(self, window, board_sz: int = 3, board_zoom: int = 5, colors: dict = None):
+    def __init__(self, window, board_sz: int = 3, board_zoom: int = 5, colors: dict = None, ai_type: int = 0):
         self.window = window
         self.board_sz = tk.IntVar(value=board_sz)
         self.board_zoom = tk.IntVar(value=board_zoom)
+        self.ai_type = tk.IntVar(value=ai_type)
         if colors is None:
             self.colors = [
                 {
@@ -204,18 +204,18 @@ class MainMenu:
 
         for widget in self.window.winfo_children():
             widget.destroy()
-        SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, mode)
+        SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, mode, self.ai_type)
 
     def exit(self):
         messagebox.showinfo('Afterword',
-                            'Thank you for playing TIC-TAC-TOE!\n\nI spend over 191+ hours creating this game all by MYSELF.\n\nIn this project, I designed the AI that finds the highest winning probability, arranged the GUI elements in the most ergonomic way, optimized the algorithms, fixed bugs, and learned tkinter.\n\nHope you enjoyed it!')
+                            'Thank you for playing TIC-TAC-TOE!\n\nI spend over 221+ hours creating this game all by MYSELF.\n\nIn this project, I designed the AI that finds the highest winning probability, arranged the GUI elements in the most ergonomic way, optimized the algorithms, fixed bugs, and learned tkinter.\n\nHope you enjoyed it!')
 
         self.window.destroy()
 
 
 def default_hint():
     messagebox.showinfo('Hint',
-                        'Ah, just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity! Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player will be X, and the other will be O. No friends? No worries! You can play with my AI:\n\'The First-Gen Tallyman\'.')
+                        'Ah, just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity! Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player will be X, and the other will be O. No friends? No worries! You can play with my AI:\n\'The Initial Move Tallyman\'.')
 
 
 def timed_hint():
@@ -240,13 +240,14 @@ class SubMenu:
     :ivar mode: pvp = player versus player; pvc = player versus pc.
     """
 
-    def __init__(self, window, board_sz, board_zoom, colors, mode: int):
+    def __init__(self, window, board_sz, board_zoom, colors: dict, mode: int, ai_type):
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
         self.board_zoom = board_zoom
         self.colors = colors
         self.mode = mode
+        self.ai_type = ai_type
 
         self.title = tk.Button(self.window,
                                state='disabled',
@@ -412,25 +413,25 @@ class SubMenu:
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenu(self.window, self.board_sz, self.board_zoom, self.colors, mode)
+        GameMenu(self.window, self.board_sz, self.board_zoom, self.colors, mode, self.ai_type)
 
     def to_gamemenu_t(self, mode: int):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenuT(self.window, self.board_sz, self.board_zoom, self.colors, mode)
+        GameMenuT(self.window, self.board_sz, self.board_zoom, self.colors, mode, self.ai_type)
 
     def to_gamemenu_v(self, mode: int):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenuV(self.window, self.board_sz, self.board_zoom, self.colors, mode)
+        GameMenuV(self.window, self.board_sz, self.board_zoom, self.colors, mode, self.ai_type)
 
     def to_gamemenu_s(self, mode: int):
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        GameMenuS(self.window, self.board_sz, self.board_zoom, self.colors, mode)
+        GameMenuS(self.window, self.board_sz, self.board_zoom, self.colors, mode, self.ai_type)
 
     def to_mainmenu(self):
         for widget in self.window.winfo_children():
@@ -441,7 +442,7 @@ class SubMenu:
     def to_settings(self):
         for widget in self.window.winfo_children():
             widget.destroy()
-        ColMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+        ColMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
 
 class ColMenu:
@@ -451,12 +452,13 @@ class ColMenu:
     :ivar col_entries: list containing 3 dicts: list[0] stores entries for general features; list[1] stores entries for X features; list[2] stores entries for O features.
     """
 
-    def __init__(self, window, board_sz, board_zoom, colors, mode):
+    def __init__(self, window, board_sz, board_zoom, colors: dict, mode: int, ai_type):
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
         self.board_zoom = board_zoom
         self.colors = colors
+        self.ai_type = ai_type
         self.mode = mode
 
         self.title = tk.Button(self.window,
@@ -562,7 +564,7 @@ class ColMenu:
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
 
 class GameMenu:
@@ -577,13 +579,13 @@ class GameMenu:
     :ivar is_debugging: show/hide the debugger.
     """
 
-    def __init__(self, window, board_sz, board_zoom, colors, mode: int):
+    def __init__(self, window, board_sz, board_zoom, colors: dict, mode: int, ai_type):
         self.window = window
         self.board_sz = board_sz
         self.win_len = set_win_len(self.board_sz.get())
         self.board_zoom = board_zoom
         self.mode = mode  # 0 = 'pvc'; 1 = 'pvp'
-        self.ai_type = tk.IntVar(value=0)  # 0 = Shayan's AI
+        self.ai_type = ai_type  # 0 = Shayan's AI
         self.colors = colors
 
         self.plyr = 1  # 1 = X
@@ -820,7 +822,7 @@ class GameMenu:
             self.debugger.grid(columnspan=3, row=11, column=0, sticky='ns')
 
             for ind, symbol in enumerate(self.main_board):
-                if symbol == ' ':
+                if symbol == 0:
                     button = self.board_buttons[ind]
                     button.config(text=ind, foreground='gray')
 
@@ -831,7 +833,7 @@ class GameMenu:
             self.debugger.grid_forget()
 
             for ind, symbol in enumerate(self.main_board):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
-                if symbol == ' ':
+                if symbol == 0:
                     self.board_buttons[ind].config(text='', background=self.colors[0]['foreground'])
 
         self.window.update_idletasks()  # refresh GUI
@@ -940,7 +942,7 @@ class GameMenu:
             if self.ai_type.get() == 0:  # if using Shayan's AI
                 pc_move = pc_input(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, prev_input, self.simmable_inds, self.is_debugging.get())
             else:  # if using CZY's AI
-                pc_move = pc_input_v1()
+                pc_move = pc_input_v1(opp(self.plyr), self.main_board, self.board_sz.get(), self.win_len, prev_input, self.simmable_inds, self.is_debugging.get())
 
             if pc_move is None:
                 self.stop_game()
@@ -949,6 +951,7 @@ class GameMenu:
 
         else:  # if PC starts first
             pc_move = random.randint(0, self.board_sz.get() ** 2 - 1)
+            self.simmable_inds = [pc_move]  # allow toggle_debugger() to unhighlight this move next turn
 
         self.filled_inds.append(pc_move)
         self.main_board[pc_move] = opp(self.plyr)
@@ -1034,7 +1037,7 @@ class GameMenu:
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
@@ -1045,7 +1048,7 @@ class GameMenu:
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+            GameMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
 
 class GameMenuT(GameMenu):
@@ -1056,8 +1059,8 @@ class GameMenuT(GameMenu):
     """
 
     # noinspection PyTypeChecker
-    def __init__(self, window, board_sz, board_zoom, colors, mode: int):
-        super().__init__(window, board_sz, board_zoom, colors, mode)
+    def __init__(self, window, board_sz, board_zoom, colors: dict, mode: int, ai_type):
+        super().__init__(window, board_sz, board_zoom, colors, mode, ai_type)
         self.remain_time = [0,
                             tk.StringVar(value='10'),  # ind 1 = X's remain_time
                             tk.StringVar(value='10')  # ind 2 = O's remain_time
@@ -1229,7 +1232,7 @@ class GameMenuT(GameMenu):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+            SubMenu(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
@@ -1245,7 +1248,7 @@ class GameMenuT(GameMenu):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenuT(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+            GameMenuT(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
 
 class GameMenuV(GameMenu):
@@ -1255,8 +1258,8 @@ class GameMenuV(GameMenu):
     :ivar show_nxt_vanish_move: show/hide which move is going to vanish in the next turn.
     """
 
-    def __init__(self, window, board_sz, board_zoom, colors, mode: int):
-        super().__init__(window, board_sz, board_zoom, colors, mode)
+    def __init__(self, window, board_sz, board_zoom, colors: dict, mode: int, ai_type):
+        super().__init__(window, board_sz, board_zoom, colors, mode, ai_type)
         self.remain_steps = tk.IntVar()
         self.show_nxt_vanish_move = tk.BooleanVar(value=False)
 
@@ -1298,7 +1301,7 @@ class GameMenuV(GameMenu):
 
             vanish_ind = self.filled_inds.pop(0)
 
-            self.main_board[vanish_ind] = ' '
+            self.main_board[vanish_ind] = 0
             self.board_buttons[vanish_ind].config(text='', background=self.colors[0]['foreground'], state='normal')
 
         # if half of the total num of moves by X + O is one less before vanishing begins, tint the 2 oldest moves about to vanish.
@@ -1328,7 +1331,7 @@ class GameMenuV(GameMenu):
             for widget in self.window.winfo_children():
                 widget.destroy()
 
-            GameMenuV(self.window, self.board_sz, self.board_zoom, self.colors, self.mode)
+            GameMenuV(self.window, self.board_sz, self.board_zoom, self.colors, self.mode, self.ai_type)
 
 
 class GameMenuS(GameMenu):
@@ -1337,8 +1340,8 @@ class GameMenuS(GameMenu):
     :ivar prev_inputs: dict containing 2 lists: one containing all the moves made by X in chronological order, the other containing O's. Leftmost element = earliest move. Rightmost element = latest move.
     """
 
-    def __init__(self, window, board_sz, board_zoom, colors, mode: int):
-        super().__init__(window, board_sz, board_zoom, colors, mode)
+    def __init__(self, window, board_sz, board_zoom, colors: dict, mode: int, ai_type):
+        super().__init__(window, board_sz, board_zoom, colors, mode, ai_type)
         self.prev_inputs = [0,
                             [],
                             []
