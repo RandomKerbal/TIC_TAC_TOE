@@ -135,16 +135,15 @@ def plyr_win_formation(board: list, board_sz: int, win_len: int, plyr: int, orig
 # ALL FUNCTIONS BELOW ARE FOR THE AI
 def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
     """
-    Limits indexes that PC can simulate to the 12 empty indexes with the highest priority.
+    Limits indexes that PC can simulate to the 13 empty indexes with the highest priority.
     Assigns priority to indexes accordingly:
-        1. index is adjacent to the origin -> highest priority.
-        2. index is 1 of the 2 at each ends of each line formed by player -> within the middle priorities; varies with dist to origin and the number of connected lines.
-        3. index has adjacent player cell -> within the lowest priorities; varies with dist to origin and the number of adjacent player cells.
+        1. if index is connected to, or at the back of another index connected to, either end of a line formed by player -> within the high priorities; varies with dist to origin and the number of connected lines.
+        2. index has adjacent player cell -> within the low priorities; varies with dist to origin and the number of adjacent player cells.
     :return: simmable_inds
     """
-    # convert origin to coords and clamp between 1 to board_sz-2 -> ensure all adjacents are inside board.
-    origin_row = max(1, min(origin // board_sz, board_sz-2))
-    origin_col = max(1, min(origin % board_sz, board_sz-2))
+    # convert origin to coords
+    origin_row = origin // board_sz
+    origin_col = origin % board_sz
 
     # setup coords (x_coord, y_coord) of 8 indexes around a center
     adjacents = (
@@ -153,9 +152,6 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
         (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
     )
 
-    # stores the 12 indexes
-    simmable_inds = []
-
     # key = index, value = priority
     ind_priority = {}
 
@@ -163,48 +159,38 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
         if symbol == 0:
             row = ind // board_sz
             col = ind % board_sz
+            origin_d = max(abs(row - origin_row), abs(col - origin_col))  # calculate Chebyshev distance
 
-            origin_d = max(abs(row - origin_row), abs(col - origin_col))  # Chebyshev distance
+            ind_priority[ind] = ind_priority.get(ind, 0) - origin_d  # set distance-dependent base priority
 
-            if origin_d <= 1:  # if the index is adjacent the origin
-                simmable_inds.append(ind)
-                continue
+            for dir_x, dir_y in adjacents:
+                fwd1_row = row + dir_y
+                fwd1_col = col + dir_x
 
-            else:
-                ind_priority[ind] = ind_priority.get(ind, 0) - origin_d  # set distance-dependent base priority
+                if 0 <= fwd1_row < board_sz and 0 <= fwd1_col < board_sz and board[fwd1_row * board_sz + fwd1_col] == opp:  # if ind has an adjacent player cell
 
-                for dir_x, dir_y in adjacents:
-                    fwd1_row = row + dir_y
-                    fwd1_col = col + dir_x
+                    ind_priority[ind] += board_sz  # +board_sz ensures the furthest index with 1 adjacent player cell has higher priority than the closest lone index
 
-                    if 0 <= fwd1_row < board_sz and 0 <= fwd1_col < board_sz and board[fwd1_row * board_sz + fwd1_col] == opp:  # if ind has an adjacent player cell
+                    fwd2_row = fwd1_row + dir_y
+                    fwd2_col = fwd1_col + dir_x
 
-                        ind_priority[ind] += board_sz  # +board_sz ensures the furthest index with 1 adjacent player cell has higher priority than the closest lone index
+                    if 0 <= fwd2_row < board_sz and 0 <= fwd2_col < board_sz and board[fwd2_row * board_sz + fwd2_col] == opp:  # if ind is connected to either end of a line formed by player
 
-                        fwd2_row = fwd1_row + dir_y
-                        fwd2_col = fwd1_col + dir_x
+                        ind_priority[ind] += board_sz * 8  # +board_sz*8 ensures the furthest index connected to 1 line formed by player has higher priority than an index surrounded by 8 player cells
 
-                        if 0 <= fwd2_row < board_sz and 0 <= fwd2_col < board_sz and board[fwd2_row * board_sz + fwd2_col] == opp:  # if ind is at the end of a line formed by player
+                        back1_row = row - dir_y
+                        back1_col = col - dir_x
 
-                            back1_row = row - dir_y
-                            back1_col = col - dir_x
+                        if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz:  # if ind is at the back of another ind connected to either end of a line formed by player
                             back1_ind = back1_row * board_sz + back1_col
 
-                            if 0 <= back1_row < board_sz and 0 <= back1_col < board_sz and board[back1_ind] == 0:  # if the 2nd index at the end of the line formed by player is valid
-
-                                ind_priority[ind] += 8
-                                # +8 ensures any index connected to 1 line formed by player has higher priority than an index fully surrounded by player cells.
-                                # Why not +board_sz+8 -> +board_sz was done 2 if statements outside.
-
-                                ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_sz + 8
+                            if board[back1_ind] == 0:
+                                ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_sz*8
 
     print(f'\nIndex Priority: {ind_priority}')
 
-    simmable_inds.extend(
-        sorted(ind_priority, key=ind_priority.get, reverse=True)
-    )
-
-    simmable_inds = simmable_inds[:12]
+    # get top 12 priorities
+    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:13]
 
     print(f'Simulatable Indexes: {simmable_inds}')
 
