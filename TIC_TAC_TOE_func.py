@@ -1,7 +1,7 @@
 import random
+import math
 import matplotlib.pyplot as plt
 import networkx as nx
-from networkx.drawing.nx_agraph import pygraphviz_layout
 
 
 def set_win_len(board_sz: int) -> int:
@@ -197,6 +197,37 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
     return simmable_inds
 
 
+def fac_tree_layout(graph, root=None) -> dict:
+    """
+    Creates a hierarchical layout for a directed factorial tree graph. Property of a factorial tree graph:
+        |
+        - the total number of children from 1 parent equals the total number of parents minus 1.
+
+    :param graph: networkx graph object (must be directed).
+    :param root: root node of the tree (if None, chooses an arbitrary node).
+    :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
+    """
+    if root is None:
+        root = next(iter(graph))  # Select an arbitrary root if not provided
+
+    def assign_pos(parent, parent_x: float = 0.0, parent_y: float = 0.0):
+        """
+        Recursively updating coord of parent nodes and calculating coord of child nodes.
+        """
+        pos[parent] = (parent_x, parent_y)
+        children = list(graph.successors(parent))
+        if children:
+            total_child_sep = math.factorial(len(children)) - math.factorial(len(children)-1)
+            child_sep = total_child_sep / (len(children)-1)
+
+            for i, child in enumerate(children):
+                assign_pos(child, parent_x - total_child_sep/2 + i*child_sep, parent_y - 1)
+
+    pos = {}
+    assign_pos(root)
+    return pos
+
+
 def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool) -> int:
     board_sz_sub1 = board_sz-1
     board_sz_add1 = board_sz+1
@@ -281,17 +312,25 @@ def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int
 
     def is_white(parent: list, parent_plyr: int, parent_origin: int) -> bool:
         """
+        Finds the path where:
+            |
+            - The PC has at least 1 winning path whenever it's the human's turn.
+            - The human has 0 winning paths whenever it's the PC's turn.
+            |
+        Returns:
+            True:
+                When all children are 'black', meaning their parent's player will win, so their parent is 'white'.
+
+                - **Black**: This node lost for whoever is playing at that layer.
+                - **White**: This node won for whoever is playing at that layer.
+
+            False:
+                When any children are 'white', meaning their parent's player will lose, so their parent is 'black'.
+
         :param parent: the board at the parent node
         :param parent_origin: latest move made on board 'parent'
         :param parent_plyr: the plyr who made the move 'parent_origin' on the board 'parent'
-        | Finds the path where:
-            i) the PC has at least 1 winning path whenever it's human's turn
-            ii) the human has 0 winning paths whenever it's PC's turn
 
-        Returns True if all children are 'black' -> their parent's player will win -> their parent is 'white'. Returns False if any children are 'white' -> their parent's player will lose -> their parent is 'black'.
-            'Black': this node lost for whoever is playing at that layer.
-
-            'White': this node won for whoever is playing at that layer.
         """
         child_plyr = opp(parent_plyr)
 
@@ -490,7 +529,7 @@ def pc_input_v1(pc: int, main_board: list, board_sz: int, win_len: int, origin: 
 
         return move
 
-    win_probs = {ind: 0 for ind in simmable_inds}   # dict saved as {'init_move': win_probability}
+    win_probs = {ind: 0 for ind in simmable_inds}   # key = init_move, val = win_probability of the init_move
 
     for i, sim_ind in enumerate(simmable_inds):
         global init_ind
