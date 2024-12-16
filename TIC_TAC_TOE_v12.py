@@ -921,7 +921,9 @@ class GameMenu:
 
                 if self.check_winner_pvc(prev_input, self.plyr) is False:
                     self.update_ind_pc(prev_input)
-                    self.check_winner_pvc(self.filled_inds[-1], opp(self.plyr))  # filled_inds[-1] is pc's latest move
+
+                    if len(self.filled_inds) > 1:  # if PC did not resign
+                        self.check_winner_pvc(self.filled_inds[-1], opp(self.plyr))  # filled_inds[-1] is pc's latest move
 
             else:
                 self.lock_settings()

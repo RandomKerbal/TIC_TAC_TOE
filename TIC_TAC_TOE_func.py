@@ -335,23 +335,29 @@ def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int
         child_plyr = opp(parent_plyr)
 
         for i, sim_ind in enumerate(simmable_inds):
-            del simmable_inds[i]
 
-            child = parent
-            child[sim_ind] = child_plyr
-
-            if is_plyr_win(child, child_plyr, sim_ind) is True or (len(simmable_inds) == 0 and child_plyr == pc) or (len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True):
+            if is_plyr_win(parent, child_plyr, sim_ind) is True or (len(simmable_inds) == 1 and child_plyr == pc):  # OPTIMIZATION: is_plyr_win can function without placing child_plyr on the board beforehand
                 # if a child is white
                 # or if a child is tie (not white) and is at the bottommost layer and the bottommost layer is pc's turn
-                # or if a child is white and is not at the bottommost layer yet
-                white_num['Lyr ' + str(len(simmable_inds))] += 1
+                white_num['Lyr ' + str(len(simmable_inds)-1)] += 1
+                return False
+
+            else:
+                del simmable_inds[i]
+
+                child = parent
+                child[sim_ind] = child_plyr  # place child_plyr on the board
+
+                if len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True:
+                    # or if a child is white and is not at the bottommost layer yet
+                    white_num['Lyr ' + str(len(simmable_inds))] += 1
+
+                    child[sim_ind] = 0
+                    simmable_inds.insert(i, sim_ind)
+                    return False
 
                 child[sim_ind] = 0
                 simmable_inds.insert(i, sim_ind)
-                return False
-
-            child[sim_ind] = 0
-            simmable_inds.insert(i, sim_ind)
 
         return True
 
