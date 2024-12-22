@@ -165,10 +165,10 @@ class MainMenu:
         self.b_changelog.pack(side='top')
         self.b_exit.pack(side='top')
 
-        # Animating title & subtitle:
+        # animate title & subtitle:
         # time between frames, in milliseconds
         wait = 250
-        # There r total 95 frames (frame 0 - 94) stored in anim_frames. All frames r called at the same time, but their executions r queued up.
+        # anim_frames contains 95 (frame 0 - 94) frames of the animation. All frames r called at the same time, but their executions r queued up.
         self.anim_frames = []
         # frames 0 - 11: animating title
         self.anim_frames.append(self.window.after(wait * 0, lambda: self.title_label.config(foreground='Black')))
@@ -543,10 +543,10 @@ class ColMenu:
 
     def update_col(self, ind: int, feat: str):
         try:
-            # Try to set the background color of the text widget
+            # try to set the background color of the text widget
             self.col_entries[ind][feat].config(bg=self.col_entries[ind][feat].get())
         except tk.TclError:
-            # If the color is not valid, do nothing
+            # if the color is not valid, do nothing
             pass
 
     def to_submenu(self):
@@ -686,7 +686,7 @@ class GameMenu:
             to=19,
             cursor='sb_h_double_arrow'
         )
-        # Set up a trace to update the number and pos of buttons on the grid whenever the value changes
+        # set up a trace to update the number and pos of buttons on the grid whenever the value changes
         self.trace1 = self.board_sz.trace_add('write', self.adjust_length)
         self.board_sz_tip = tk.Label(
             self.settings_frame,
@@ -711,7 +711,7 @@ class GameMenu:
             to=13,
             cursor='sb_h_double_arrow'
         )
-        # Set up a trace to update scale of buttons on the grid whenever the value changes
+        # set up a trace to update scale of buttons on the grid whenever the value changes
         self.trace2 = self.board_zoom.trace_add('write', self.adjust_zoom)
         self.pvco_checkbox = tk.Checkbutton(
             self.settings_frame,
@@ -863,22 +863,22 @@ class GameMenu:
             self.v_scrollbar.pack_forget()
 
     def adjust_length(self, *args):
-        # When I adjust the board length, I must delete the old buttons as I cannot change their position
+        # when I adjust the board length, I must delete the old buttons as I cannot change their position
         for button in self.board_buttons:
             button.destroy()
 
-        # Generate new board and attributes with the correct dimension at backend
+        # generate new board and attributes with the correct dimension at backend
         self.main_board = setup_board(self.board_sz.get())
         self.win_len = set_win_len(self.board_sz.get())
 
-        # Generate new buttons and symbol indicator at frontend
+        # generate new buttons and symbol indicator at frontend
         self.create_boardframe()
         self.board_sz_tip.config(text='Amount in a row to win: ' + str(self.win_len))
         self.toggle_debugger()
         self.update_scrollbars()
 
     def adjust_zoom(self, *args):
-        # Update the position of the turn indicator and the scale of the buttons.
+        # update the position of the turn indicator and the scale of the buttons.
         for ind_button in self.board_buttons:
             ind_button.config(font=('Helvetica', self.board_zoom.get() * 4, 'bold' if self.board_zoom.get() > 4 else 'normal'))  # if font was bold when board_zoom == 4, button becomes rectangle
         self.turn_hint[1].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
@@ -1145,10 +1145,10 @@ class GameMenuT(GameMenu):
 
     def validate_timer(self, ind: int, *args):
         try:
-            # Try to convert the value of the key to a float
+            # try to convert the value of the key to a float
             float(self.remain_time[ind].get())
         except ValueError:
-            # Show a messagebox and reset the value if conversion fails
+            # show a messagebox and reset the value if conversion fails
             messagebox.askretrycancel('Warning', f'Please enter a decimal number for {ind}!')
             self.remain_time[ind].set('10')
 
@@ -1167,7 +1167,7 @@ class GameMenuT(GameMenu):
 
             self.window.update_idletasks()
 
-            # If X has under 5 secs left, flash the timer.
+            # if X has under 5 secs left, flash the timer
             if remain_time < 5.0 and remain_time % 1 < 0.4:
                 self.time_entry[self.plyr].config(relief='sunken', disabledbackground='white')
             elif remain_time < 5.0 and remain_time % 1 >= 0.4:
@@ -1380,9 +1380,9 @@ class GameMenuS(GameMenu):
 
             # setup coords (x_coord, y_coord) of 8 indexes around a center
             relative_adj = {
-                (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
-                (-1, 0), (1, 0),  # Left, Right
-                (-1, 1), (0, 1), (1, 1)  # Bottom-left, Bottom-right
+                (-1, -1), (0, -1), (1, -1),  # top-left, top-right
+                (-1, 0), (1, 0),  # left, right
+                (-1, 1), (0, 1), (1, 1)  # bottom-left, bottom-right
             }
 
             def gen_adj(row: int, col: int) -> set:

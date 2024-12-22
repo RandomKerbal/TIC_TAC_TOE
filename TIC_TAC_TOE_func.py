@@ -18,27 +18,6 @@ def setup_board(board_sz: int) -> list:
     return main_board
 
 
-def print_board(board: list, board_sz: int):
-    # print the board
-    # eg 3x3 board:
-    #     1   2   3
-    # 1  [ ] [ ] [ ]
-    # 2  [ ] [ ] [ ]
-    # 3  [ ] [ ] [ ]
-    print(end='\n')
-    print('\t', end='')
-    for i in range(board_sz):
-        print(str(i + 1) + ' ' * (4 - len(str(i+2))), end='')
-    for i in range(board_sz):
-        print('\n' + str(i + 1) + ' ' * (3 - len(str(i+1))), end='')
-        for ii in range(i*board_sz, (i*board_sz)+board_sz):
-            if board[ii] == 0:
-                print('[ ]', end=' ')
-            else:
-                print(' ' + board[ii], end='  ')
-    print(end='\n')
-
-
 def opp(original: int) -> int:
     """
     (opponent)
@@ -58,6 +37,30 @@ def get_symbol(base3: int) -> str:
         return 'O'
     elif base3 == 0:
         return ' '
+
+
+def print_board(board: list, board_sz: int):
+    """
+    Print the board in the following format:\n
+        1  2  3  ...\n
+    1  [ ] [ ] [ ]\n
+    2  [ ] [ ] [ ]\n
+    3  [ ] [ ] [ ]\n
+    ...
+    """
+    print(end='\n')
+    print('\t', end='')
+    for i in range(board_sz):
+        print(str(i + 1) + ' ' * (4 - len(str(i+2))), end='')  # print the col number
+    for i in range(board_sz):
+        print('\n' + str(i + 1) + ' ' * (3 - len(str(i+1))), end='')  # print the row number
+        for ii in range(i*board_sz, (i+1)*board_sz):
+            # print the symbols in the row
+            if board[ii] == 0:
+                print('[ ]', end=' ')
+            else:
+                print(' ' + get_symbol(board[ii]), end='  ')
+    print(end='\n')
 
 
 def plyr_win_formation(board: list, board_sz: int, win_len: int, plyr: int, origin: int) -> str | None:
@@ -147,13 +150,12 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
 
     # setup coords (x_coord, y_coord) of 8 indexes around a center
     adjacents = (
-        (-1, -1), (0, -1), (1, -1),  # Top-left, Top-right
-        (-1, 0),           (1, 0),   # Left, Right
-        (-1, 1),  (0, 1),  (1, 1)    # Bottom-left, Bottom-right
+        (-1, -1), (0, -1), (1, -1),  # top-left, top-right
+        (-1, 0),           (1, 0),   # left, right
+        (-1, 1),  (0, 1),  (1, 1)    # bottom-left, bottom-right
     )
 
-    # key = index, value = priority
-    ind_priority = {}
+    ind_priority = {}  # key = index, value = priority
 
     for ind, symbol in enumerate(board):
         if symbol == 0:
@@ -189,36 +191,36 @@ def prune(board: list, board_sz: int, opp: int, origin: int) -> list:
 
     print(f'\nIndex Priority: {ind_priority}')
 
-    # get top 12 priorities
-    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:13]
+    # get the 14 cells with top priority
+    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:14]
 
     print(f'Simulatable Indexes: {simmable_inds}')
 
     return simmable_inds
 
 
-def fac_tree_layout(graph, root=None) -> dict:
+def fac_tree_layout(tree, root=None) -> dict:
     """
     Creates a hierarchical layout for a directed factorial tree graph. Property of a factorial tree graph:
         |
         - the total number of children from 1 parent equals the total number of parents minus 1.
 
-    :param graph: networkx graph object (must be directed).
+    :param tree: networkx graph object (must be directed).
     :param root: root node of the tree (if None, chooses an arbitrary node).
     :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
     """
     if root is None:
-        root = next(iter(graph))  # Select an arbitrary root if not provided
+        root = next(iter(tree))  # select an arbitrary root if not provided
 
     def assign_pos(parent, parent_x: float = 0.0, parent_y: float = 0.0):
         """
         Recursively updating coord of parent nodes and calculating coord of child nodes.
         """
         pos[parent] = (parent_x, parent_y)
-        children = list(graph.successors(parent))
+        children = list(tree.successors(parent))
         if children:
             total_child_sep = math.factorial(len(children)) - math.factorial(len(children)-1)
-            child_sep = total_child_sep / (len(children)-1)
+            child_sep = total_child_sep / max(1, (len(children)-1))
 
             for i, child in enumerate(children):
                 assign_pos(child, parent_x - total_child_sep/2 + i*child_sep, parent_y - 1)
@@ -332,53 +334,73 @@ def pc_input(pc: int, main_board: list, board_sz: int, win_len: int, origin: int
         :param parent_plyr: the plyr who made the move 'parent_origin' on the board 'parent'
 
         """
-        child_plyr = opp(parent_plyr)
+        parent_node = tuple(parent)
+        if parent_node in color_table:
+            return color_table[parent_node]
 
-        for i, sim_ind in enumerate(simmable_inds):
+        else:
+            child_plyr = opp(parent_plyr)
 
-            if is_plyr_win(parent, child_plyr, sim_ind) is True or (len(simmable_inds) == 1 and child_plyr == pc):  # OPTIMIZATION: is_plyr_win can function without placing child_plyr on the board beforehand
-                # if a child is white
-                # or if a child is tie (not white) and is at the bottommost layer and the bottommost layer is pc's turn
-                white_num['Lyr ' + str(len(simmable_inds)-1)] += 1
-                return False
+            for i, sim_ind in enumerate(simmable_inds):
 
-            else:
-                del simmable_inds[i]
+                if is_plyr_win(parent, child_plyr, sim_ind) is True or (len(simmable_inds) == 1 and child_plyr == pc):  # OPTIMIZATION: is_plyr_win can function without placing child_plyr on the board beforehand
+                    # if a child is white
+                    # or if a child is at the bottommost layer (Why not len(simmable_inds) == 0? -> len(simmable_inds) is parent's.) and the bottommost layer is pc's turn
+                    color_table[parent_node] = False
+                    return False
 
-                child = parent
-                child[sim_ind] = child_plyr  # place child_plyr on the board
+                else:
+                    del simmable_inds[i]
 
-                if len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True:
-                    # or if a child is white and is not at the bottommost layer yet
-                    white_num['Lyr ' + str(len(simmable_inds))] += 1
+                    child = parent
+                    child[sim_ind] = child_plyr  # place child_plyr on the board
+
+                    if len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True:
+                        # or if a child is white and is not at the bottommost layer yet
+                        tree.add_edge(parent_node, tuple(child),)
+
+                        child[sim_ind] = 0
+                        simmable_inds.insert(i, sim_ind)
+
+                        color_table[parent_node] = False
+                        return False
+
+                    tree.add_edge(parent_node, tuple(child),)
 
                     child[sim_ind] = 0
                     simmable_inds.insert(i, sim_ind)
-                    return False
 
-                child[sim_ind] = 0
-                simmable_inds.insert(i, sim_ind)
+            color_table[parent_node] = True
+            return True
 
-        return True
+    color_table = {}  # OPTIMIZATION: stores the color of nodes that had been calculated in a dict whose key = board, val = is_white. Dict has lookup time of O(1).
 
     for i, sim_ind in enumerate(simmable_inds):
-        global white_num
-        white_num = {f"Lyr {i}": 0 for i in range(len(simmable_inds)-1, -1, -1)}
+        tree = nx.DiGraph()
 
-        del simmable_inds[i]
-
-        child = main_board
-        child[sim_ind] = pc
-
-        if is_plyr_win(child, pc, sim_ind) is True or is_white(child, pc, sim_ind) is True:
-            white_num['Lyr ' + str(len(simmable_inds))] += 1
-            print('Number of white nodes at', sim_ind, ':', white_num)
-
-            simmable_inds.insert(i, sim_ind)
-
+        if is_plyr_win(main_board, pc, sim_ind) is True:
             return sim_ind
+
         else:
-            print('Number of white nodes at', sim_ind, ':', white_num)
+            del simmable_inds[i]
+
+            child = main_board
+            child[sim_ind] = pc
+
+            if is_white(child, pc, sim_ind) is True:
+                simmable_inds.insert(i, sim_ind)
+
+                if is_debugging:
+                    # get positions for each node of the tree
+                    pos = fac_tree_layout(tree, tuple(child))
+                    nx.draw(
+                        tree, pos, with_labels=True,
+                        node_size=500, node_color='c',
+                        font_size=10, font_weight='bold'
+                    )
+                    plt.show()
+
+                return sim_ind
 
             child[sim_ind] = 0
             simmable_inds.insert(i, sim_ind)
@@ -495,7 +517,7 @@ def pc_input_v1(pc: int, main_board: list, board_sz: int, win_len: int, origin: 
 
                 elif is_win is False and len(simmable_inds) != 0:
 
-                    if parent_origin == init_ind:  # if this is the first recursion
+                    if parent_origin == init_ind:  # if this is the highest simulated layer
                         all_child_lost = True
 
                     for ii, sim_ind_ii in enumerate(simmable_inds):
@@ -538,7 +560,6 @@ def pc_input_v1(pc: int, main_board: list, board_sz: int, win_len: int, origin: 
     win_probs = {ind: 0 for ind in simmable_inds}   # key = init_move, val = win_probability of the init_move
 
     for i, sim_ind in enumerate(simmable_inds):
-        global init_ind
         init_ind = sim_ind
 
         del simmable_inds[i]
