@@ -36,7 +36,7 @@ def opp(original: int) -> int:
     return 3 - original
 
 
-def convert_symbol(base3: int) -> str:
+def convert_symbol(base3: int, show_empty: bool = False) -> str:
     """
     Converts a symbol from base3 to readable character.
     """
@@ -44,7 +44,7 @@ def convert_symbol(base3: int) -> str:
         return 'X'
     elif base3 == 2:
         return 'O'
-    elif base3 == 0:
+    elif base3 == 0 and show_empty:
         return '∟'
 
 
@@ -70,7 +70,7 @@ def print_board(board: int, board_len: int):
     for i in range(board_len):
         print('\n' + str(i + 1) + ' ' * (3 - len(str(i+1))), end='')  # print the row number
         for ii in range(i*board_len, (i+1)*board_len):
-            print(' ' + convert_symbol(get_symbol(board, ii)), end='  ')  # print the symbols in the row
+            print(' ' + convert_symbol(get_symbol(board, ii), show_empty=True), end='  ')  # print the symbols in the row
     print(end='\n')
 
 
@@ -81,7 +81,7 @@ def fac_tree_layout(tree, root=None) -> dict:
         - the total number of children from 1 parent equals the total number of parents minus 1.
 
     :param tree: networkx graph object (must be directed).
-    :param root: root node of the tree (if None, chooses an arbitrary node).
+    :param root: root node of the tree (if None: chooses an arbitrary node).
     :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
     """
     if root is None:
@@ -178,7 +178,7 @@ def prune(board: int, board_len: int, opp: int, origin: int) -> list:
     """
     Limits indexes that PC can simulate to the 13 empty indexes with the highest priority.
     Assigns priority to indexes accordingly:
-        1. if index is connected to, or at the back of another index connected to, either end of a line formed by player -> within the high priorities; varies with dist to origin and the number of connected lines.
+        1. if index is connected to, or at the back of another index connected to, either end of a line formed by player: within the high priorities; varies with dist to origin and the number of connected lines.
         2. index has adjacent player cell -> within the low priorities; varies with dist to origin and the number of adjacent player cells.
     :return: simmable_inds
     """
@@ -230,14 +230,14 @@ def prune(board: int, board_len: int, opp: int, origin: int) -> list:
     print(f'\nIndex Priority: {ind_priority}')
 
     # get the 14 cells with top priority
-    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:14]
+    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:15]
 
     print(f'Simulatable Indexes: {simmable_inds}')
 
     return simmable_inds
 
 
-def pc_input(pc: int, main_board: int, board_len: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool) -> int:
+def pc_input(pc: int, main_board: int, board_len: int, win_len: int, simmable_inds: list, is_debugging: bool) -> int:
     board_len_sub1 = board_len-1
     board_len_add1 = board_len+1
     half_win_len = win_len // 2
@@ -347,7 +347,7 @@ def pc_input(pc: int, main_board: int, board_len: int, win_len: int, origin: int
 
                 if is_plyr_win(parent, child_plyr, sim_ind) is True or (len(simmable_inds) == 1 and child_plyr == pc):  # OPTIMIZATION: is_plyr_win can function without placing child_plyr on the board beforehand
                     # if a child is white
-                    # or if a child is at the bottommost layer (Why not len(simmable_inds) == 0? -> len(simmable_inds) is parent's.) and the bottommost layer is pc's turn
+                    # or if a child is at the bottommost layer (Why not len(simmable_inds) == 0: len(simmable_inds) is parent's.) and the bottommost layer is pc's turn
                     color_table[parent] = False
                     return False
 
@@ -403,7 +403,7 @@ def pc_input(pc: int, main_board: int, board_len: int, win_len: int, origin: int
             simmable_inds.insert(i, sim_ind)
 
 
-def pc_input_v1(pc: int, main_board: int, board_len: int, win_len: int, origin: int, simmable_inds: list, is_debugging: bool) -> int:
+def pc_input_v1(pc: int, main_board: int, board_len: int, win_len: int, simmable_inds: list, is_debugging: bool) -> int:
     board_len_sub1 = board_len-1
     board_len_add1 = board_len+1
     half_win_len = win_len // 2
@@ -491,7 +491,7 @@ def pc_input_v1(pc: int, main_board: int, board_len: int, win_len: int, origin: 
         if is_win is True:  # this layer is always pc
             win_probs[init_ind] += len(simmable_inds) + 1   # +1 because len(simmable_inds) can be 0
 
-        elif is_win is False and len(simmable_inds) != 0:     # if this node has no winner and not tie yet, continue branching down.
+        elif is_win is False and len(simmable_inds) != 0:     # if this node has no winner and not tie yet: continue branching down
             plyr = opp(pc)
 
             for i, sim_ind in enumerate(simmable_inds):

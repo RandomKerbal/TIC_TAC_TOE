@@ -1,7 +1,7 @@
 import random
 import tkinter as tk
 from tkinter import messagebox
-import TIC_TAC_TOE_func as ttt
+import backend as ttt
 
 
 def to_changelog():
@@ -63,23 +63,24 @@ class MainMenu:
             self.colors = colors
 
         self.title_line1 = tk.Label(self.window,
-                                    takefocus=False,
                                     width=500,
                                     borderwidth=0,
                                     background='Black',
                                     foreground='Sea Green1',
                                     text='=' * 999,
-                                    font='TkFixedFont')
+                                    font='TkFixedFont',
+                                    takefocus=False
+                                    )
         self.title_line2 = tk.Label(self.window,
-                                    takefocus=False,
                                     width=500,
                                     borderwidth=0,
                                     background='Black',
                                     foreground='Sea Green1',
                                     text='\n' + '=' * 999,
-                                    font='TkFixedFont')
+                                    font='TkFixedFont',
+                                    takefocus=False
+                                    )
         self.title_label = tk.Label(self.window,
-                                    takefocus=False,
                                     borderwidth=0,
                                     width=82,
                                     background='Black',
@@ -92,17 +93,20 @@ class MainMenu:
    ██    ██  ██████          ██    ██   ██  ██████          ██     ██████  ███████''',
                                     font='TkFixedFont',
                                     justify='left',
-                                    anchor='nw')
+                                    anchor='nw',
+                                    takefocus=False
+                                    )
 
         self.subtitle_label = tk.Label(self.window,
-                                       takefocus=False,
                                        borderwidth=0,
                                        width=500,
                                        background='Black',
                                        foreground='Sea Green1',
                                        text='',
                                        font='TkFixedFont',
-                                       justify='left')
+                                       justify='left',
+                                       takefocus=False
+                                       )
         subtitle_text = '   99% Made by CZY          4 Unprecedented Modes!          Unbeatable AI!        '
 
         self.b_pvc = tk.Button(self.window,
@@ -238,7 +242,7 @@ class SubMenu:
     """
     :ivar window, board_len, board_zoom, colors: same as GameMenu.
     :ivar win_len: how many X in a row/column/diagonal to win.
-    :ivar mode: pvp = player versus player; pvc = player versus pc.
+    :ivar mode: 0 = player versus pc; 1 = player versus player.
     """
 
     def __init__(self, window, board_len, board_zoom, colors: dict, mode: int, ai_type):
@@ -546,8 +550,9 @@ class ColMenu:
         try:
             # try to set the background color of the text widget
             self.col_entries[ind][feat].config(bg=self.col_entries[ind][feat].get())
+
         except tk.TclError:
-            # if the color is not valid, do nothing
+            # if the color is not valid
             pass
 
     def to_submenu(self):
@@ -557,6 +562,7 @@ class ColMenu:
                 try:
                     self.window.winfo_rgb(entry.get())
                     self.colors[ind][feat] = entry.get()
+
                 except tk.TclError:
                     messagebox.askretrycancel('Settings', f'Please enter a valid color for {feat}!')
                     return None
@@ -572,7 +578,7 @@ class GameMenu:
     """
     :ivar window, board_len, board_zoom, colors, mode: same as SubMenu.
     :ivar win_len: how many X in a row/column/diagonal to win.
-    :ivar plyr: player playing in the current turn.
+    :ivar plyr: player playing in the current turn. 1 = X; 2 = O.
     :ivar main_board: list containing the board on screen.
     :ivar simmable_inds: list containing the 12 indexes PC is allowed to simulate.
     :ivar filled_inds: list containing the indexes that are filled on main_board, in chronological order. Left element = earlier; right element = later.
@@ -586,11 +592,11 @@ class GameMenu:
         ttt.set_three_pow(self.board_len.get())  # initialize universal var three_pow in TIC_TAC_TOE_func
         self.win_len = ttt.set_win_len(self.board_len.get())
         self.board_zoom = board_zoom
-        self.mode = mode  # 0 = 'pvc'; 1 = 'pvp'
+        self.mode = mode
         self.ai_type = ai_type
         self.colors = colors
 
-        self.plyr = 1  # 1 = X
+        self.plyr = 1
         self.main_board = 0
         self.simmable_inds = []
         self.filled_inds = []
@@ -670,10 +676,22 @@ class GameMenu:
             width=5,
             borderwidth=5
         )
+        self.load_button = tk.Button(
+            self.settings_frame,
+            text='Load',
+            background=self.colors[0]['background'],
+            cursor='hand2',
+            relief='groove',
+            overrelief='sunken',
+            command=self.ask_board,
+            width=5,
+            borderwidth=5
+        )
         self.board_len_label = tk.Label(
             self.settings_frame,
             background=self.colors[0]['background'],
-            text='\nBoard Length'
+            text='\nBoard Length',
+            takefocus=False
         )
         self.board_len_slider = tk.Scale(
             self.settings_frame,
@@ -689,16 +707,18 @@ class GameMenu:
             cursor='sb_h_double_arrow'
         )
         # set up a trace to update the number and pos of buttons on the grid whenever the value changes
-        self.trace1 = self.board_len.trace_add('write', self.adjust_length)
+        self.trace1 = self.board_len.trace_add('write', self.update_len)
         self.board_len_tip = tk.Label(
             self.settings_frame,
             text='Amount in a row to win: ' + str(self.win_len),
-            background=self.colors[0]['background']
+            background=self.colors[0]['background'],
+            takefocus=False
         )
         self.board_zoom_label = tk.Label(
             self.settings_frame,
             text='\nZoom',
-            background=self.colors[0]['background']
+            background=self.colors[0]['background'],
+            takefocus=False
         )
         self.board_zoom_slider = tk.Scale(
             self.settings_frame,
@@ -714,7 +734,7 @@ class GameMenu:
             cursor='sb_h_double_arrow'
         )
         # set up a trace to update scale of buttons on the grid whenever the value changes
-        self.trace2 = self.board_zoom.trace_add('write', self.adjust_zoom)
+        self.trace2 = self.board_zoom.trace_add('write', self.update_zoom)
         self.pvco_checkbox = tk.Checkbutton(
             self.settings_frame,
             text='Computer starts first',
@@ -785,6 +805,7 @@ class GameMenu:
 
         self.b_back.grid(row=1, column=0, pady=(0, 15))
         self.replay_button.grid(row=1, column=1, pady=(0, 15))
+        self.load_button.grid(row=1, column=2, pady=(0, 15), sticky='w')
         self.board_len_label.grid(row=4, column=1, sticky='e')
         self.board_len_slider.grid(row=4, column=2, padx=(0, 5))
         self.board_len_tip.grid(columnspan=2, row=5, column=1)
@@ -801,19 +822,111 @@ class GameMenu:
         # rebinds the close window (X) ind_button in the top right corner
         self.window.protocol('WM_DELETE_WINDOW', self.to_submenu)
 
+    def ask_board(self):
+        def load_board():
+            try:
+                # temp vars ensure both entries are valid before assigning to main_board and board_len
+                temp_board = int(board_entry.get())
+                temp_board_len = int(board_len_entry.get())
+
+                if len(self.filled_inds) == 0 or messagebox.askyesno('Confirmation',
+                                                                     'Are you sure you want to load?\n\nYou will loose all your progress.'):  # if board is empty: continue; else ask user
+                    self.filled_inds = []
+                    self.main_board = temp_board
+                    self.debugger.insert('end', f'Base10 board:  {self.main_board}\n\n')
+                    self.board_len_slider.config(state='disabled')
+                    self.board_len_label.config(state='disabled')
+                    self.board_len.set(temp_board_len)
+                    self.update_len()  # create new board of board_len
+
+                    plyr_balance = 0
+                    for ind, button in enumerate(self.board_buttons):
+                        plyr = ttt.get_symbol(self.main_board, ind)
+
+                        if plyr != 0:
+                            plyr_balance += plyr * 2 - 3  # if plyr = X (1): count-1; if plyr = O (2): count+1
+                            self.filled_inds.append(ind)
+                            button.config(text=ttt.convert_symbol(plyr),
+                                          disabledforeground=self.colors[plyr]['symbol'],
+                                          state='disabled')
+
+                    if plyr_balance >= 0:  # if there are more O than X: X's turn
+                        self.plyr = 1
+                        # disable O's indicator
+                        self.turn_hint[2].config(foreground='SystemDisabledText', background=self.colors[0]['background'], relief='flat')
+
+                    else:  # if there are more X than O or equal numbers: O's turn
+                        self.plyr = 2
+                        # disable X's indicator
+                        self.turn_hint[1].config(foreground='SystemDisabledText', background=self.colors[0]['background'], relief='flat')
+
+            except ValueError:
+                # show a messagebox and reset the value if conversion fails
+                messagebox.askretrycancel('Warning', 'Please enter an integer number!')
+
+            dialogue.destroy()
+
+        dialogue = tk.Toplevel(
+            self.window,
+            background=self.colors[0]['background']
+        )
+
+        board_label = tk.Label(
+            dialogue,
+            text='Board in base10',
+            background=self.colors[0]['background'],
+            takefocus=False
+        )
+        board_entry = tk.Entry(
+            dialogue,
+            cursor='xterm',
+            width=30
+        )
+        board_len_label = tk.Label(
+            dialogue,
+            text='Length of board',
+            background=self.colors[0]['background'],
+            takefocus=False
+        )
+        board_len_entry = tk.Entry(
+            dialogue,
+            cursor='xterm',
+            width=30
+        )
+        submit_button = tk.Button(
+            dialogue,
+            text='Submit',
+            background=self.colors[0]['foreground'],
+            cursor='hand2',
+            relief='groove',
+            overrelief='sunken',
+            width=10,
+            borderwidth=3,
+            command=load_board
+        )
+
+        board_label.grid(row=0, column=0, padx=(10, 5), pady=(10, 0), sticky='e')
+        board_entry.grid(row=0, column=1, padx=(5, 10), pady=(10, 0))
+        board_len_label.grid(row=1, column=0, padx=(10, 5), pady=(2, 0), sticky='e')
+        board_len_entry.grid(row=1, column=1, padx=(5, 10), pady=(2, 0))
+        submit_button.grid(row=2, columnspan=2, pady=5)
+        dialogue.title('Load')
+        dialogue.resizable(False, False)
+
     def create_boardframe(self):
         self.board_buttons = []
 
         # create buttons in button_frame
         for row in range(self.board_len.get()):
             for col in range(self.board_len.get()):
-                button_num = row * self.board_len.get() + col
+                ind = row * self.board_len.get() + col
                 button = tk.Button(
                     self.button_frame,
                     font=('Helvetica', self.board_zoom.get() * 4, 'bold' if self.board_zoom.get() > 4 else 'normal'),
+                    foreground='gray',
                     background=self.colors[0]['foreground'],
                     cursor='plus',
-                    command=lambda _=button_num: self.update_ind(_),
+                    command=lambda _=ind: self.update_ind(_),
                     width=3,
                     borderwidth=5
                 )
@@ -824,10 +937,9 @@ class GameMenu:
         if self.is_debugging.get() is True:  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
             self.debugger.grid(columnspan=3, row=11, column=0, sticky='ns')
 
-            for ind in range(self.board_len.get() ** 2):
+            for ind, button in enumerate(self.board_buttons):
                 if ttt.get_symbol(self.main_board, ind) == 0:
-                    button = self.board_buttons[ind]
-                    button.config(text=ind, foreground='gray')
+                    button.config(text=ind)
 
                     if ind in self.simmable_inds:
                         button.config(background=self.colors[0]['simmable_inds'])
@@ -835,9 +947,9 @@ class GameMenu:
         else:
             self.debugger.grid_forget()
 
-            for ind in range(self.board_len.get() ** 2):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
+            for ind, button in enumerate(self.board_buttons):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
                 if ttt.get_symbol(self.main_board, ind) == 0:
-                    self.board_buttons[ind].config(text='', background=self.colors[0]['foreground'])
+                    button.config(text='', background=self.colors[0]['foreground'])
 
         self.window.update_idletasks()  # refresh GUI
 
@@ -865,8 +977,7 @@ class GameMenu:
         else:
             self.v_scrollbar.pack_forget()
 
-    def adjust_length(self, *args):
-        # when I adjust the board length, I must delete the old buttons as I cannot change their position
+    def update_len(self, *args):
         for button in self.board_buttons:
             button.destroy()
 
@@ -880,10 +991,10 @@ class GameMenu:
         self.toggle_debugger()
         self.update_scrollbars()
 
-    def adjust_zoom(self, *args):
+    def update_zoom(self, *args):
         # update the position of the turn indicator and the scale of the buttons.
         for ind_button in self.board_buttons:
-            ind_button.config(font=('Helvetica', self.board_zoom.get() * 4, 'bold' if self.board_zoom.get() > 4 else 'normal'))  # if font was bold when board_zoom == 4, button becomes rectangle
+            ind_button.config(font=('Helvetica', self.board_zoom.get() * 4, 'bold' if self.board_zoom.get() > 4 else 'normal'))  # if font was bold when board_zoom == 4: button becomes rectangle
         self.turn_hint[1].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
         self.turn_hint[2].config(font=('Helvetica', self.board_zoom.get() * 2, 'bold'))
 
@@ -891,6 +1002,7 @@ class GameMenu:
         self.board_len_slider.config(state='disabled')
         self.board_len_label.config(state='disabled')
         self.replay_button.config(state='normal')
+        self.load_button.config(state='disabled')
         self.pvco_checkbox.config(state='disabled')
 
         # disable X's indicator
@@ -902,15 +1014,16 @@ class GameMenu:
     def pvc_first(self):
         self.plyr = 2
         self.lock_settings()
-        self.update_ind_pc(None)
+        self.update_ind_pc()
 
-    def update_ind(self, prev_input: int):
-        self.update_ind_plyr(prev_input)
+    def update_ind(self, ind: int):
+        self.filled_inds.append(ind)
+        self.update_ind_plyr()
 
         if self.mode == 1:
 
             if len(self.filled_inds) > 1:  # if both players alr moved once and there is no outcome
-                self.check_winner_pvp(prev_input)
+                self.check_winner_pvp()
 
             else:  # if this is the first move
                 self.plyr = ttt.opp(self.plyr)
@@ -922,30 +1035,30 @@ class GameMenu:
                 for ind in self.simmable_inds:
                     self.board_buttons[ind].config(background=self.colors[0]['foreground'])  # unhighlight simmable_inds and pc move from the previous turn
 
-                if self.check_winner_pvc(prev_input, self.plyr) is False:
-                    self.update_ind_pc(prev_input)
+                if self.check_winner_pvc(self.plyr) is False:
+                    self.update_ind_pc()
 
                     if len(self.filled_inds) > 1:  # if PC did not resign
-                        self.check_winner_pvc(self.filled_inds[-1], ttt.opp(self.plyr))  # filled_inds[-1] is pc's latest move
+                        self.check_winner_pvc(ttt.opp(self.plyr))
 
             else:
                 self.lock_settings()
 
-                self.update_ind_pc(prev_input)
-                self.check_winner_pvc(prev_input, ttt.opp(self.plyr))
+                self.update_ind_pc()
+                self.check_winner_pvc(ttt.opp(self.plyr))
 
-    def update_ind_pc(self, prev_input: int | None):
+    def update_ind_pc(self):
         # initialize pc_move
-        if prev_input is not None:  # if PC start second
+        if self.filled_inds is not None:  # if PC starts second or pre-filled board is loaded
 
-            self.simmable_inds = ttt.prune(self.main_board, self.board_len.get(), self.plyr, prev_input)
+            self.simmable_inds = ttt.prune(self.main_board, self.board_len.get(), self.plyr, self.filled_inds[-1])
             self.debugger.insert(tk.END, 'Simulatable indexes:\n' + str(self.simmable_inds) + '\n')
             self.toggle_debugger()  # highlight new simmable_inds
 
             if self.ai_type.get() == 0:  # if using Shayan's AI
-                pc_move = ttt.pc_input(ttt.opp(self.plyr), self.main_board, self.board_len.get(), self.win_len, prev_input, self.simmable_inds, self.is_debugging.get())
+                pc_move = ttt.pc_input(ttt.opp(self.plyr), self.main_board, self.board_len.get(), self.win_len, self.simmable_inds, self.is_debugging.get())
             else:  # if using CZY's AI
-                pc_move = ttt.pc_input_v1(ttt.opp(self.plyr), self.main_board, self.board_len.get(), self.win_len, prev_input, self.simmable_inds, self.is_debugging.get())
+                pc_move = ttt.pc_input_v1(ttt.opp(self.plyr), self.main_board, self.board_len.get(), self.win_len, self.simmable_inds, self.is_debugging.get())
 
             if pc_move is None:
                 self.stop_game()
@@ -964,12 +1077,12 @@ class GameMenu:
         self.debugger.insert('end', f'PC\'s move:  {pc_move}\n')
         self.debugger.insert('end', f'Base10 board:  {self.main_board}\n\n')
 
-    def check_winner_pvc(self, prev_input: int, cur_plyr: int) -> bool:
+    def check_winner_pvc(self, cur_plyr: int) -> bool:
         """
         Check winner after each turn in PVC mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
         :return: whether the game has an outcome
         """
-        formation = ttt.plyr_win_formation(self.main_board, self.board_len.get(), self.win_len, cur_plyr, prev_input)
+        formation = ttt.plyr_win_formation(self.main_board, self.board_len.get(), self.win_len, cur_plyr, self.filled_inds[-1])
         if formation is not None:
             self.stop_game()
 
@@ -995,25 +1108,24 @@ class GameMenu:
                 self.turn_hint[ttt.opp(cur_plyr)].config(foreground=self.colors[ttt.opp(cur_plyr)]['symbol'], background=self.colors[0]['foreground'], relief='ridge')
                 return False
 
-    def update_ind_plyr(self, prev_input: int):
+    def update_ind_plyr(self):
         # update backend board
-        self.main_board += self.plyr * ttt.three_pow[prev_input]
-        self.filled_inds.append(prev_input)
+        self.main_board += self.plyr * ttt.three_pow[self.filled_inds[-1]]
 
         # update frontend board
-        self.board_buttons[prev_input].config(text=ttt.convert_symbol(self.plyr),
-                                              disabledforeground=self.colors[self.plyr]['symbol'],
-                                              state='disabled')
+        self.board_buttons[self.filled_inds[-1]].config(text=ttt.convert_symbol(self.plyr),
+                                                        disabledforeground=self.colors[self.plyr]['symbol'],
+                                                        state='disabled')
 
-        self.debugger.insert(tk.END, f'Player {self.plyr}\'s move:  {prev_input}\n')
+        self.debugger.insert(tk.END, f'Player {self.plyr}\'s move:  {self.filled_inds[-1]}\n')
         self.debugger.insert('end', f'Base10 board:  {self.main_board}\n\n')
 
-    def check_winner_pvp(self, prev_input: int) -> bool:
+    def check_winner_pvp(self) -> bool:
         """
         Check winner after each turn in PVP mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
         :return: whether the game has an outcome
         """
-        formation = ttt.plyr_win_formation(self.main_board, self.board_len.get(), self.win_len, self.plyr, prev_input)
+        formation = ttt.plyr_win_formation(self.main_board, self.board_len.get(), self.win_len, self.plyr, self.filled_inds[-1])
         if formation is not None:
             self.stop_game()
             messagebox.showinfo('Outcome', f'Player \'{ttt.convert_symbol(self.plyr)}\' wins {formation}!')
@@ -1126,8 +1238,8 @@ class GameMenuT(GameMenu):
         self.time_entry[1].pack()
         self.time_entry[2].pack()
 
-    def adjust_zoom(self, *args):
-        super().adjust_zoom()
+    def update_zoom(self, *args):
+        super().update_zoom()
 
         self.time_entry[1].config(font=('Helvetica', self.board_zoom.get() * 3 + 2, 'bold'))
         self.time_entry[2].config(font=('Helvetica', self.board_zoom.get() * 3 + 2, 'bold'))
@@ -1148,14 +1260,15 @@ class GameMenuT(GameMenu):
 
         self.countdown()
 
-    def validate_timer(self, ind: int, *args):
+    def validate_timer(self, plyr: int, *args):
         try:
-            # try to convert the value of the key to a float
-            float(self.remain_time[ind].get())
+            # try to convert the remain time to float
+            float(self.remain_time[plyr].get())
+
         except ValueError:
-            # show a messagebox and reset the value if conversion fails
-            messagebox.askretrycancel('Warning', f'Please enter a decimal number for {ind}!')
-            self.remain_time[ind].set('10')
+            # if the remain time is not valid: show a messagebox and reset the value
+            messagebox.askretrycancel('Warning', f'Please enter a decimal number for {ttt.convert_symbol(plyr)}!')
+            self.remain_time[plyr].set('10')
 
     def countdown(self):
         remain_time = float(self.remain_time[self.plyr].get())
@@ -1172,25 +1285,25 @@ class GameMenuT(GameMenu):
 
             self.window.update_idletasks()
 
-            # if X has under 5 secs left, flash the timer
+            # if X has under 5 secs left: flash the timer
             if remain_time < 5.0 and remain_time % 1 < 0.4:
                 self.time_entry[self.plyr].config(relief='sunken', disabledbackground='white')
             elif remain_time < 5.0 and remain_time % 1 >= 0.4:
                 self.time_entry[self.plyr].config(relief='groove', disabledbackground='yellow')
 
-        # if player runs out of time, opponent wins and stop all recursions.
+        # if player runs out of time: opponent wins and stop all recursions.
         else:
             messagebox.showinfo('Outcome', f"Time's up! Player {ttt.convert_symbol(ttt.opp(self.plyr))} wins!")
             self.stop_game()
             return None
 
-    def check_winner_pvc(self, prev_input: int, cur_plyr: int) -> bool:
+    def check_winner_pvc(self, cur_plyr: int) -> bool:
         """
         Modified to include disabling timer entry, switching timer and adding bonus time.
         """
         self.hint_scale = 0  # reset inflate animation
 
-        if super().check_winner_pvc(prev_input, cur_plyr) is False:
+        if super().check_winner_pvc(cur_plyr) is False:
             # disable and reset font size of current plyr's timer
             self.time_entry[cur_plyr].config(relief='flat', disabledforeground='SystemDisabledText',
                                              disabledbackground=self.colors[0]['foreground'],
@@ -1201,13 +1314,13 @@ class GameMenuT(GameMenu):
             self.remain_time[cur_plyr].set(str(float(self.remain_time[cur_plyr].get()) + 1))
             return False
 
-    def check_winner_pvp(self, prev_input: int) -> bool:
+    def check_winner_pvp(self) -> bool:
         """
         Modified to include disabling timer entry, switching timer and adding bonus time.
         """
         self.hint_scale = 0  # reset inflate animation
 
-        if super().check_winner_pvp(prev_input) is False:  # changes self.plyr to next plyr
+        if super().check_winner_pvp() is False:  # changes self.plyr to next plyr
             # disable and reset font size of current plyr's timer
             self.time_entry[ttt.opp(self.plyr)].config(relief='flat', disabledforeground='SystemDisabledText',
                                                        disabledbackground=self.colors[0]['foreground'],
@@ -1272,7 +1385,8 @@ class GameMenuV(GameMenu):
 
         self.remain_stps_label = tk.Label(
             self.settings_frame,
-            text='\nRemain for'
+            text='\nRemain for',
+            takefocus=False
         )
         self.remain_count_slider = tk.Scale(
             self.settings_frame,
@@ -1302,7 +1416,7 @@ class GameMenuV(GameMenu):
         self.nxt_vanish_checkbox.grid(columnspan=2, row=3, column=1)
 
     def del_moves(self):
-        # if half of the total num of moves by X + O > remain_steps, X's moves start to vanish.
+        # if half of the total num of moves by X + O > remain_steps: X's moves start to vanish.
         if len(self.filled_inds) / 2 > self.remain_steps.get():
             self.debugger.insert('end', f'Vanish order:\n{self.filled_inds}')
 
@@ -1311,22 +1425,22 @@ class GameMenuV(GameMenu):
             self.main_board -= self.plyr * ttt.three_pow[vanish_ind]
             self.board_buttons[vanish_ind].config(text='', background=self.colors[0]['foreground'], state='normal')
 
-        # if half of the total num of moves by X + O is one less before vanishing begins, tint the 2 oldest moves about to vanish.
+        # if half of the total num of moves by X + O is one less before vanishing begins: tint the 2 oldest moves about to vanish.
         if self.show_nxt_vanish_move.get() is True and len(self.filled_inds) / 2 >= self.remain_steps.get():
             self.board_buttons[self.filled_inds[1]].config(background=self.colors[0]['nxt_vanish_move'])
             self.board_buttons[self.filled_inds[0]].config(background=self.colors[0]['nxt_vanish_move'])
 
-    def adjust_length(self, *args):
-        super().adjust_length(*args)
+    def update_len(self, *args):
+        super().update_len(*args)
         self.remain_count_slider.config(from_=self.win_len, to=self.win_len * 2)
 
-    def check_winner_pvc(self, prev_input: int, cur_plyr: int) -> bool:
+    def check_winner_pvc(self, cur_plyr: int) -> bool:
         self.del_moves()
-        return super().check_winner_pvc(prev_input, cur_plyr)
+        return super().check_winner_pvc(cur_plyr)
 
-    def check_winner_pvp(self, prev_input: int) -> bool:
+    def check_winner_pvp(self) -> bool:
         self.del_moves()
-        return super().check_winner_pvp(prev_input)
+        return super().check_winner_pvp()
 
     def replay(self):
         if messagebox.askyesno('Confirmation',
@@ -1356,32 +1470,32 @@ class GameMenuS(GameMenu):
         self.win_len = self.board_len.get()
         self.board_len_tip.config(text='Amount in a row to win: ' + str(self.win_len))
 
-    def adjust_length(self, *args):
-        super().adjust_length(*args)
+    def update_len(self, *args):
+        super().update_len(*args)
 
         self.win_len = self.board_len.get()
         self.board_len_tip.config(text='Amount in a row to win: ' + str(self.win_len))
 
-    def update_ind_pc(self, prev_input: int) -> int:
+    def update_ind_pc(self) -> int:
         pass
 
-    def update_ind_plyr(self, prev_input: int):
-        super().update_ind_plyr(prev_input)
+    def update_ind_plyr(self):
+        super().update_ind_plyr()
 
-        self.board_buttons[prev_input].config(background=self.colors[self.plyr]['snake_head'])
+        self.board_buttons[self.filled_inds[-1]].config(background=self.colors[self.plyr]['snake_head'])
         if len(self.prev_inputs[self.plyr]) > 0:
             # turn the snake's previous head to body color
             self.board_buttons[self.prev_inputs[self.plyr][-1]].config(background=self.colors[self.plyr]['snake_body'])
 
-        self.prev_inputs[self.plyr].append(prev_input)
+        self.prev_inputs[self.plyr].append(self.filled_inds[-1])
 
-    def check_winner_pvp(self, prev_input: int) -> bool:
+    def check_winner_pvp(self) -> bool:
         """
         Modified to:
          1. give snake a new head when the old head stuck.
          2. disable the adj cells from the previous turn and enable the adj cells for the next turn.
         """
-        if super().check_winner_pvp(prev_input) is False:  # changes self.plyr to next player
+        if super().check_winner_pvp() is False:  # changes self.plyr to next player
 
             # setup coords (x_coord, y_coord) of 8 indexes around a center
             relative_adj = {
@@ -1408,7 +1522,7 @@ class GameMenuS(GameMenu):
                             self.board_buttons[adj_ind].config(state='normal', relief='raised')
                             absolute_adj.add(adj_ind)
 
-                if not absolute_adj:  # if absolute_adj is empty, next player is stuck
+                if not absolute_adj:  # empty absolute_adj means next player is stuck
                     self.prev_inputs[self.plyr].pop()
                     prev_input = self.prev_inputs[self.plyr][-1]
                     absolute_adj = gen_adj(prev_input // self.board_len.get(), prev_input % self.board_len.get())  # recursion for the previous-previous input
