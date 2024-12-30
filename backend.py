@@ -50,7 +50,7 @@ def convert_symbol(base3: int, show_empty: bool = False) -> str:
 
 def get_symbol(board: int, ind: int) -> int:
     """
-    Extracts the base3 symbol of the cell with the given index.
+    Extracts the base3 symbol of the cell of given index.
     """
     return board // three_pow[ind] % 3
 
@@ -345,19 +345,20 @@ def pc_input(pc: int, main_board: int, board_len: int, win_len: int, simmable_in
 
             for i, sim_ind in enumerate(simmable_inds):
 
-                if is_plyr_win(parent, child_plyr, sim_ind) is True or (len(simmable_inds) == 1 and child_plyr == pc):  # OPTIMIZATION: is_plyr_win can function without placing child_plyr on the board beforehand
-                    # if a child is white
-                    # or if a child is at the bottommost layer (Why not len(simmable_inds) == 0: len(simmable_inds) is parent's.) and the bottommost layer is pc's turn
+                # if child is white. OPTIMIZATION: is_plyr_win can function without placing child_plyr on the board beforehand
+                # or if child is at the bottommost layer and is pc's turn
+                # why not len(simmable_inds) == 0? -> the len is at parent node's
+                if is_plyr_win(parent, child_plyr, sim_ind) is True or (len(simmable_inds) == 1 and child_plyr == pc):
                     color_table[parent] = False
                     return False
 
-                else:
+                elif len(simmable_inds) > 1:  # OPTIMIZATION: child is only generated if it is not at the bottommost layer
                     del simmable_inds[i]
 
                     child = parent + child_plyr*three_pow[sim_ind]  # place child_plyr on the board
 
-                    if len(simmable_inds) != 0 and is_white(child, child_plyr, sim_ind) is True:
-                        # or if a child is white and is not at the bottommost layer yet
+                    # or if a child is white and is not at the bottommost layer yet
+                    if is_white(child, child_plyr, sim_ind) is True:
                         tree.add_edge(parent, child,)
 
                         simmable_inds.insert(i, sim_ind)
@@ -377,20 +378,23 @@ def pc_input(pc: int, main_board: int, board_len: int, win_len: int, simmable_in
     for i, sim_ind in enumerate(simmable_inds):
         tree = nx.DiGraph()
 
-        if is_plyr_win(main_board, pc, sim_ind) is True:
+        if is_plyr_win(main_board, pc, sim_ind) is True or len(simmable_inds) == 1:
             return sim_ind
 
-        else:
+        elif len(simmable_inds) > 1:
             del simmable_inds[i]
 
             child = main_board + pc*three_pow[sim_ind]
 
             if is_white(child, pc, sim_ind) is True:
+                tree.add_node(child,)
+
                 simmable_inds.insert(i, sim_ind)
 
                 if is_debugging:
                     # get positions for each node of the tree
                     pos = fac_tree_layout(tree, child)
+                    plt.title('Simulated Nodes under the Chosen Initial Node')
                     nx.draw(
                         tree, pos, with_labels=True,
                         node_size=500, node_color='c',
@@ -564,7 +568,7 @@ def pc_input_v1(pc: int, main_board: int, board_len: int, win_len: int, simmable
         p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='c')
         plt.bar_label(p, label_type='center')
         plt.locator_params(axis='x', nbins=board_len * win_len + 1)  # sets the tick interval of graph
-        plt.title('Computer\'s Risk Analysis of each Initial Move')
+        plt.title('Computer\'s Risk Analysis of each Initial Node')
         plt.xlabel('Initial Move')
         plt.ylabel('Winning Probability')
         plt.show()
