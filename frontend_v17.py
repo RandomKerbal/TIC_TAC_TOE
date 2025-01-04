@@ -798,6 +798,7 @@ class GameMenu:
         self.debugger = tk.Text(
             self.settings_frame,
             wrap='none',
+            borderwidth=2,
             height=15,
             width=27
         )
@@ -1005,7 +1006,7 @@ class GameMenu:
 
     def toggle_debugger(self):
         if self.is_debugging.get() is True:
-            self.debugger.grid(columnspan=3, row=11, column=0, pady=(0, 10), sticky='ns')
+            self.debugger.grid(columnspan=3, row=11, column=0, pady=5, padx=(10, 0), sticky='nsew')
 
             for ind, button in enumerate(self.board_buttons):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
                 if ttt.get_symbol(self.main_board, ind) == 0:

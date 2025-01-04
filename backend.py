@@ -37,7 +37,12 @@ relative_adj = (
     (-1, 1), (0, 1), (1, 1)  # bottom-left, bottom-right
 )
 """A pre-calculated universal tuple containing the relative coordinates (x, y) of 8 adjacent cells around a center cell."""
+color_table = {}
+"""
+A universal dictionary that stores the color of nodes that had been calculated for optimization.
 
+key = board, val = is_white
+"""
 
 # def set_win_len(board_len: int) -> int:
 #     return board_len//4 + 3
@@ -65,6 +70,8 @@ def set_universals(tk_board_len: int | None = None, tk_win_len: int | None = Non
     bln_mul_hwl = board_len * half_win_len
     bln_add1_mul_hwl = bln_add1 * half_win_len
     bln_sub1_mul_hwl = bln_sub1 * half_win_len
+
+    color_table.clear()
 
 
 def opp(original: int) -> int:
@@ -117,8 +124,10 @@ def print_board(board: int, board_len: int):
 def fac_tree_layout(tree, root=None) -> dict:
     """
     Creates a hierarchical layout for a directed factorial tree graph. Property of a factorial tree graph:
-        |
-        - the total number of children from 1 parent equals the total number of parents minus 1.
+        - each node has at least one less children than its parent
+
+    Use case:
+        - when you don't know the maximum number of children, but you know the maximum number of layers
 
     :param tree: networkx graph object (must be directed).
     :param root: root node of the tree (if None, chooses an arbitrary node).
@@ -130,11 +139,11 @@ def fac_tree_layout(tree, root=None) -> dict:
         """
         if children:
             layer_neg1 = layer - 1
-            sep_count = len(children) - 1  # total number of separations between each child
+            sep_count = len(children) - 1  # total number of separations between children
             sep_dist = factorials[layer + 1] / max(1, sep_count)  # separation distance between each child
 
             # assign positions for each child
-            start_x = parent_x - sep_count/2 * sep_dist
+            start_x = parent_x - (sep_count/2) * sep_dist
             for i, child in enumerate(children):
                 child_x = start_x + i*sep_dist
                 pos[child] = (child_x, layer_neg1)
@@ -144,8 +153,7 @@ def fac_tree_layout(tree, root=None) -> dict:
         root = next(iter(tree))  # select an arbitrary root if not provided
 
     root_children = list(tree.successors(root))
-    max_layer = len(root_children)  # max_layer assumes the bottommost layer is 1
-
+    max_layer = len(root_children)  # the maximum number of layers, assuming the bottommost layer is 1
     factorials = tuple(math.factorial(layer) for layer in range(max_layer+2))
 
     pos = {root: (0, max_layer)}
@@ -153,36 +161,41 @@ def fac_tree_layout(tree, root=None) -> dict:
     return pos
 
 
-def radial_tree_layout(tree, root=None) -> dict:
+def recip_tree_layout(tree, root=None) -> dict:
     """
-    TODO
+    Creates a hierarchical layout for a directed reciprocal tree graph. Property of a reciprocal tree graph:
+        - each node from any layer has a maximum of *n* children
+
+    Use case:
+        - when you don't know the maximum number of layers, but you know the maximum number of children
+
+    :param tree: networkx graph object (must be directed).
+    :param root: root node of the tree (if None, chooses an arbitrary node).
+    :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
     """
-    def assign_pos(layer: int, children, parent_x: float, parent_y: float):
+    def assign_pos(layer: int, children, parent_x: float):
         """
         Recursively updating coord of parent nodes and calculating coord of child nodes.
         """
-        if parent_x > 0:
-            angle_offset = -math.pi/2  # 90 degrees clockwise offset
-            angle_sep = math.pi / (len(children) + 1)
-        elif parent_x < 0:
-            angle_offset = math.pi/2  # 90 degrees anticlockwise offset
-            angle_sep = math.pi / (len(children) + 1)
-        else:
-            angle_offset = 0
-            angle_sep = math.pi*2 / len(children)
+        if children:
+            layer_neg1 = layer - 1
+            sep_dist = max_sep_count**layer  # separation distance between each child. DO NOT use 1/(max_sep_count**layer) as layer is negative.
 
-        for i, child in enumerate(children):
-            angle = angle_sep * (i+1) + angle_offset
-            child_x = parent_x + (math.cos(angle)/layer)  # further layer = closer to parent; closer layer = further from parent
-            child_y = parent_y + (math.sin(angle)/layer)
-            pos[child] = (child_x, child_y,)
-            assign_pos(layer+1, list(tree.successors(child)), child_x, child_y)
+            # assign positions for each child
+            start_x = parent_x - (len(children)-1)/2 * sep_dist
+            for i, child in enumerate(children):
+                child_x = start_x + i*sep_dist
+                pos[child] = (child_x, layer_neg1)
+                assign_pos(layer_neg1, list(tree.successors(child)), child_x)
 
     if root is None:
         root = next(iter(tree))  # select an arbitrary root if not provided
 
+    max_sep_count = max(degree for _, degree in tree.degree()) - 1  # the maximum number of separations between children of any node (maximum number of children - 1)
+    root_children = list(tree.successors(root))
+
     pos = {root: (0, 0)}
-    assign_pos(1, list(tree.successors(root)), 0.0, 0.0)
+    assign_pos(0, root_children, 0.0)
     return pos
 
 
@@ -438,8 +451,6 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
             color_table[parent] = True
             return True
 
-    color_table = {}  # OPTIMIZATION: stores the color of nodes that had been calculated in a dict whose key = board, val = is_white. Dict has lookup time of O(1).
-
     for i, sim_ind in enumerate(simmable_inds):
 
         if is_plyr_win(main_board, pc, sim_ind) is True or len(simmable_inds) == 1:
@@ -529,7 +540,7 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
                             tree.add_node(child,)
 
                             # get positions for each node of the tree
-                            pos = radial_tree_layout(tree, child)
+                            pos = recip_tree_layout(tree, child)
                             plt.title('Simulated Nodes under the Chosen Initial Node')
                             nx.draw(
                                 tree, pos, with_labels=True, arrows=False,
