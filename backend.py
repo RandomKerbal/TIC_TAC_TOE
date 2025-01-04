@@ -19,7 +19,7 @@ bln_sub1 = 0
 """A pre-calculated universal integer calculated as: board_len - 1."""
 bln_add1 = 0
 """A pre-calculated universal integer calculated as: board_len + 1."""
-max_row_ind = 0
+max_y_ind = 0
 """A pre-calculated universal integer calculated as: board_len * (board_len - 1)."""
 half_win_len = 0
 """A pre-calculated universal integer calculated as: win_len // 2."""
@@ -47,7 +47,7 @@ def set_universals(tk_board_len: int | None = None, tk_win_len: int | None = Non
     """
     Assign values to all the universal variables.
     """
-    global three_pow, board_len, win_len, bln_sub1, bln_add1, max_row_ind, half_win_len, bln_sub_hwl, bln_mul_hwl, bln_add1_mul_hwl, bln_sub1_mul_hwl
+    global three_pow, board_len, win_len, bln_sub1, bln_add1, max_y_ind, half_win_len, bln_sub_hwl, bln_mul_hwl, bln_add1_mul_hwl, bln_sub1_mul_hwl
 
     if tk_board_len:
         three_pow = tuple(3 ** place_val for place_val in range(tk_board_len ** 2 - 1, -1, -1))  # counter is reversed as the order of place values is the reverse of index order
@@ -55,7 +55,7 @@ def set_universals(tk_board_len: int | None = None, tk_win_len: int | None = Non
         board_len = tk_board_len
         bln_sub1 = board_len - 1
         bln_add1 = board_len + 1
-        max_row_ind = board_len * bln_sub1
+        max_y_ind = board_len * bln_sub1
 
     if tk_win_len:
         win_len = tk_win_len
@@ -124,29 +124,65 @@ def fac_tree_layout(tree, root=None) -> dict:
     :param root: root node of the tree (if None, chooses an arbitrary node).
     :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
     """
-    def assign_pos(layer: int, parent, parent_x: float):
+    def assign_pos(layer: int, children, parent_x: float):
         """
         Recursively updating coord of parent nodes and calculating coord of child nodes.
         """
-        children = list(tree.successors(parent))
         if children:
             layer_neg1 = layer - 1
-            total_child_sep = factorial[layer] - factorial[layer_neg1]
-            child_sep = total_child_sep / layer_neg1
+            sep_count = len(children) - 1  # total number of separations between each child
+            sep_dist = factorials[layer + 1] / max(1, sep_count)  # separation distance between each child
 
+            # assign positions for each child
+            start_x = parent_x - sep_count/2 * sep_dist
             for i, child in enumerate(children):
-                child_x = parent_x - total_child_sep/2 + i*child_sep
+                child_x = start_x + i*sep_dist
                 pos[child] = (child_x, layer_neg1)
-                assign_pos(layer_neg1, child, child_x)
+                assign_pos(layer_neg1, list(tree.successors(child)), child_x)
 
     if root is None:
         root = next(iter(tree))  # select an arbitrary root if not provided
 
-    max_layer = tree.out_degree(root)  # max_layer assumes the bottommost layer is 1
-    factorial = tuple(math.factorial(layer) for layer in range(max_layer+1))  # OPTIMIZATION: precalculate
-    pos = {root: (0, max_layer)}
-    assign_pos(max_layer, root, 0.0)
+    root_children = list(tree.successors(root))
+    max_layer = len(root_children)  # max_layer assumes the bottommost layer is 1
 
+    factorials = tuple(math.factorial(layer) for layer in range(max_layer+2))
+
+    pos = {root: (0, max_layer)}
+    assign_pos(max_layer, root_children, 0.0)
+    return pos
+
+
+def radial_tree_layout(tree, root=None) -> dict:
+    """
+    TODO
+    """
+    def assign_pos(layer: int, children, parent_x: float, parent_y: float):
+        """
+        Recursively updating coord of parent nodes and calculating coord of child nodes.
+        """
+        if parent_x > 0:
+            angle_offset = -math.pi/2  # 90 degrees clockwise offset
+            angle_sep = math.pi / (len(children) + 1)
+        elif parent_x < 0:
+            angle_offset = math.pi/2  # 90 degrees anticlockwise offset
+            angle_sep = math.pi / (len(children) + 1)
+        else:
+            angle_offset = 0
+            angle_sep = math.pi*2 / len(children)
+
+        for i, child in enumerate(children):
+            angle = angle_sep * (i+1) + angle_offset
+            child_x = parent_x + (math.cos(angle)/layer)  # further layer = closer to parent; closer layer = further from parent
+            child_y = parent_y + (math.sin(angle)/layer)
+            pos[child] = (child_x, child_y,)
+            assign_pos(layer+1, list(tree.successors(child)), child_x, child_y)
+
+    if root is None:
+        root = next(iter(tree))  # select an arbitrary root if not provided
+
+    pos = {root: (0, 0)}
+    assign_pos(1, list(tree.successors(root)), 0.0, 0.0)
     return pos
 
 
@@ -160,8 +196,8 @@ def prune(board: int, plyr: int, origin: int) -> list:
     :return: simmable_inds
     """
     # convert origin to coords
-    origin_row = origin // board_len
-    origin_col = origin % board_len
+    origin_y = origin // board_len
+    origin_x = origin % board_len
 
     ind_priority = {}  # key = index of cell, value = priority
 
@@ -169,30 +205,30 @@ def prune(board: int, plyr: int, origin: int) -> list:
         if get_symbol(board, ind) == 0:
             row = ind // board_len
             col = ind % board_len
-            origin_d = max(abs(row - origin_row), abs(col - origin_col))  # calculate Chebyshev distance
+            origin_d = max(abs(row - origin_y), abs(col - origin_x))  # calculate Chebyshev distance
 
             ind_priority[ind] = ind_priority.get(ind, 0) - origin_d  # set distance-dependent base priority
 
             for dir_x, dir_y in relative_adj:
-                fwd1_row = row + dir_y
-                fwd1_col = col + dir_x
+                fwd1_y = row + dir_y
+                fwd1_x = col + dir_x
 
-                if 0 <= fwd1_row < board_len and 0 <= fwd1_col < board_len and get_symbol(board, fwd1_row * board_len + fwd1_col) == plyr:  # if ind has an adjacent player cell
+                if 0 <= fwd1_y < board_len and 0 <= fwd1_x < board_len and get_symbol(board, fwd1_y * board_len + fwd1_x) == plyr:  # if ind has an adjacent player cell
 
                     ind_priority[ind] += board_len  # +board_len ensures the furthest index with 1 adjacent player cell has higher priority than the closest lone index
 
-                    fwd2_row = fwd1_row + dir_y
-                    fwd2_col = fwd1_col + dir_x
+                    fwd2_y = fwd1_y + dir_y
+                    fwd2_x = fwd1_x + dir_x
 
-                    if 0 <= fwd2_row < board_len and 0 <= fwd2_col < board_len and get_symbol(board, fwd2_row * board_len + fwd2_col) == plyr:  # if ind is connected to either end of a line formed by player
+                    if 0 <= fwd2_y < board_len and 0 <= fwd2_x < board_len and get_symbol(board, fwd2_y * board_len + fwd2_x) == plyr:  # if ind is connected to either end of a line formed by player
 
                         ind_priority[ind] += board_len * 8  # +board_len*8 ensures the furthest index connected to 1 line formed by player has higher priority than an index surrounded by 8 player cells
 
-                        back1_row = row - dir_y
-                        back1_col = col - dir_x
+                        back1_y = row - dir_y
+                        back1_x = col - dir_x
 
-                        if 0 <= back1_row < board_len and 0 <= back1_col < board_len:  # if ind is at the back of another ind connected to either end of a line formed by player
-                            back1_ind = back1_row * board_len + back1_col
+                        if 0 <= back1_y < board_len and 0 <= back1_x < board_len:  # if ind is at the back of another ind connected to either end of a line formed by player
+                            back1_ind = back1_y * board_len + back1_x
 
                             if get_symbol(board, back1_ind) == 0:
                                 ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_len*8
@@ -209,25 +245,25 @@ def prune(board: int, plyr: int, origin: int) -> list:
 
 def plyr_win_formation(board: int, plyr: int, origin: int) -> str | None:
 
-    origin_col = origin % board_len
-    origin_row = origin // board_len
+    origin_x = origin % board_len
+    origin_y = origin // board_len
 
     # check column
     # I put check column as the first function as it is the fastest to complete
-    if (origin_row >= half_win_len and get_symbol(board, origin - bln_mul_hwl) == plyr) or (origin_row < bln_sub_hwl and get_symbol(board, origin + bln_mul_hwl) == plyr):
+    if (origin_y >= half_win_len and get_symbol(board, origin - bln_mul_hwl) == plyr) or (origin_y < bln_sub_hwl and get_symbol(board, origin + bln_mul_hwl) == plyr):
 
         start = origin
         while (start >= board_len) and get_symbol(board, start - board_len) == plyr:
             start -= board_len
         end = origin
-        while (end < max_row_ind) and get_symbol(board, end + board_len) == plyr:
+        while (end < max_y_ind) and get_symbol(board, end + board_len) == plyr:
             end += board_len
 
         if end // board_len - start // board_len + 1 >= win_len:
             return 'vertically'
 
     # check row
-    if (origin_col >= half_win_len and get_symbol(board, origin - half_win_len) == plyr) or (origin_col < bln_sub_hwl and get_symbol(board, origin + half_win_len) == plyr):
+    if (origin_x >= half_win_len and get_symbol(board, origin - half_win_len) == plyr) or (origin_x < bln_sub_hwl and get_symbol(board, origin + half_win_len) == plyr):
 
         start = origin
         while (start % board_len > 0) and get_symbol(board, start - 1) == plyr:
@@ -240,28 +276,28 @@ def plyr_win_formation(board: int, plyr: int, origin: int) -> str | None:
             return 'horizontally'
 
     # check top left to down right
-    if (origin_row >= half_win_len <= origin_col and get_symbol(board, origin - bln_add1_mul_hwl) == plyr) or (
-            origin_row < bln_sub_hwl > origin_col and get_symbol(board, origin + bln_add1_mul_hwl) == plyr):
+    if (origin_y >= half_win_len <= origin_x and get_symbol(board, origin - bln_add1_mul_hwl) == plyr) or (
+            origin_y < bln_sub_hwl > origin_x and get_symbol(board, origin + bln_add1_mul_hwl) == plyr):
 
         start = origin
         while (start >= board_len) and (start % board_len > 0) and get_symbol(board, start - bln_add1) == plyr:
             start -= bln_add1
         end = origin
-        while (end < max_row_ind) and (end % board_len < bln_sub1) and get_symbol(board, end + bln_add1) == plyr:
+        while (end < max_y_ind) and (end % board_len < bln_sub1) and get_symbol(board, end + bln_add1) == plyr:
             end += bln_add1
 
         if (end // board_len - start // board_len) + 1 >= win_len:
             return 'from top left to down right'
 
     # check top right to down left
-    if (origin_row >= half_win_len and origin_col < bln_sub_hwl and get_symbol(board, origin - bln_sub1_mul_hwl) == plyr) or (
-            origin_row < bln_sub_hwl and origin_col >= half_win_len and get_symbol(board, origin + bln_sub1_mul_hwl) == plyr):
+    if (origin_y >= half_win_len and origin_x < bln_sub_hwl and get_symbol(board, origin - bln_sub1_mul_hwl) == plyr) or (
+            origin_y < bln_sub_hwl and origin_x >= half_win_len and get_symbol(board, origin + bln_sub1_mul_hwl) == plyr):
 
         start = origin
         while (start >= board_len) and (start % board_len < bln_sub1) and get_symbol(board, start - bln_sub1) == plyr:
             start -= bln_sub1
         end = origin
-        while (end < max_row_ind) and (end % board_len > 0) and get_symbol(board, end + bln_sub1) == plyr:
+        while (end < max_y_ind) and (end % board_len > 0) and get_symbol(board, end + bln_sub1) == plyr:
             end += bln_sub1
 
         if (end // board_len - start // board_len + 1) >= win_len:
@@ -281,25 +317,25 @@ def is_plyr_win(board: int, plyr: int, origin: int) -> bool:
     # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
     # 3. pre-calculate only once: half_win_len, bln_sub1, bln_add1, bln_sub_hwl, max_row_ind, origin_col, origin_row
 
-    origin_col = origin % board_len
-    origin_row = origin // board_len
+    origin_x = origin % board_len
+    origin_y = origin // board_len
 
     # check column
     # I put check column as the first function as it is the fastest to complete
-    if (origin_row >= half_win_len and get_symbol(board, origin - bln_mul_hwl) == plyr) or (origin_row < bln_sub_hwl and get_symbol(board, origin + bln_mul_hwl) == plyr):
+    if (origin_y >= half_win_len and get_symbol(board, origin - bln_mul_hwl) == plyr) or (origin_y < bln_sub_hwl and get_symbol(board, origin + bln_mul_hwl) == plyr):
 
         start = origin
         while (start >= board_len) and get_symbol(board, start - board_len) == plyr:
             start -= board_len
         end = origin
-        while (end < max_row_ind) and get_symbol(board, end + board_len) == plyr:
+        while (end < max_y_ind) and get_symbol(board, end + board_len) == plyr:
             end += board_len
 
         if end // board_len - start // board_len + 1 >= win_len:
             return True
 
     # check row
-    if (origin_col >= half_win_len and get_symbol(board, origin - half_win_len) == plyr) or (origin_col < bln_sub_hwl and get_symbol(board, origin + half_win_len) == plyr):
+    if (origin_x >= half_win_len and get_symbol(board, origin - half_win_len) == plyr) or (origin_x < bln_sub_hwl and get_symbol(board, origin + half_win_len) == plyr):
 
         start = origin
         while (start % board_len > 0) and get_symbol(board, start - 1) == plyr:
@@ -312,28 +348,28 @@ def is_plyr_win(board: int, plyr: int, origin: int) -> bool:
             return True
 
     # check top left to down right
-    if (origin_row >= half_win_len <= origin_col and get_symbol(board, origin - bln_add1_mul_hwl) == plyr) or (
-            origin_row < bln_sub_hwl > origin_col and get_symbol(board, origin + bln_add1_mul_hwl) == plyr):
+    if (origin_y >= half_win_len <= origin_x and get_symbol(board, origin - bln_add1_mul_hwl) == plyr) or (
+            origin_y < bln_sub_hwl > origin_x and get_symbol(board, origin + bln_add1_mul_hwl) == plyr):
 
         start = origin
         while (start >= board_len) and (start % board_len > 0) and get_symbol(board, start - bln_add1) == plyr:
             start -= bln_add1
         end = origin
-        while (end < max_row_ind) and (end % board_len < bln_sub1) and get_symbol(board, end + bln_add1) == plyr:
+        while (end < max_y_ind) and (end % board_len < bln_sub1) and get_symbol(board, end + bln_add1) == plyr:
             end += bln_add1
 
         if (end // board_len - start // board_len) + 1 >= win_len:
             return True
 
     # check top right to down left
-    if (origin_row >= half_win_len and origin_col < bln_sub_hwl and get_symbol(board, origin - bln_sub1_mul_hwl) == plyr) or (
-            origin_row < bln_sub_hwl and origin_col >= half_win_len and get_symbol(board, origin + bln_sub1_mul_hwl) == plyr):
+    if (origin_y >= half_win_len and origin_x < bln_sub_hwl and get_symbol(board, origin - bln_sub1_mul_hwl) == plyr) or (
+            origin_y < bln_sub_hwl and origin_x >= half_win_len and get_symbol(board, origin + bln_sub1_mul_hwl) == plyr):
 
         start = origin
         while (start >= board_len) and (start % board_len < bln_sub1) and get_symbol(board, start - bln_sub1) == plyr:
             start -= bln_sub1
         end = origin
-        while (end < max_row_ind) and (end % board_len > 0) and get_symbol(board, end + bln_sub1) == plyr:
+        while (end < max_y_ind) and (end % board_len > 0) and get_symbol(board, end + bln_sub1) == plyr:
             end += bln_sub1
 
         if (end // board_len - start // board_len) + 1 >= win_len:
@@ -417,12 +453,11 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
             child = main_board + pc*three_pow[sim_ind]
 
             if is_white(child, pc, sim_ind) is True:
+                simmable_inds.insert(i, sim_ind)
+
                 if is_debugging:  # noinspection PyUnboundLocalVariable
                     tree.add_node(child, )
 
-                simmable_inds.insert(i, sim_ind)
-
-                if is_debugging:
                     # get positions for each node of the tree
                     pos = fac_tree_layout(tree, child)
                     plt.title('Simulated Nodes under the Chosen Initial Node')
@@ -440,18 +475,18 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
             simmable_inds.insert(i, sim_ind)
 
 
-def snake_pc_input(pc: int, main_board: int, pc_row: int, pc_col: int, plyr_row: int, plyr_col: int, is_debugging: bool) -> int:
+def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, plyr_x: int, is_debugging: bool) -> int:
 
-    def is_white(parent: int, parent_plyr: int, gparent_row: int, gparent_col: int, parent_row: int, parent_col: int) -> bool:
+    def is_white(parent: int, parent_plyr: int, gparent_y: int, gparent_x: int, parent_y: int, parent_x: int) -> bool:
         child_plyr = opp(parent_plyr)
-        has_valid = False  # TODO
+        has_valid = False
 
         for dir_x, dir_y in relative_adj:
-            child_col = gparent_col + dir_x
-            child_row = gparent_row + dir_y
+            child_x = gparent_x + dir_x
+            child_y = gparent_y + dir_y
 
-            if 0 <= child_col < board_len and 0 <= child_row < board_len:
-                child_ind = child_row * board_len + child_col
+            if 0 <= child_x < board_len and 0 <= child_y < board_len:
+                child_ind = child_y * board_len + child_x
 
                 if get_symbol(parent, child_ind) == 0:
                     has_valid = True
@@ -463,21 +498,21 @@ def snake_pc_input(pc: int, main_board: int, pc_row: int, pc_col: int, plyr_row:
                         child = parent + child_plyr * three_pow[child_ind]  # place child_plyr on the board
 
                         # or if a child is white and is not at the bottommost layer yet
-                        if is_white(child, child_plyr, parent_row, parent_col, child_row, child_col) is True:
+                        if is_white(child, child_plyr, parent_y, parent_x, child_y, child_x) is True:
                             if is_debugging: tree.add_edge(parent, child, )
 
                             return False
 
                         if is_debugging: tree.add_edge(parent, child, )
 
-        return has_valid  # if has_valid = False: return False; if has_valid = True return True
+        return has_valid  # if has_valid = False: return False; if has_valid = True: return True
 
     for dir_x, dir_y in relative_adj:
-        child_col = pc_col + dir_x
-        child_row = pc_row + dir_y
+        child_x = pc_x + dir_x
+        child_y = pc_y + dir_y
 
-        if 0 <= child_col < board_len and 0 <= child_row < board_len:
-            child_ind = child_row * board_len + child_col
+        if 0 <= child_x < board_len and 0 <= child_y < board_len:
+            child_ind = child_y * board_len + child_x
 
             if get_symbol(main_board, child_ind) == 0:
 
@@ -489,13 +524,12 @@ def snake_pc_input(pc: int, main_board: int, pc_row: int, pc_col: int, plyr_row:
 
                     child = main_board + pc*three_pow[child_ind]
 
-                    if is_white(child, pc, plyr_row, plyr_col, child_row, child_col) is True:
+                    if is_white(child, pc, plyr_y, plyr_x, child_y, child_x) is True:
                         if is_debugging:  # noinspection PyUnboundLocalVariable
                             tree.add_node(child,)
 
-                        if is_debugging:
                             # get positions for each node of the tree
-                            pos = fac_tree_layout(tree, child)
+                            pos = radial_tree_layout(tree, child)
                             plt.title('Simulated Nodes under the Chosen Initial Node')
                             nx.draw(
                                 tree, pos, with_labels=True, arrows=False,

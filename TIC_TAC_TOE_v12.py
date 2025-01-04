@@ -1592,11 +1592,11 @@ class GameMenuS(GameMenu):
             absolute_adj = set()
 
             for dir_x, dir_y in ttt.relative_adj:
-                adj_col = col + dir_x
-                adj_row = row + dir_y
+                adj_x = col + dir_x
+                adj_y = row + dir_y
 
-                if 0 <= adj_col < ttt.board_len and 0 <= adj_row < ttt.board_len:
-                    adj_ind = adj_row * ttt.board_len + adj_col
+                if 0 <= adj_x < ttt.board_len and 0 <= adj_y < ttt.board_len:
+                    adj_ind = adj_y * ttt.board_len + adj_x
 
                     if ttt.get_symbol(self.main_board, adj_ind) == 0:
                         self.board_buttons[adj_ind].config(state='normal', relief='raised')
