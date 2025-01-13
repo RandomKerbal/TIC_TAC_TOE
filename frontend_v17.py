@@ -6,18 +6,18 @@ import backend as ttt
 
 def to_changelog():
     messagebox.showinfo('Changelog', '''
-Ver 1 : Added the basics: player vs player mode, infinite board length, winner checker, etc...\n
+Ver 1 : Added the basics: player vs player mode, infinite board length, winner check, etc...\n
 Ver 2 : Boards are now stored as single list instead of dictionary. Changes player input from index number to x,y coordinates. Rebuild the entire code to process this new file format.\n
 Ver 3 : Added basic AI. Added console GUI. Make boards that are 7*7 or larger needs only half the board length to win.\n
 Ver 4 : Added board pruning for boards larger than 3x3 to reduce AI calculations. Added some randomization to the moves made by the AI. Restructured the entire AI code for optimization.\n
-Ver 5 : Added deathtrap checker - that's the hardest part of this project! Now the AI is 100% unbeatable for a 3x3 board. Added the option to let AI start first.\n
+Ver 5 : Added deathtrap check - that's the hardest part of this project! Now the AI is 100% unbeatable for a 3x3 board. Added the option to let AI start first.\n
 Ver 6 : Make board pruning only for boards larger than 5x5. Added land-filling to boards larger than 3x3. Added a matplotlib display for AI's Risk Analysis.\n
-Ver 7 : Added Tkinter GUI. Rebuild winner checker for HUGE optimization. Changed every code to user-def function. Added user-friendly debugging root.\n
+Ver 7 : Added Tkinter GUI. Rebuild winner check for HUGE optimization. Changed every code to user-def function. Added user-friendly debugging root.\n
 Ver 8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both pruning and land-filling into 1 function. Pruned board and main board now have the same dimension - no additional function is needed to convert indexes between the two boards!\n
 Ver 9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty indexes. Added 'Replay' button. Changed empty indexes from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
 Ver 10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
 Ver 11: Globalised colors for each feature. Added color settings. Changed O's snake color. Capped length to win at 4. Added 'Total Child Count' to debugger.
-Ver 12: Redesign the algorithm to use depth-first search instead of breadth-first-search. Build a specialized, faster winner-checking algo that only checks for whether a specific player wins, instead of checking who wins.\n
+Ver 12: Redesign the algorithm to use depth-first search instead of breadth-first-search. Build a specialized, faster check winner algo that only checks for whether a specific player wins, instead of checking who wins.\n
 Ver 13: Prunner V2
 Ver 14: Prunner V3, Shayan's Algo.
 Ver 15: GUI Revamp
@@ -883,17 +883,26 @@ class GameMenu:
     def ask_board(self):
         def load_board(event=None):
             try:
-                if len(self.filled_inds) == 0 or messagebox.askyesno('Confirmation',
-                                                                     'Are you sure you want to load?\n\nYou will loose all your progress.'):  # if board is empty: continue; else ask user
+                if not self.filled_inds or messagebox.askyesno('Confirmation',
+                                                               'Are you sure you want to load?\n\nYou will loose all your progress.'):  # if board is empty: continue; else ask user
 
-                    # try to convert the board_entry to int
+                    # try to convert the board_entry to int; update backend board
                     self.main_board = int(board_entry.get())
+
+                    # update frontend board
+                    self.update_buttonframe()
                     self.debugger.insert('end', f'Base10 board:  {self.main_board}\n\n')
                     self.debugger.see(tk.END)
-                    self.filled_inds = []  # clear filled_inds but DO NOT reassign as filled filled_inds skips lock_settings()
-                    self.update_buttonframe()
-                    self.board_len_label.config(state='normal')
-                    self.win_len_slider.config(state='normal')
+
+                    if self.filled_inds:
+                        self.board_buttons[self.filled_inds[-1]].config(background=self.colors[0]['foreground'])  # unhighlight previous pc move
+                        self.filled_inds.clear()  # clear filled_inds but DO NOT reassign as filled filled_inds skips lock_settings()
+                        self.simmable_inds.clear()
+
+                        self.board_len_label.config(state='normal')
+                        self.board_len_slider.config(state='normal')
+                        self.win_len_label.config(state='normal')
+                        self.win_len_slider.config(state='normal')
 
             except ValueError:
                 # if the board_entry is not int
@@ -959,7 +968,7 @@ class GameMenu:
                     background=self.colors[0]['foreground'],
                     activebackground=self.colors[0]['foreground'],
                     cursor='plus',
-                    overrelief='groove',
+                    overrelief='ridge',
                     command=lambda _=len(self.board_buttons): self.update_ind(_),
                     width=3,
                     borderwidth=5
@@ -1010,7 +1019,7 @@ class GameMenu:
 
             for ind, button in enumerate(self.board_buttons):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
                 if ttt.get_symbol(self.main_board, ind) == 0:
-                    button.config(text=ind)
+                    button.config(text=ind, background=self.colors[0]['foreground'])
 
                     if ind in self.simmable_inds:
                         button.config(background=self.colors[0]['simmable_inds'])
@@ -1075,8 +1084,7 @@ class GameMenu:
         elif self.mode == 0:
 
             if len(self.filled_inds) > 1:
-                for ind in self.simmable_inds:
-                    self.board_buttons[ind].config(background=self.colors[0]['foreground'])  # unhighlight simmable_inds and pc move from the previous turn
+                self.board_buttons[self.filled_inds[-2]].config(background=self.colors[0]['foreground'])  # unhighlight previous pc move
 
                 if self.check_winner_pvc(self.plyr) is False:
                     self.update_ind_pc()
@@ -1118,7 +1126,9 @@ class GameMenu:
         self.filled_inds.append(pc_move)
         self.main_board += ttt.opp(self.plyr) * ttt.three_pow[pc_move]
         self.board_buttons[pc_move].config(text=ttt.convert_symbol(ttt.opp(self.plyr)),
-                                           disabledforeground=self.colors[ttt.opp(self.plyr)]['symbol'], background=self.colors[0]['pc_move'], state='disabled')
+                                           disabledforeground=self.colors[ttt.opp(self.plyr)]['symbol'],
+                                           background=self.colors[0]['pc_move'],
+                                           state='disabled')
 
         self.debugger.insert('end', f'PC move:  {pc_move}\n')
         self.debugger.insert('end', f'Base10 board:  {self.main_board}\n\n')
@@ -1134,12 +1144,12 @@ class GameMenu:
             self.stop_game()
 
             if plyr_or_pc == self.plyr:  # if someone won and the current turn is human
-                if messagebox.askyesno('Outcome', f'You win {formation}!\n\nPC: "NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!"') is True:
+                if messagebox.askyesno('Outcome', f'You won {formation}!\n\nPC: "NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!"') is True:
                     self.replay()
                 return True
 
             else:  # if someone won and the current turn is pc
-                if messagebox.askyesno('Outcome', f'Computer wins {formation}!\n\nPC: "Shouldn\'t humans be smarter?"') is True:
+                if messagebox.askyesno('Outcome', f'Computer won {formation}!\n\nPC: "Shouldn\'t humans be smarter?"') is True:
                     self.replay()
                 return True
 
@@ -1162,6 +1172,7 @@ class GameMenu:
         # update frontend board
         self.board_buttons[self.filled_inds[-1]].config(text=ttt.convert_symbol(self.plyr),
                                                         disabledforeground=self.colors[self.plyr]['symbol'],
+                                                        background=self.colors[0]['background'],
                                                         state='disabled')
 
         self.debugger.insert(tk.END, f'Player {self.plyr} move:  {self.filled_inds[-1]}\n')
@@ -1176,7 +1187,7 @@ class GameMenu:
         formation = ttt.plyr_win_formation(self.main_board, self.plyr, self.filled_inds[-1])
         if formation is not None:
             self.stop_game()
-            messagebox.showinfo('Outcome', f'Player \'{ttt.convert_symbol(self.plyr)}\' wins {formation}!')
+            messagebox.showinfo('Outcome', f'Player \'{ttt.convert_symbol(self.plyr)}\' won {formation}!')
             return True
 
         else:
@@ -1345,7 +1356,7 @@ class GameMenuT(GameMenu):
 
         # if player runs out of time: opponent wins and stop all recursions.
         else:
-            messagebox.showinfo('Outcome', f"Time's up! Player {ttt.convert_symbol(ttt.opp(self.plyr))} wins!")
+            messagebox.showinfo('Outcome', f"Time's up! Player {ttt.convert_symbol(ttt.opp(self.plyr))} won!")
             self.stop_game()
             return None
 

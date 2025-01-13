@@ -32,9 +32,9 @@ bln_add1_mul_hwl = 0
 bln_sub1_mul_hwl = 0
 """A pre-calculated universal integer calculated as: (board_len - 1) * (win_len // 2)."""
 relative_adj = (
-    (-1, -1), (0, -1), (1, -1),  # top-left, top-right
+    (-1, -1), (0, -1), (1, -1),  # top-left, top-center, top-right
     (-1, 0), (1, 0),  # left, right
-    (-1, 1), (0, 1), (1, 1)  # bottom-left, bottom-right
+    (-1, 1), (0, 1), (1, 1)  # bottom-left, bottom-center, bottom-right
 )
 """A pre-calculated universal tuple containing the relative coordinates (x, y) of 8 adjacent cells around a center cell."""
 color_table = {}
@@ -61,6 +61,8 @@ def set_universals(tk_board_len: int | None = None, tk_win_len: int | None = Non
         bln_sub1 = board_len - 1
         bln_add1 = board_len + 1
         max_y_ind = board_len * bln_sub1
+
+        cell_to_line = [[]] * board_len
 
     if tk_win_len:
         win_len = tk_win_len
@@ -209,49 +211,40 @@ def prune(board: int, plyr: int, origin: int) -> list:
     :return: simmable_inds
     """
     # convert origin to coords
-    origin_y = origin // board_len
-    origin_x = origin % board_len
+    origin_x, origin_y = origin % board_len, origin // board_len
 
     ind_priority = {}  # key = index of cell, value = priority
 
     for ind in range(board_len**2):
         if get_symbol(board, ind) == 0:
-            row = ind // board_len
-            col = ind % board_len
-            origin_d = max(abs(row - origin_y), abs(col - origin_x))  # calculate Chebyshev distance
+            x, y = ind % board_len, ind // board_len
+            origin_d = max(abs(y - origin_y), abs(x - origin_x))  # calculate Chebyshev distance
 
             ind_priority[ind] = ind_priority.get(ind, 0) - origin_d  # set distance-dependent base priority
 
             for dir_x, dir_y in relative_adj:
-                fwd1_y = row + dir_y
-                fwd1_x = col + dir_x
+                fwd1_x, fwd1_y = x + dir_x, y + dir_y
 
-                if 0 <= fwd1_y < board_len and 0 <= fwd1_x < board_len and get_symbol(board, fwd1_y * board_len + fwd1_x) == plyr:  # if ind has an adjacent player cell
-
+                if 0 <= fwd1_x < board_len and 0 <= fwd1_y < board_len and get_symbol(board, fwd1_y * board_len + fwd1_x) == plyr:  # if ind has an adjacent player cell
                     ind_priority[ind] += board_len  # +board_len ensures the furthest index with 1 adjacent player cell has higher priority than the closest lone index
 
-                    fwd2_y = fwd1_y + dir_y
-                    fwd2_x = fwd1_x + dir_x
+                    fwd2_x, fwd2_y = fwd1_x + dir_x, fwd1_y + dir_y
 
-                    if 0 <= fwd2_y < board_len and 0 <= fwd2_x < board_len and get_symbol(board, fwd2_y * board_len + fwd2_x) == plyr:  # if ind is connected to either end of a line formed by player
-
+                    if 0 <= fwd2_x < board_len and 0 <= fwd2_y < board_len and get_symbol(board, fwd2_y * board_len + fwd2_x) == plyr:  # if ind is connected to either end of a line formed by player
                         ind_priority[ind] += board_len * 8  # +board_len*8 ensures the furthest index connected to 1 line formed by player has higher priority than an index surrounded by 8 player cells
 
-                        back1_y = row - dir_y
-                        back1_x = col - dir_x
+                        back1_x, back1_y = x - dir_x, y - dir_y
 
-                        if 0 <= back1_y < board_len and 0 <= back1_x < board_len:  # if ind is at the back of another ind connected to either end of a line formed by player
+                        if 0 <= back1_x < board_len and 0 <= back1_y < board_len:  # if ind is at the back of another ind connected to either end of a line formed by player
                             back1_ind = back1_y * board_len + back1_x
 
                             if get_symbol(board, back1_ind) == 0:
                                 ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_len*8
 
-    print(f'\nIndex Priority: {ind_priority}')
+    # print(f'\nIndex Priority: {ind_priority}')
 
-    # get the 14 cells with top priority
-    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:15]
-
-    print(f'Simulatable Indexes: {simmable_inds}')
+    # get the 17 cells with top priority
+    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:17]
 
     return simmable_inds
 
@@ -393,7 +386,7 @@ def is_plyr_win(board: int, plyr: int, origin: int) -> bool:
 
 def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) -> int:
 
-    def is_white(parent: int, parent_plyr: int, parent_origin: int) -> bool:
+    def is_white(parent: int, parent_plyr: int) -> bool:
         """
         Finds the path where:
             |
@@ -411,7 +404,6 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
                 When any children are 'white', meaning their parent's player will lose, so their parent is 'black'.
 
         :param parent: the board at the parent node
-        :param parent_origin: latest move made on board 'parent'
         :param parent_plyr: the plyr who made the move 'parent_origin' on the board 'parent'
 
         """
@@ -436,7 +428,7 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
                     child = parent + child_plyr*three_pow[sim_ind]  # place child_plyr on the board
 
                     # or if a child is white and is not at the bottommost layer yet
-                    if is_white(child, child_plyr, sim_ind) is True:
+                    if is_white(child, child_plyr) is True:
                         if is_debugging: tree.add_edge(parent, child, )
 
                         simmable_inds.insert(i, sim_ind)
@@ -463,7 +455,7 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
 
             child = main_board + pc*three_pow[sim_ind]
 
-            if is_white(child, pc, sim_ind) is True:
+            if is_white(child, pc) is True:
                 simmable_inds.insert(i, sim_ind)
 
                 if is_debugging:  # noinspection PyUnboundLocalVariable
@@ -471,6 +463,7 @@ def pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) 
 
                     # get positions for each node of the tree
                     pos = fac_tree_layout(tree, child)
+                    plt.figure()
                     plt.title('Simulated Nodes under the Chosen Initial Node')
                     nx.draw(
                         tree, pos, with_labels=True, arrows=False,
@@ -562,7 +555,7 @@ def pc_input_v1(pc: int, main_board: int, simmable_inds: list, is_debugging: boo
         if is_win is True:  # this layer is always pc
             win_probs[init_ind] += len(simmable_inds) + 1   # +1 because len(simmable_inds) can be 0
 
-        elif is_win is False and len(simmable_inds) != 0:     # if this node has no winner and not tie yet: continue branching down
+        elif is_win is False and simmable_inds:     # if this node has no winner and not tie yet: continue branching down
             plyr = opp(pc)
 
             for i, sim_ind in enumerate(simmable_inds):
@@ -578,7 +571,7 @@ def pc_input_v1(pc: int, main_board: int, simmable_inds: list, is_debugging: boo
                     simmable_inds.insert(i, sim_ind)
                     return False
 
-                elif is_win is False and len(simmable_inds) != 0:
+                elif is_win is False and simmable_inds:
 
                     if parent_origin == init_ind:  # if this is the highest simulated layer
                         all_child_lost = True
@@ -632,9 +625,9 @@ def pc_input_v1(pc: int, main_board: int, simmable_inds: list, is_debugging: boo
     fin_move = pick_init_move(pc, win_probs)
 
     if is_debugging:
-        plt.clf()
-        p = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(44/255, 255/255, 140/255, 1.0))
-        plt.bar_label(p, label_type='center')
+        plt.figure()
+        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(44/255, 255/255, 140/255, 1.0))
+        plt.bar_label(bar, label_type='center')
         plt.locator_params(axis='x', nbins=board_len * win_len + 1)  # sets the tick interval of graph
         plt.title('Computer\'s Risk Analysis of each Initial Node')
         plt.xlabel('Initial Move')
