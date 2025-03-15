@@ -35,12 +35,12 @@ class MainMenu:
     :ivar colors: list containing 3 dicts: list[0] stores colors for general features; list[1] stores colors for X features; list[2] stores colors for O features.
     """
 
-    def __init__(self, window, board_len: int = 3, win_len: int = 3, board_zoom: int = 5, colors: dict = None, ai_type: int = 0):
+    def __init__(self, window, board_len: int = 3, win_len: int = 3, board_zoom: int = 5, colors: dict = None, ai_type: str = 'ShayanCZY\'s Iterative AI'):
         self.window = window
         self.board_len = tk.IntVar(value=board_len)
         self.win_len = tk.IntVar(value=win_len)
         self.board_zoom = tk.IntVar(value=board_zoom)
-        self.ai_type = tk.IntVar(value=ai_type)
+        self.ai_type = tk.StringVar(value=ai_type)
         if colors is None:
             self.colors = [
                 {
@@ -765,25 +765,26 @@ class GameMenu:
             cursor='hand2',
             command=self.pvc_first
         )
-        self.shayan_ai_radiobutton = tk.Radiobutton(
+        self.ai_dropdown = tk.OptionMenu(
             self.settings_frame,
-            text='Shayan\'s AI',
-            background=self.colors[0]['background'],
-            activebackground=self.colors[0]['background'],
-            selectcolor=self.colors[0]['foreground'] if self.colors[0]['foreground'] != 'SystemButtonFace' else None,
-            cursor='hand2',
-            variable=self.ai_type,
-            value=0
+            self.ai_type,
+            'ShayanCZY\'s Iterative AI',
+            'ShayanCZY\'s Recursive AI',
+            'CZY\'s AI',
         )
-        self.czy_ai_radiobutton = tk.Radiobutton(
-            self.settings_frame,
-            text='CZY\'s AI',
+        self.ai_dropdown.config(
             background=self.colors[0]['background'],
             activebackground=self.colors[0]['background'],
-            selectcolor=self.colors[0]['foreground'] if self.colors[0]['foreground'] != 'SystemButtonFace' else None,
+            highlightthickness=0,
             cursor='hand2',
-            variable=self.ai_type,
-            value=1
+            relief='groove',
+            borderwidth=3
+        )
+        self.ai_dropdown['menu'].config(
+            activebackground=self.colors[0]['background'] if self.colors[0]['background'] != 'SystemButtonFace' else None,
+            background=self.colors[0]['foreground'],
+            relief='sunken',
+            cursor='hand2',
         )
         self.debug_checkbox = tk.Checkbutton(
             self.settings_frame,
@@ -798,6 +799,7 @@ class GameMenu:
         self.debugger = tk.Text(
             self.settings_frame,
             wrap='none',
+            relief='ridge',
             borderwidth=2,
             height=15,
             width=27
@@ -839,8 +841,7 @@ class GameMenu:
         self.board_zoom_slider.grid(row=6, column=2, pady=(0, 8))
         if self.mode == 0:
             self.pvco_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 5))
-            self.shayan_ai_radiobutton.grid(columnspan=1, row=8, column=1, pady=(0, 5))
-            self.czy_ai_radiobutton.grid(columnspan=1, row=8, column=2, pady=(0, 5))
+            self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 5))
         self.debug_checkbox.grid(columnspan=2, row=10, column=1)
 
         # initialize the button_frame and buttons
@@ -1015,7 +1016,7 @@ class GameMenu:
 
     def toggle_debugger(self):
         if self.is_debugging.get() is True:
-            self.debugger.grid(columnspan=3, row=11, column=0, pady=5, padx=(10, 0), sticky='nsew')
+            self.debugger.grid(columnspan=3, row=11, column=0, pady=5, padx=(10, 5), sticky='nsew')
 
             for ind, button in enumerate(self.board_buttons):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
                 if ttt.get_symbol(self.main_board, ind) == 0:
@@ -1102,16 +1103,19 @@ class GameMenu:
         # initialize pc_move
         if self.filled_inds:  # if PC starts second or pre-filled board is loaded
 
-            self.simmable_inds = ttt.prune(self.main_board, self.plyr, self.filled_inds[-1])
+            self.simmable_inds = ttt.prune(self.plyr, self.main_board, self.filled_inds[-1])
             self.debugger.insert(tk.END, 'Simulatable indexes:\n' + str(self.simmable_inds) + '\n')
             self.debugger.see(tk.END)
             self.toggle_debugger()  # highlight new simmable_inds
 
-            if self.ai_type.get() == 0:  # if using Shayan's AI
-                pc_move = ttt.pc_input(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get())
+            if self.ai_type.get() == 'ShayanCZY\'s Recursive AI':
+                pc_move = ttt.pc_input_recur(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get())
 
-            else:  # if using CZY's AI
-                pc_move = ttt.pc_input_v1(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get())
+            elif self.ai_type.get() == 'ShayanCZY\'s Iterative AI':
+                pc_move = ttt.pc_input_iter(ttt.opp(self.plyr), self.main_board, set(self.simmable_inds), self.is_debugging.get())
+
+            else:  # CZY's AI
+                pc_move = ttt.czy_pc_input(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get())
 
             if pc_move is None:
                 self.stop_game()
@@ -1139,7 +1143,7 @@ class GameMenu:
         Check winner after each turn in PVC mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
         :return: whether the game has an outcome
         """
-        formation = ttt.plyr_win_formation(self.main_board, plyr_or_pc, self.filled_inds[-1])
+        formation = ttt.plyr_win_formation(plyr_or_pc, self.main_board, self.filled_inds[-1])
         if formation is not None:
             self.stop_game()
 
@@ -1184,7 +1188,7 @@ class GameMenu:
         Check winner after each turn in PVP mode. Executes only after both players already moved once and also contains special functions in Timed and Vanishing modes.
         :return: whether the game has an outcome
         """
-        formation = ttt.plyr_win_formation(self.main_board, self.plyr, self.filled_inds[-1])
+        formation = ttt.plyr_win_formation(self.plyr, self.main_board, self.filled_inds[-1])
         if formation is not None:
             self.stop_game()
             messagebox.showinfo('Outcome', f'Player \'{ttt.convert_symbol(self.plyr)}\' won {formation}!')
