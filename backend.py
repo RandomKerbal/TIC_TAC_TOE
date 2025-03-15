@@ -751,7 +751,7 @@ def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bo
 
     if is_debugging:
         plt.figure()
-        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(44/255, 255/255, 140/255, 1.0))
+        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(44/255, 255/255, 140/255, 1.0), edgecolor='black')
         plt.bar_label(bar, label_type='center')
         plt.locator_params(axis='x', nbins=board_len * win_len + 1)  # sets the tick interval of graph
         plt.title('Computer\'s Risk Analysis of each Initial Node')
