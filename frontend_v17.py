@@ -41,7 +41,7 @@ class MainMenu:
         self.win_len = tk.IntVar(value=win_len)
         self.board_zoom = tk.IntVar(value=board_zoom)
         self.ai_type = tk.StringVar(value=ai_type)
-        if colors is None:
+        if not colors:
             self.colors = [
                 {
                     'pc_move': 'Khaki1',
@@ -1102,20 +1102,30 @@ class GameMenu:
     def update_ind_pc(self):
         # initialize pc_move
         if self.filled_inds:  # if PC starts second or pre-filled board is loaded
-
             self.simmable_inds = ttt.prune(self.plyr, self.main_board, self.filled_inds[-1])
+
+            if self.ai_type.get() == 'ShayanCZY\'s Iterative AI':
+                self.simmable_inds = set(self.simmable_inds)
+                ai = ttt.pc_input_iter
+
+            elif self.ai_type.get() == 'ShayanCZY\'s Recursive AI':
+                ai = ttt.pc_input_recur
+
+            else:  # CZY's AI
+                self.simmable_inds = self.simmable_inds[:10]  # CZY's AI is only capable of simulating 9 indexes
+                ai = ttt.czy_pc_input
+
             self.debugger.insert(tk.END, 'Simulatable indexes:\n' + str(self.simmable_inds) + '\n')
             self.debugger.see(tk.END)
             self.toggle_debugger()  # highlight new simmable_inds
 
-            if self.ai_type.get() == 'ShayanCZY\'s Recursive AI':
-                pc_move = ttt.pc_input_recur(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get())
-
-            elif self.ai_type.get() == 'ShayanCZY\'s Iterative AI':
-                pc_move = ttt.pc_input_iter(ttt.opp(self.plyr), self.main_board, set(self.simmable_inds), self.is_debugging.get())
-
-            else:  # CZY's AI
-                pc_move = ttt.czy_pc_input(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get())
+            pc_move = None
+            for sim_ind in ai(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get()):
+                if pc_move is not None:
+                    self.board_buttons[pc_move].config(background=self.colors[0]['foreground'])  # unhighlight previous sim_ind. pc_move acts like previous sim_ind.
+                self.board_buttons[sim_ind].config(background=self.colors[0]['pc_move'])  # highlight current sim_ind. When the loop ends, cell remains highlighted.
+                self.window.update_idletasks()
+                pc_move = sim_ind
 
             if pc_move is None:
                 self.stop_game()
@@ -1144,7 +1154,7 @@ class GameMenu:
         :return: whether the game has an outcome
         """
         formation = ttt.plyr_win_formation(plyr_or_pc, self.main_board, self.filled_inds[-1])
-        if formation is not None:
+        if formation:
             self.stop_game()
 
             if plyr_or_pc == self.plyr:  # if someone won and the current turn is human
@@ -1189,7 +1199,7 @@ class GameMenu:
         :return: whether the game has an outcome
         """
         formation = ttt.plyr_win_formation(self.plyr, self.main_board, self.filled_inds[-1])
-        if formation is not None:
+        if formation:
             self.stop_game()
             messagebox.showinfo('Outcome', f'Player \'{ttt.convert_symbol(self.plyr)}\' won {formation}!')
             return True

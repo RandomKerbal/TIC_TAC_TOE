@@ -1,3 +1,4 @@
+import collections
 import random
 import math
 import matplotlib.pyplot as plt
@@ -206,7 +207,7 @@ def prune(plyr: int, board: int, origin: int) -> list:
     Assigns priority to indexes accordingly:
         1. if index is connected to, or at the back of another index connected to, either end of a line formed by player: within the high priorities; varies with dist to origin and the number of connected lines.
         2. index has adjacent player cell -> within the low priorities; varies with dist to origin and the number of adjacent player cells.
-    :return: simmable_inds
+    :return: simmable_inds (simulatable indexes): a list containing the indexes that AI can simulate
     """
     # convert origin to coords
     origin_x, origin_y = origin % board_len, origin // board_len
@@ -383,15 +384,27 @@ def is_win(plyr: int, board: int, origin: int) -> bool:
     return False
 
 
-def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) -> int:
+def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: bool):
+    """
+    Note: This function exploits Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
+
+    :rtype: collections.Iterable[int]
+    :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
+    """
 
     def is_white(u_board: int, u_plyr: int) -> bool:
         """
+        prefix 'u_' = belong to current node
+
+        prefix 'v_' = belong to child node
+
+        prefix 'w_' = belong to parent node
+
         Finds the path where:
-            |
+
             - The PC has at least 1 winning move whenever it's the human's turn.
             - The human has 0 winning move whenever it's the PC's turn.
-            |
+
         Returns:
             True:
                 When all children are 'black', meaning their parent's player will win, so their parent is 'white'.
@@ -424,7 +437,7 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
                 del simmable_inds[i]
                 v_board = u_board + v_plyr*three_pow[sim_ind]  # generate children
 
-                if is_debugging: tree.add_edge(u_board, v_board, )
+                if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = sim_ind
 
                 if v_board not in black_table and (is_win(v_plyr, u_board, sim_ind) or is_white(v_board, v_plyr)):
                     simmable_inds.insert(i, sim_ind)
@@ -435,22 +448,23 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
 
         return True
 
-    for i, sim_ind in enumerate(simmable_inds):
+    for i, root_sim_ind in enumerate(simmable_inds):
+        yield root_sim_ind
 
-        if len(simmable_inds) == 1 or is_win(pc, main_board, sim_ind):
-            return sim_ind
+        if len(simmable_inds) == 1 or is_win(pc, main_board, root_sim_ind):
+            return  # root_sim_ind is already returned by 'yield'
 
         else:
-            if is_debugging: tree = nx.DiGraph()
+            if is_debugging: tree = nx.DiGraph(); edge_labels = {}
 
             del simmable_inds[i]
-            v_board = main_board + pc*three_pow[sim_ind]
+            root_board = main_board + pc*three_pow[root_sim_ind]
 
-            if v_board not in black_table and is_white(v_board, pc):
-                simmable_inds.insert(i, sim_ind)
+            if root_board not in black_table and is_white(root_board, pc):
+                simmable_inds.insert(i, root_sim_ind)
 
                 if is_debugging:  # noinspection PyUnboundLocalVariable
-                    tree.add_edge(main_board, v_board,)
+                    tree.add_edge(main_board, root_board,)
 
                     # get positions for each node of the tree
                     pos = recip_tree_layout(tree, main_board)
@@ -461,7 +475,10 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
                         node_size=0,
                         bbox=dict(facecolor=(44/255, 255/255, 140/255, 1.0), boxstyle='round,pad=0.4', linewidth=0.5),
                         font_family='Arial', font_weight='bold', font_size=10
-                    )
+                    ),
+                    nx.draw_networkx_edge_labels(tree, pos, edge_labels=edge_labels,
+                                                 bbox=dict(facecolor='white', alpha=0.75, edgecolor='none', boxstyle='circle', pad=0),
+                                                 font_color='crimson', font_family='Arial', font_size=10, rotate=False)
                     plt.text(
                         0.0, 0.0,  # coordinates (x, y) in axes fraction
                         f'Total # of Nodes: {tree.number_of_nodes()}  |  Max # of Children: {max(dict(tree.out_degree()).values())}',
@@ -471,14 +488,23 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
                     plt.tight_layout()
                     plt.show(block=False)
 
-                return sim_ind
+                return  # root_sim_ind is already returned by 'yield'
 
-            simmable_inds.insert(i, sim_ind)
+            simmable_inds.insert(i, root_sim_ind)
 
 
-def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bool) -> int:
+def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bool):
+    """
+    Note: This function exploits Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
+
+    :rtype: collections.Iterable[int]
+    :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
+    """
+
     for root_sim_ind in simmable_inds.copy():
-        if is_debugging: tree = nx.DiGraph()
+        yield root_sim_ind
+
+        if is_debugging: tree = nx.DiGraph(); edge_labels = {}
 
         stack = [(root_sim_ind, None,)]
         while stack:
@@ -537,9 +563,11 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
             v_plyr = opp(u_plyr)
             v_pointer = len(stack)
 
-            if is_debugging: tree.add_edge(w[1], u_board, )
+            if is_debugging: tree.add_edge(w[1], u_board,); edge_labels[(w[1], u_board,)] = u_sim_ind
 
             if u_board in black_table:
+                if not stack:
+                    break
                 continue
 
             elif len(simmable_inds) == 2:  # if child is at the bottommost layer
@@ -584,9 +612,12 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
                 nx.draw(
                     tree, pos, with_labels=True, arrows=False,
                     node_size=0,
-                    bbox=dict(facecolor=(44 / 255, 255 / 255, 140 / 255, 1.0), boxstyle='round,pad=0.4', linewidth=0.5),
+                    bbox=dict(facecolor=(44 / 255, 255 / 255, 140 / 255, 1.0), boxstyle='round', pad=0.4, linewidth=0.5),
                     font_family='Arial', font_weight='bold', font_size=10
                 )
+                nx.draw_networkx_edge_labels(tree, pos, edge_labels=edge_labels,
+                                             bbox=dict(facecolor='white', alpha=0.75, edgecolor='none', boxstyle='circle', pad=0),
+                                             font_color='crimson', font_family='Arial', font_size=10, rotate=False)
                 plt.text(
                     0.0, 0.0,  # coordinates (x, y) in axes fraction
                     f'Total # of Nodes: {tree.number_of_nodes()}  |  Max # of Children: {max(dict(tree.out_degree()).values())}',
@@ -596,10 +627,10 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
                 plt.tight_layout()
                 plt.show(block=True)
 
-            return root_sim_ind
+            return  # root_sim_ind is already returned by 'yield'
 
 
-def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, plyr_x: int, is_debugging: bool) -> int:
+def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, plyr_x: int, is_debugging: bool):
 
     def is_white(u_board: int, u_plyr: int, grand_u_y: int, grand_u_x: int, u_y: int, u_x: int) -> bool:
         v_plyr = opp(u_plyr)
@@ -610,24 +641,22 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
             v_y = grand_u_y + dir_y
 
             if 0 <= v_x < board_len and 0 <= v_y < board_len:
-                v_ind = v_y * board_len + v_x
+                v_sim_ind = v_y * board_len + v_x
 
-                if get_symbol(u_board, v_ind) == 0:
+                if get_symbol(u_board, v_sim_ind) == 0:
                     has_valid = True
 
-                    if is_win(v_plyr, u_board, v_ind):  # TODO: make is_win accept origin row, col
+                    if is_win(v_plyr, u_board, v_sim_ind):  # TODO: make is_win accept origin row, col
                         return False
 
                     else:
-                        v_board = u_board + v_plyr * three_pow[v_ind]  # place v_plyr on the board
+                        v_board = u_board + v_plyr * three_pow[v_sim_ind]  # place v_plyr on the board
+
+                        if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = v_sim_ind
 
                         # or if a child is white and is not at the bottommost layer yet
                         if is_white(v_board, v_plyr, u_y, u_x, v_y, v_x):
-                            if is_debugging: tree.add_edge(u_board, v_board, )
-
                             return False
-
-                        if is_debugging: tree.add_edge(u_board, v_board, )
 
         return has_valid
 
@@ -636,21 +665,21 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
         v_y = pc_y + dir_y
 
         if 0 <= v_x < board_len and 0 <= v_y < board_len:
-            v_ind = v_y * board_len + v_x
+            root_sim_ind = v_y * board_len + v_x
 
-            if get_symbol(main_board, v_ind) == 0:
+            if get_symbol(main_board, root_sim_ind) == 0:
 
-                if is_win(pc, main_board, v_ind):
-                    return v_ind
+                if is_win(pc, main_board, root_sim_ind):
+                    return root_sim_ind
 
                 else:
-                    if is_debugging: tree = nx.DiGraph()
+                    if is_debugging: tree = nx.DiGraph(); edge_labels = {}
 
-                    v_board = main_board + pc*three_pow[v_ind]
+                    root_board = main_board + pc*three_pow[root_sim_ind]
 
-                    if is_white(v_board, pc, plyr_y, plyr_x, v_y, v_x):
+                    if is_white(root_board, pc, plyr_y, plyr_x, v_y, v_x):
                         if is_debugging:  # noinspection PyUnboundLocalVariable
-                            tree.add_edge(main_board, v_board, )
+                            tree.add_edge(main_board, root_board, )
 
                             # get positions for each node of the tree
                             pos = recip_tree_layout(tree, main_board)
@@ -660,45 +689,55 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
                                 node_size=0,
                                 bbox=dict(facecolor=(44 / 255, 255 / 255, 140 / 255, 1.0), boxstyle='round,pad=0.4', linewidth=0.5),
                                 font_family='Arial', font_weight='bold', font_size=10
-                            )
+                            ),
+                            nx.draw_networkx_edge_labels(tree, pos, edge_labels=edge_labels,
+                                                         bbox=dict(facecolor='white', alpha=0.75, edgecolor='none', boxstyle='circle', pad=0),
+                                                         font_color='crimson', font_family='Arial', font_size=10, rotate=False)
                             plt.text(
                                 0.0, 0.0,  # coordinates (x, y) in axes fraction
                                 f'Total # of Nodes: {tree.number_of_nodes()}  |  Max # of Children: {max(dict(tree.out_degree()).values())}',
                                 fontsize=10, color='gray',
                                 transform=plt.gca().transAxes  # use axes fraction for positioning
                             )
+                            plt.tight_layout()
                             plt.show(block=False)
 
-                        return v_ind
+                        return root_sim_ind
 
 
-def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool) -> int:
+def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool):
+    """
+    Note: This function exploits Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
+
+    :rtype: collections.Iterable[int]
+    :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
+    """
 
     def recur(u_board: int, pc: int, u_origin: int) -> bool:
 
-        is_win_ = is_win(pc, u_board, u_origin)
+        _is_win = is_win(pc, u_board, u_origin)
 
-        if is_win_:  # this layer is always pc
-            win_probs[init_ind] += len(simmable_inds) + 1   # +1 because len(simmable_inds) can be 0
+        if _is_win:  # this layer is always pc
+            win_probs[root_sim_ind] += len(simmable_inds) + 1  # +1 because len(simmable_inds) can be 0
 
-        elif is_win_ is False and simmable_inds:     # if this node has no winner and not tie yet: continue branching down
+        elif _is_win is False and simmable_inds:  # if this node has no winner and not tie yet: continue branching down
             plyr = opp(pc)
 
             for i, sim_ind in enumerate(simmable_inds):
                 del simmable_inds[i]
 
                 v_board = u_board + plyr*three_pow[sim_ind]
-                is_win_ = is_win(plyr, v_board, sim_ind)
+                _is_win = is_win(plyr, v_board, sim_ind)
 
-                if is_win_:  # this layer is always player
-                    win_probs[init_ind] -= (len(simmable_inds) + 1)
+                if _is_win:  # this layer is always player
+                    win_probs[root_sim_ind] -= len(simmable_inds) - 2
 
                     simmable_inds.insert(i, sim_ind)
                     return False
 
-                elif is_win_ is False and simmable_inds:
+                elif _is_win is False and simmable_inds:
 
-                    if u_origin == init_ind:  # if this is the highest simulated layer
+                    if u_origin == root_sim_ind:  # if this is the highest simulated layer
                         all_v_lost = True
 
                     for ii, sim_ind_ii in enumerate(simmable_inds):
@@ -706,18 +745,17 @@ def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bo
 
                         v_ii_board = v_board + pc*three_pow[sim_ind]
 
-                        if recur(v_ii_board, pc, sim_ind_ii) is None and u_origin == init_ind:
+                        if recur(v_ii_board, pc, sim_ind_ii) is None and u_origin == root_sim_ind:
                             all_v_lost = False
 
                             simmable_inds.insert(ii, sim_ind_ii)
-                            break  # OPTIMIZATION ?
+                            break
 
                         simmable_inds.insert(ii, sim_ind_ii)
 
-                    # noinspection PyUnboundLocalVariable
-                    if u_origin == init_ind and all_v_lost:
-                        del win_probs[init_ind]
-                        print(f'Deathtrap Found: Index {init_ind}')
+                    if u_origin == root_sim_ind and all_v_lost:
+                        del win_probs[root_sim_ind]
+                        # print(f'Deathtrap Found: Index {root_sim_ind}')
 
                         simmable_inds.insert(i, sim_ind)
                         return False
@@ -725,38 +763,38 @@ def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bo
                 simmable_inds.insert(i, sim_ind)
 
     def pick_init_move(plyr: int, outcomes: dict) -> int:
-        # find which init_ind results in the most winning child nodes
+        # find which root_sim_ind results in the most winning child nodes
         max_win_prob = max(outcomes.values())
 
-        # moves_pool creates a list of init_inds containing the same highest win_prob to be picked randomly
+        # moves_pool creates a list of root_sim_ind containing the same highest win_prob to be picked randomly
         moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
         move = moves_pool[random.randint(0, len(moves_pool) - 1)]
 
         return move
 
-    simmable_inds = simmable_inds[:9]  # CZY's AI is only capable of simulating 9 indexes
     win_probs = {ind: 0 for ind in simmable_inds}   # key = init_move, val = win_probability of the init_move
 
-    for i, sim_ind in enumerate(simmable_inds):
-        init_ind = sim_ind
+    for i, root_sim_ind in enumerate(simmable_inds):
+        yield root_sim_ind
 
         del simmable_inds[i]
 
-        v_board = main_board + pc*three_pow[sim_ind]
-        recur(v_board, pc, sim_ind)
+        root_board = main_board + pc*three_pow[root_sim_ind]
+        recur(root_board, pc, root_sim_ind)
 
-        simmable_inds.insert(i, sim_ind)
+        simmable_inds.insert(i, root_sim_ind)
 
     fin_move = pick_init_move(pc, win_probs)
 
     if is_debugging:
         plt.figure()
-        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(44/255, 255/255, 140/255, 1.0), edgecolor='black')
+        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(34/255, 245/255, 130/255, 1.0))
         plt.bar_label(bar, label_type='center')
-        plt.locator_params(axis='x', nbins=board_len * win_len + 1)  # sets the tick interval of graph
+        plt.locator_params(axis='x')  # sets the tick interval of graph
         plt.title('Computer\'s Risk Analysis of each Initial Node')
         plt.xlabel('Initial Move')
         plt.ylabel('Winning Probability')
         plt.show(block=False)
 
-    return fin_move
+    yield fin_move
+    return
