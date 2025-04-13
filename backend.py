@@ -242,8 +242,7 @@ def prune(plyr: int, board: int, origin: int) -> list:
 
     # print(f'\nIndex Priority: {ind_priority}')
 
-    # get the 17 cells with top priority
-    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)[:17]
+    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)
 
     return simmable_inds
 
@@ -394,11 +393,11 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
 
     def is_white(u_board: int, u_plyr: int) -> bool:
         """
-        prefix 'u_' = belong to current node
+        'u' = current node, prefix 'u_' = belong to parent node
 
-        prefix 'v_' = belong to child node
+        'v' = child node, prefix 'v_' = belong to child node
 
-        prefix 'w_' = belong to parent node
+        'w' = parent node, prefix 'w_' = belong to grandparent node
 
         Finds the path where:
 
@@ -421,8 +420,8 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
         """
         v_plyr = opp(u_plyr)
 
-        if len(simmable_inds) == 1:  # if child is at the bottommost layer
-            if v_plyr == pc:  # if pc is next turn -> pc can only win/tie -> child must be white -> parent must be black
+        if len(simmable_inds) == 1:  # if v is at the bottommost layer
+            if v_plyr == pc:  # if pc is next turn -> pc can only win/tie -> v must be white -> u must be black
                 black_table.add(u_board)
                 return False
 
@@ -435,7 +434,7 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
         else:
             for i, sim_ind in enumerate(simmable_inds):
                 del simmable_inds[i]
-                v_board = u_board + v_plyr*three_pow[sim_ind]  # generate children
+                v_board = u_board + v_plyr*three_pow[sim_ind]
 
                 if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = sim_ind
 
@@ -500,21 +499,41 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
     :rtype: collections.Iterable[int]
     :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
     """
+    stack: list[None | tuple] = [None] * sum(range(1, len(simmable_inds) + 1))  # Preallocate list size. The largest possible size is (n) + (n-1) + (n-2) + ... + 1, where n is len(simmable_inds).
+
+    def pop() -> tuple:
+        nonlocal top
+        top -= 1
+        return stack[top]
+
+    def append(node: tuple):
+        nonlocal top
+        stack[top] = node
+        top += 1
+
+    def truncate(new_top: int):
+        """
+        Slice off a section of stack, starting from new_top (inclusive) to the end.
+        """
+        nonlocal top
+        top = new_top
 
     for root_sim_ind in simmable_inds.copy():
         yield root_sim_ind
 
         if is_debugging: tree = nx.DiGraph(); edge_labels = {}
 
-        stack = [(root_sim_ind, None,)]
-        while stack:
-            u = stack.pop()
+        top = 0  # reset stack
+        append((root_sim_ind, None,))
+
+        while top:
+            u = pop()
             """            
-            'u' = current node, prefix 'u_' = belong to current node
+            'u' = current node, prefix 'u_' = belong to parent node
 
             'v' = child node, prefix 'v_' = belong to child node
 
-            'w' = parent node, prefix 'w_' = belong to parent node
+            'w' = parent node, prefix 'w_' = belong to grandparent node
 
             A node can be either of 2 types:
                 1. Typical Node:
@@ -539,39 +558,39 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
                         2. Indicate whether the former popped node was white.
 
                             - if the index of the node has a marker -> the node is white.
-                            - if the index of the node does not have a marker (the marker was removed by skip_siblings_n_parent()) -> the node is black.
+                            - if the index of the node does not have a marker -> the node is black.
             """
 
             if len(u) == 4:  # if node is marker
                 simmable_inds.add(u[2])
-                if stack:
+                if top:
                     # skip siblings
-                    del stack[u[3] + 1:]
-                    # skip parent
-                    w = stack.pop()
-                    black_table.add(w[1])  # since all markers (u) are white, its parent (w) must be black
+                    truncate(u[3] + 1)
+
+                    # skip w
+                    w = pop()
+                    black_table.add(w[1])  # since u is white, its w must be black
                     simmable_inds.add(w[2])
-                    if not stack:
+                    if not top:
                         break
                 continue
 
-            # if node is typical
             u_sim_ind, u_pointer = u
-            w = stack[u_pointer] if stack else (pc, main_board,)  # get info from the previous marker (w)
+            w = stack[u_pointer] if top else (pc, main_board,)  # get info from w to construct u_plyr, u_board, ...
             u_plyr = w[0]
             u_board = w[1] + u_plyr * three_pow[u_sim_ind]
             v_plyr = opp(u_plyr)
-            v_pointer = len(stack)
+            v_pointer = top
 
             if is_debugging: tree.add_edge(w[1], u_board,); edge_labels[(w[1], u_board,)] = u_sim_ind
 
             if u_board in black_table:
-                if not stack:
+                if not top:
                     break
                 continue
 
-            elif len(simmable_inds) == 2:  # if child is at the bottommost layer
-                if v_plyr == pc:  # if pc is next turn -> pc can only win/tie -> child must be white -> parent must be black
+            elif len(simmable_inds) == 2:  # if v is at the bottommost layer
+                if v_plyr == pc:  # if pc is next turn -> pc can only win/tie -> v must be white -> u must be black
                     continue
 
                 # if human is next turn -> human can win/tie/loose -> check
@@ -580,27 +599,28 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
                 for v_sim_ind in simmable_inds:
                     if is_win(v_plyr, u_board, v_sim_ind):  # OPTIMIZATION: v_board is not generated
                         break
-                else:  # if inner loop did NOT break -> no child is white; if inner loop DID break -> GOTO end of loop
-                    stack.append((v_plyr, u_board, u_sim_ind, u_pointer,))  # append marker
+                else:  # if inner loop did NOT break -> all v is black; if inner loop DID break -> GOTO end of loop
+                    append((v_plyr, u_board, u_sim_ind, u_pointer,))  # append marker
                     continue
 
             else:
                 simmable_inds.remove(u_sim_ind)
 
-                stack.append((v_plyr, u_board, u_sim_ind, u_pointer,))  # append marker
+                append((v_plyr, u_board, u_sim_ind, u_pointer,))  # append marker
+
                 for v_sim_ind in simmable_inds:
                     if is_win(v_plyr, u_board, v_sim_ind):  # OPTIMIZATION: v_board is not generated
-                        del stack[v_pointer:]  # pop all children & node u from stack
-                        break
+                        truncate(v_pointer)  # pop all v and u
+                        break  # GOTO end of outer loop
                     else:
-                        stack.append((v_sim_ind, v_pointer,))  # append children
+                        append((v_sim_ind, v_pointer,))  # append v
 
-                else:  # if inner loop did NOT break -> no child is white; if inner loop DID break -> GOTO end of loop
+                else:  # if inner loop did NOT break -> no v is white; if inner loop DID break -> GOTO end of loop
                     continue
 
             black_table.add(u_board)
             simmable_inds.add(u_sim_ind)
-            if not stack:
+            if not top:
                 break
 
         else:
@@ -654,7 +674,7 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
 
                         if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = v_sim_ind
 
-                        # or if a child is white and is not at the bottommost layer yet
+                        # or if any v is white and is not at the bottommost layer yet
                         if is_white(v_board, v_plyr, u_y, u_x, v_y, v_x):
                             return False
 
@@ -763,7 +783,7 @@ def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bo
                 simmable_inds.insert(i, sim_ind)
 
     def pick_init_move(plyr: int, outcomes: dict) -> int:
-        # find which root_sim_ind results in the most winning child nodes
+        # find which root_sim_ind results in the most winning leaves
         max_win_prob = max(outcomes.values())
 
         # moves_pool creates a list of root_sim_ind containing the same highest win_prob to be picked randomly
