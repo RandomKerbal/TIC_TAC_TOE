@@ -35,7 +35,7 @@ class MainMenu:
     :ivar colors: list containing 3 dicts: list[0] stores colors for general features; list[1] stores colors for X features; list[2] stores colors for O features.
     """
 
-    def __init__(self, window, board_len: int = 3, win_len: int = 3, board_zoom: int = 5, colors: dict = None, ai_type: str = 'ShayanCZY\'s Recursive AI'):
+    def __init__(self, window, board_len: int = 3, win_len: int = 3, board_zoom: int = 5, colors: dict = None, ai_type: str = 'Recursive And-Or AI'):
         self.window = window
         self.board_len = tk.IntVar(value=board_len)
         self.win_len = tk.IntVar(value=win_len)
@@ -768,9 +768,9 @@ class GameMenu:
         self.ai_dropdown = tk.OptionMenu(
             self.settings_frame,
             self.ai_type,
-            'ShayanCZY\'s Recursive AI',
-            'ShayanCZY\'s Iterative AI',
-            'CZY\'s AI',
+            'Recursive And-Or AI',
+            'Iterative And-Or AI',
+            'Recursive Probability AI',
         )
         self.ai_dropdown.config(
             background=self.colors[0]['background'],
@@ -1104,16 +1104,16 @@ class GameMenu:
         if self.filled_inds:  # if PC starts second or pre-filled board is loaded
             self.simmable_inds = ttt.prune(self.plyr, self.main_board, self.filled_inds[-1])
 
-            if self.ai_type.get() == 'ShayanCZY\'s Recursive AI':
+            if self.ai_type.get() == 'Recursive And-Or AI':
                 self.simmable_inds = self.simmable_inds[:17]
                 ai = ttt.pc_input_recur
 
-            elif self.ai_type.get() == 'ShayanCZY\'s Iterative AI':
+            elif self.ai_type.get() == 'Iterative And-Or AI':
                 self.simmable_inds = set(self.simmable_inds[:17])
                 ai = ttt.pc_input_iter
 
-            else:  # CZY's AI
-                self.simmable_inds = self.simmable_inds[:10]  # CZY's AI is only capable of simulating 9 indexes
+            else:  # Recursive Probability AI
+                self.simmable_inds = self.simmable_inds[:10]  # this AI is only capable of simulating 9 indexes
                 ai = ttt.czy_pc_input
 
             self.debugger.insert(tk.END, 'Simulatable indexes:\n' + str(self.simmable_inds) + '\n')
