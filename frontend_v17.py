@@ -778,7 +778,7 @@ class GameMenu:
             highlightthickness=0,
             cursor='hand2',
             relief='groove',
-            borderwidth=3
+            borderwidth=4
         )
         self.ai_dropdown['menu'].config(
             activebackground=self.colors[0]['background'] if self.colors[0]['background'] != 'SystemButtonFace' else None,
@@ -840,9 +840,9 @@ class GameMenu:
         self.board_zoom_label.grid(row=6, column=1, sticky='e')
         self.board_zoom_slider.grid(row=6, column=2, pady=(0, 8))
         if self.mode == 0:
-            self.pvco_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 5))
-            self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 5))
-        self.debug_checkbox.grid(columnspan=2, row=10, column=1)
+            self.pvco_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 8))
+            self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 8))
+        self.debug_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 8))
 
         # initialize the button_frame and buttons
         self.update_buttonframe()
@@ -1016,7 +1016,7 @@ class GameMenu:
 
     def toggle_debugger(self):
         if self.is_debugging.get() is True:
-            self.debugger.grid(columnspan=3, row=11, column=0, pady=5, padx=(10, 5), sticky='nsew')
+            self.debugger.grid(columnspan=3, row=11, column=0, pady=0, padx=0, sticky='nsew')
 
             for ind, button in enumerate(self.board_buttons):  # DO NOT use set.difference(filled_inds) as filled_inds is cleared when game ends
                 if ttt.get_symbol(self.main_board, ind) == 0:
@@ -1110,7 +1110,7 @@ class GameMenu:
 
             elif self.ai_type.get() == 'Iterative And-Or AI':
                 self.simmable_inds = set(self.simmable_inds[:17])
-                ai = ttt.pc_input_iter
+                ai = ttt.pc_input_iter_
 
             else:  # Recursive Probability AI
                 self.simmable_inds = self.simmable_inds[:10]  # this AI is only capable of simulating 9 indexes
@@ -1123,7 +1123,7 @@ class GameMenu:
             pc_move = None
             for sim_ind in ai(ttt.opp(self.plyr), self.main_board, self.simmable_inds, self.is_debugging.get()):
                 if pc_move is not None:
-                    self.board_buttons[pc_move].config(background=self.colors[0]['foreground'])  # unhighlight previous sim_ind. pc_move acts like previous sim_ind.
+                    self.board_buttons[pc_move].config(background=self.colors[0]['simmable_inds'])  # unhighlight previous sim_ind. pc_move acts like previous sim_ind.
                 self.board_buttons[sim_ind].config(background=self.colors[0]['pc_move'])  # highlight current sim_ind. When the loop ends, cell remains highlighted.
                 self.window.update_idletasks()
                 pc_move = sim_ind

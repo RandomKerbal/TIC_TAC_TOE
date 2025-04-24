@@ -39,9 +39,7 @@ relative_adj = (
 )
 """A pre-calculated universal tuple containing the relative coordinates (x, y) of 8 adjacent cells around a center cell."""
 black_table = set()
-"""
-A universal set that stores nodes that were pre-calculated as black for optimization.
-"""
+"""A universal set that stores nodes that were pre-calculated as black for optimization."""
 
 # def set_win_len(board_len: int) -> int:
 #     return board_len//4 + 3
@@ -103,23 +101,156 @@ def get_symbol(board: int, ind: int) -> int:
     return board // three_pow[ind] % 3
 
 
-def print_board(board: int):
+def print_board(board: int, show_axis: bool = True) -> str:
     """
-    Print the board in the following format:\n
+    Returns the decoded board as a single string in the following format:
+
+    If 'show_axis' is True,
+
          1  2  3  ...\n
-    1  ∟ ∟ ∟\n
-    2  ∟ ∟ ∟\n
-    3  ∟ ∟ ∟\n
+    1  ∟ ∟ ∟...\n
+    2  ∟ ∟ ∟...\n
+    3  ∟ ∟ ∟...\n
+    ...
+
+    If 'show_axis' is False,
+
+      ∟ ∟ ∟...\n
+      ∟ ∟ ∟...\n
+      ∟ ∟ ∟...\n
     ...
     """
-    print('\t', end='')
+    output = ''
+    if show_axis:
+        # print the col axis
+        output += ' ' * 3
+        for i in range(board_len):
+            str_i = str(i)
+            output += str_i + ' ' * (3 - len(str_i))
+        output += '\n'
+
     for i in range(board_len):
-        print(str(i + 1) + ' ' * (4 - len(str(i+2))), end='')  # print the col number
-    for i in range(board_len):
-        print('\n' + str(i + 1) + ' ' * (3 - len(str(i+1))), end='')  # print the row number
+        if show_axis:
+            # print the row axis
+            str_i = str(i)
+            output += str_i + ' ' * (3 - len(str_i))
+
         for ii in range(i*board_len, (i+1)*board_len):
-            print(' ' + convert_symbol(get_symbol(board, ii), show_empty=True), end='  ')  # print the symbols in the row
-    print(end='\n')
+            output += convert_symbol(get_symbol(board, ii), show_empty=True) + ' ' * 2  # print the symbols in the row
+        output += '\n'
+
+    return output
+
+
+def print_graph(tree, pos: dict, edge_labels: dict):
+
+    def recapture_bg(*args):
+        """Retake screenshot after zoom or pan."""
+        nonlocal bg
+        fig.canvas.draw()  # redraw canvas to get correct bbox
+        bg = fig.canvas.copy_from_bbox(fig.bbox)
+
+    def on_click(event):
+        """If mouse clicked on a node, update fig_text to show its detailed information and animate scaling of clicked node."""
+        is_node, info = fig_nodes.contains(event)
+
+        if is_node:  # if clicked on a node
+            # get the node under cursor and its label
+            node = tree_2d[info['ind'][0]]
+            label = fig_labels[node]
+
+            # UPDATE FIG_TEXT
+            parents = list(tree.predecessors(node))
+            children = list(tree.successors(node))
+
+            fig_text.set_text(
+                f'Node: {node}\n'
+                f'Decoded:\n{print_board(node, show_axis=False)}'  # already included \n at the end
+                f'{len(parents)} Parent: {parents}\n'
+                f'{len(parents)} Eldest Sibling: {[next(tree.successors(parent)) for parent in parents]}\n'
+                f'{max(dict(tree.out_degree()).values()) + (pos[node][1] + 1) - len(children)} Skipped Children\n'  # total # of children of root (assume root has max # of children) - # of layers away from root (root = -1) + # of visited children
+                f'{len(children)} Visited Children: {children}'
+            )
+
+            # DRAW
+            def on_timer():
+                nonlocal frame
+                scale = 1 + 0.5 * math.sin(math.pi * frame / 8)  # k must be integer
+                label.set_fontsize(10 * scale)  # 10 is original size of node
+
+                fig.canvas.restore_region(bg)  # revert background to erase previous frame
+                fig.draw_artist(fig_text)  # show temporary fig_text while waiting for label animation
+                fig.draw_artist(label)
+                fig.canvas.blit(fig.bbox)
+
+                frame += 1
+                if frame > 8:
+                    timer.stop()
+                    fig.canvas.draw_idle()
+                    return
+
+            frame = 0
+            timer = fig.canvas.new_timer(interval=30, callbacks=[(on_timer, (), {})])
+            timer.start()
+
+        else:
+            fig_text.set_text(
+                f'Total # of Nodes: {tree.number_of_nodes()}'
+            )
+            fig.canvas.draw_idle()
+
+    def on_move(event):
+        """If mouse hover over a node, change the cursor to hand2."""
+        is_node, info = fig_nodes.contains(event)
+        fig.canvas.get_tk_widget().config(cursor='hand2' if is_node else '')
+
+    tree_2d = list(tree.nodes)
+
+    fig = plt.figure()
+    plt.title('Simulated Nodes under the Chosen Initial Node', fontdict={'family': 'Consolas', 'size': 12})
+    plt.axis('off')
+    plt.tight_layout()
+
+    # draw nodes and edges separately to set picker on nodes
+    fig_nodes = nx.draw_networkx_nodes(
+        tree, pos, node_shape='s', alpha=0.0
+    )
+    fig_nodes.set_picker(True)
+
+    fig_labels = {}
+    for node, (x, y) in pos.items():  # replaced nx.draw_networkx_labels to color each label separately
+        fig_labels[node] = plt.text(
+            x, y, node,
+            ha='center', va='center',
+            bbox=dict(facecolor='SeaGreen' if node in black_table else 'MediumSpringGreen', boxstyle='round', pad=0.4, linewidth=0.5),
+            color='white' if node in black_table else 'black',
+            family='Arial', weight='bold', size=10
+        )
+
+    nx.draw_networkx_edges(
+        tree, pos, arrows=False, alpha=0.75
+    )
+    nx.draw_networkx_edge_labels(
+        tree, pos, edge_labels,
+        bbox=dict(facecolor='white', edgecolor='none', alpha=0.5, boxstyle='circle', pad=0),
+        font_color='crimson', font_family='Arial', font_size=10, rotate=False
+    )
+
+    bg = None
+    recapture_bg()  # screenshot background WITHOUT fig_text
+
+    fig_text = plt.text(
+        0.0, 0.0, f'Total # of Nodes: {tree.number_of_nodes()}',
+        transform=plt.gca().transAxes,  # use axes fraction for positioning
+        bbox=dict(facecolor='white', edgecolor='gray', alpha=0.8, boxstyle='square', pad=0.75),
+        family='Consolas', linespacing=1.5
+    )
+
+    fig.gca().callbacks.connect('xlim_changed', recapture_bg)
+    fig.gca().callbacks.connect('ylim_changed', recapture_bg)
+    fig.canvas.mpl_connect('button_press_event', on_click)
+    fig.canvas.mpl_connect('motion_notify_event', on_move)
+    plt.show(block=True)
 
 
 def fac_tree_layout(tree, root=None) -> dict:
@@ -454,38 +585,17 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
             return  # root_sim_ind is already returned by 'yield'
 
         else:
-            if is_debugging: tree = nx.DiGraph(); edge_labels = {}
-
             del simmable_inds[i]
             root_board = main_board + pc*three_pow[root_sim_ind]
+
+            if is_debugging: tree = nx.DiGraph(); edge_labels = {}; tree.add_edge(main_board, root_board,)
 
             if root_board not in black_table and is_white(root_board, pc):
                 simmable_inds.insert(i, root_sim_ind)
 
                 if is_debugging:  # noinspection PyUnboundLocalVariable
-                    tree.add_edge(main_board, root_board,)
-
-                    # get positions for each node of the tree
                     pos = recip_tree_layout(tree, main_board)
-                    plt.figure()
-                    plt.title('Simulated Nodes under the Chosen Initial Node')
-                    nx.draw(
-                        tree, pos, with_labels=True, arrows=False,
-                        node_size=0,
-                        bbox=dict(facecolor=(44/255, 255/255, 140/255, 1.0), boxstyle='round,pad=0.4', linewidth=0.5),
-                        font_family='Arial', font_weight='bold', font_size=10
-                    ),
-                    nx.draw_networkx_edge_labels(tree, pos, edge_labels=edge_labels,
-                                                 bbox=dict(facecolor='white', alpha=0.75, edgecolor='none', boxstyle='circle', pad=0),
-                                                 font_color='crimson', font_family='Arial', font_size=10, rotate=False)
-                    plt.text(
-                        0.0, 0.0,  # coordinates (x, y) in axes fraction
-                        f'Total # of Nodes: {tree.number_of_nodes()}  |  Max # of Children: {max(dict(tree.out_degree()).values())}',
-                        fontsize=10, color='gray',
-                        transform=plt.gca().transAxes  # use axes fraction for positioning
-                    )
-                    plt.tight_layout()
-                    plt.show(block=False)
+                    print_graph(tree, pos, edge_labels)
 
                 return  # root_sim_ind is already returned by 'yield'
 
@@ -625,29 +735,82 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
 
         else:
             if is_debugging:
-                # get positions for each node of the tree
                 pos = recip_tree_layout(tree, main_board)
-                plt.figure()
-                plt.title('Simulated Nodes under the Chosen Initial Node')
-                nx.draw(
-                    tree, pos, with_labels=True, arrows=False,
-                    node_size=0,
-                    bbox=dict(facecolor=(44 / 255, 255 / 255, 140 / 255, 1.0), boxstyle='round', pad=0.4, linewidth=0.5),
-                    font_family='Arial', font_weight='bold', font_size=10
-                )
-                nx.draw_networkx_edge_labels(tree, pos, edge_labels=edge_labels,
-                                             bbox=dict(facecolor='white', alpha=0.75, edgecolor='none', boxstyle='circle', pad=0),
-                                             font_color='crimson', font_family='Arial', font_size=10, rotate=False)
-                plt.text(
-                    0.0, 0.0,  # coordinates (x, y) in axes fraction
-                    f'Total # of Nodes: {tree.number_of_nodes()}  |  Max # of Children: {max(dict(tree.out_degree()).values())}',
-                    fontsize=10, color='gray',
-                    transform=plt.gca().transAxes  # use axes fraction for positioning
-                )
-                plt.tight_layout()
-                plt.show(block=True)
+                print_graph(tree, pos, edge_labels)
 
             return  # root_sim_ind is already returned by 'yield'
+
+
+def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: bool):
+
+    for root_sim_ind in simmable_inds:
+        yield root_sim_ind
+
+        tree = nx.DiGraph(); edge_labels = {}
+
+        stack = [(main_board, root_sim_ind, simmable_inds.difference({root_sim_ind}), pc, eldest_ptr := 0,)]
+
+        def truncate(new_top: int):
+            del stack[new_top:]
+
+        def is_eldest():
+            return u_eldest_ptr == len(stack)  # if eldest pointer is pointing to its own index
+
+        while stack:
+            w_board, u_sim_ind, u_simmable_inds, u_plyr, u_eldest_ptr = stack.pop()
+
+            if is_win(u_plyr, w_board, u_sim_ind):
+                black_table.add(w_board)
+                if stack:
+                    _1, _2, _3, w_plyr, w_eldest_ptr = stack[u_eldest_ptr-1]
+
+                    if w_board == 10379:
+                        print('\n', stack)
+                        print('Is win:', is_win(u_plyr, w_board, u_sim_ind))
+                        print('U player VS W player:', u_plyr, w_plyr)
+                        print(u_eldest_ptr, w_eldest_ptr)
+
+                    if w_plyr == u_plyr:
+                        truncate(w_eldest_ptr)  # pop w and all its siblings and children
+                        continue
+
+                    else:
+                        truncate(u_eldest_ptr)  # pop u and all its siblings
+                        continue
+
+                elif pc == u_plyr:
+                    print('Exit Code: 1')
+                    break
+
+            elif len(u_simmable_inds) == 0 and is_eldest():
+                if stack:
+                    _, _, _, w_plyr, w_eldest_ptr = stack[-1]
+
+                    if w_plyr != u_plyr:
+                        truncate(w_eldest_ptr)  # pop w and all its siblings
+                        continue
+
+                elif pc != u_plyr:
+                    print('Exit Code: 2')
+                    break
+
+            else:
+                u_board = w_board + u_plyr * three_pow[u_sim_ind]
+
+                tree.add_edge(w_board, u_board, ); edge_labels[(w_board, u_board,)] = u_sim_ind
+
+                v_plyr = opp(u_plyr)
+                v_eldest_ptr = len(stack)
+                for v_sim_ind in u_simmable_inds:
+                    stack.append((u_board, v_sim_ind, u_simmable_inds.difference({v_sim_ind}), v_plyr, v_eldest_ptr,))
+
+        else:  # if inner loop did NOT break
+            print('Exit Code 3')  # TODO add info to debugger
+            pos = recip_tree_layout(tree, main_board)
+            print_graph(tree, pos, edge_labels)
+            continue
+
+        return  # if inner loop DID break
 
 
 def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, plyr_x: int, is_debugging: bool):
@@ -700,27 +863,8 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
                     if is_white(root_board, pc, plyr_y, plyr_x, v_y, v_x):
                         if is_debugging:  # noinspection PyUnboundLocalVariable
                             tree.add_edge(main_board, root_board, )
-
-                            # get positions for each node of the tree
                             pos = recip_tree_layout(tree, main_board)
-                            plt.title('Simulated Nodes under the Chosen Initial Node')
-                            nx.draw(
-                                tree, pos, with_labels=True, arrows=False,
-                                node_size=0,
-                                bbox=dict(facecolor=(44 / 255, 255 / 255, 140 / 255, 1.0), boxstyle='round,pad=0.4', linewidth=0.5),
-                                font_family='Arial', font_weight='bold', font_size=10
-                            ),
-                            nx.draw_networkx_edge_labels(tree, pos, edge_labels=edge_labels,
-                                                         bbox=dict(facecolor='white', alpha=0.75, edgecolor='none', boxstyle='circle', pad=0),
-                                                         font_color='crimson', font_family='Arial', font_size=10, rotate=False)
-                            plt.text(
-                                0.0, 0.0,  # coordinates (x, y) in axes fraction
-                                f'Total # of Nodes: {tree.number_of_nodes()}  |  Max # of Children: {max(dict(tree.out_degree()).values())}',
-                                fontsize=10, color='gray',
-                                transform=plt.gca().transAxes  # use axes fraction for positioning
-                            )
-                            plt.tight_layout()
-                            plt.show(block=False)
+                            print_graph(tree, pos, edge_labels)
 
                         return root_sim_ind
 
@@ -808,7 +952,7 @@ def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bo
 
     if is_debugging:
         plt.figure()
-        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color=(34/255, 245/255, 130/255, 1.0))
+        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='MediumSpringGreen')
         plt.bar_label(bar, label_type='center')
         plt.locator_params(axis='x')  # sets the tick interval of graph
         plt.title('Computer\'s Risk Analysis of each Initial Node')
