@@ -168,7 +168,7 @@ def print_graph(tree, pos: dict, edge_labels: dict):
                 f'Decoded:\n{print_board(node, show_axis=False)}'  # already included \n at the end
                 f'{len(parents)} Parent: {parents}\n'
                 f'{len(parents)} Eldest Sibling: {[next(tree.successors(parent)) for parent in parents]}\n'
-                f'{max(dict(tree.out_degree()).values()) + (pos[node][1] + 1) - len(children)} Skipped Children\n'  # total # of children of root (assume root has max # of children) - # of layers away from root (root = -1) + # of visited children
+                f'{max(dict(tree.out_degree()).values()) + (pos[node][1] + 1) - len(children)} Skipped Children*\n'  # total # of children of root (assume root has max # of children) - # of layers away from root (root = -1) + # of visited children
                 f'{len(children)} Visited Children: {children}'
             )
 
@@ -248,6 +248,7 @@ def print_graph(tree, pos: dict, edge_labels: dict):
 
     fig.gca().callbacks.connect('xlim_changed', recapture_bg)
     fig.gca().callbacks.connect('ylim_changed', recapture_bg)
+    fig.canvas.mpl_connect('resize_event', recapture_bg)
     fig.canvas.mpl_connect('button_press_event', on_click)
     fig.canvas.mpl_connect('motion_notify_event', on_move)
     plt.show(block=True)
@@ -524,11 +525,11 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
 
     def is_white(u_board: int, u_plyr: int) -> bool:
         """
-        'u' = current node, prefix 'u_' = belong to parent node
+        'u' = current node, prefix 'u_' = belong to current node
 
         'v' = child node, prefix 'v_' = belong to child node
 
-        'w' = parent node, prefix 'w_' = belong to grandparent node
+        'w' = parent node, prefix 'w_' = belong to parent node
 
         Finds the path where:
 
@@ -639,11 +640,11 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
         while top:
             u = pop()
             """            
-            'u' = current node, prefix 'u_' = belong to parent node
+            'u' = current node, prefix 'u_' = belong to current node
 
             'v' = child node, prefix 'v_' = belong to child node
 
-            'w' = parent node, prefix 'w_' = belong to grandparent node
+            'w' = parent node, prefix 'w_' = belong to parent node
 
             A node can be either of 2 types:
                 1. Typical Node:
@@ -759,58 +760,66 @@ def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: b
         while stack:
             w_board, u_sim_ind, u_simmable_inds, u_plyr, u_eldest_ptr = stack.pop()
 
-            if is_win(u_plyr, w_board, u_sim_ind):
+            u_board = w_board + u_plyr * three_pow[u_sim_ind]
+            tree.add_edge(w_board, u_board, ); edge_labels[(w_board, u_board,)] = u_sim_ind
+            if u_board == 10897 and w_board == 10870:
+                print(stack)
+
+            if is_win(u_plyr, w_board, u_sim_ind) or (len(u_simmable_inds) == 0 and u_plyr == pc):
                 black_table.add(w_board)
                 if stack:
-                    _1, _2, _3, w_plyr, w_eldest_ptr = stack[u_eldest_ptr-1]
-
-                    if w_board == 10379:
-                        print('\n', stack)
-                        print('Is win:', is_win(u_plyr, w_board, u_sim_ind))
-                        print('U player VS W player:', u_plyr, w_plyr)
-                        print(u_eldest_ptr, w_eldest_ptr)
+                    ww_board, _, _, w_plyr, w_eldest_ptr = stack[u_eldest_ptr-1]
 
                     if w_plyr == u_plyr:
+                        black_table.add(ww_board)
                         truncate(w_eldest_ptr)  # pop w and all its siblings and children
+                        if not stack and pc == w_plyr:
+                            print('Root is white 1')
+                            return
                         continue
 
                     else:
                         truncate(u_eldest_ptr)  # pop u and all its siblings
+                        if not stack and pc == u_plyr:
+                            print('Root is white 2')
+                            return
                         continue
 
                 elif pc == u_plyr:
-                    print('Exit Code: 1')
-                    break
+                    print('Root is white 3')
+                    return
 
-            elif len(u_simmable_inds) == 0 and is_eldest():
+            elif len(u_simmable_inds) == 0 and is_eldest() and u_plyr == opp(pc):
+                black_table.add(u_board)
                 if stack:
-                    _, _, _, w_plyr, w_eldest_ptr = stack[-1]
+                    ww_board, _, _, w_plyr, w_eldest_ptr = stack[-1]
 
-                    if w_plyr != u_plyr:
+                    if w_plyr == u_plyr:
+                        continue
+
+                    elif w_plyr != u_plyr:
                         truncate(w_eldest_ptr)  # pop w and all its siblings
+                        if not stack and pc == w_plyr:
+                            print('Root is white 4')
+                            return
                         continue
 
                 elif pc != u_plyr:
-                    print('Exit Code: 2')
-                    break
+                    print('Root is white 5')
+                    return
 
             else:
                 u_board = w_board + u_plyr * three_pow[u_sim_ind]
-
-                tree.add_edge(w_board, u_board, ); edge_labels[(w_board, u_board,)] = u_sim_ind
 
                 v_plyr = opp(u_plyr)
                 v_eldest_ptr = len(stack)
                 for v_sim_ind in u_simmable_inds:
                     stack.append((u_board, v_sim_ind, u_simmable_inds.difference({v_sim_ind}), v_plyr, v_eldest_ptr,))
 
-        else:  # if inner loop did NOT break
-            print('Exit Code 3')  # TODO add info to debugger
+        else:
+            print('Root is black')
             pos = recip_tree_layout(tree, main_board)
             print_graph(tree, pos, edge_labels)
-            continue
-
-        return  # if inner loop DID break
 
 
 def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, plyr_x: int, is_debugging: bool):
