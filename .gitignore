@@ -1,0 +1,12 @@
+.idea/
+build/
+dist/
+
+*.zip
+*.spec
+*.cfg
+
+New Check Winner Algo.py
+New Iterative Search Algo.py
+PC INPUT RECUR 100%.py
+TEST.py
