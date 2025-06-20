@@ -3,7 +3,6 @@ build/
 dist/
 __pycache__/
 
-*.py[cod]
 *.zip
 *.spec
 *.cfg
