@@ -1,6 +1,8 @@
 .idea/
 build/
 dist/
+__pycache__/
+
 
 *.zip
 *.spec
