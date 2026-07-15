@@ -594,7 +594,7 @@ class GameMenu:
 
         self.board_len = board_len
         self.win_len = win_len
-        ttt.set_universals(self.board_len.get(), self.win_len.get())  # initialize universal vars in TIC_TAC_TOE_func
+        ttt.set_vars(self.board_len.get(), self.win_len.get())  # initialize cross-file vars in TIC_TAC_TOE_func
         self.board_zoom = board_zoom
         self.mode = mode
         self.ai_type = ai_type
@@ -733,7 +733,7 @@ class GameMenu:
             from_=min(ttt.board_len, 5),
             to=ttt.board_len,
             cursor='sb_h_double_arrow',
-            command=lambda val: ttt.set_universals(tk_win_len=int(val))  # 'val' is automatically passed by slider when it changes and is a str
+            command=lambda val: ttt.set_vars(tk_win_len=int(val))  # 'val' is automatically passed by slider when it changes and is a str
         )
 
         self.board_zoom_label = tk.Label(
@@ -1035,8 +1035,8 @@ class GameMenu:
         self.window.update_idletasks()
 
     def update_len(self, val: int):
-        ttt.set_universals(tk_board_len=val)  # update board_len-related universal vars in TIC_TAC_TOE_func
-        self.win_len_slider.config(from_=min(ttt.board_len, 5), to=ttt.board_len)  # X can force a win if win_len is shorter. The slider will update win_len-related universal vars automatically
+        ttt.set_vars(tk_board_len=val)  # update board_len-related cross-file vars in TIC_TAC_TOE_func
+        self.win_len_slider.config(from_=min(ttt.board_len, 5), to=ttt.board_len)  # X can force a win if win_len is shorter. The slider will update win_len-related cross-file vars automatically
 
         # update position of buttons and window size at frontend
         self.update_buttonframe()
@@ -1110,7 +1110,7 @@ class GameMenu:
 
             elif self.ai_type.get() == 'Iterative And-Or AI':
                 self.simmable_inds = set(self.simmable_inds[:17])
-                ai = ttt.pc_input_iter_
+                ai = ttt.pc_input_iter
 
             else:  # Recursive Probability AI
                 self.simmable_inds = self.simmable_inds[:10]  # this AI is only capable of simulating 9 indexes
@@ -1171,7 +1171,7 @@ class GameMenu:
         else:
             if len(self.filled_inds) == ttt.board_len ** 2:  # if no one win and the whole board is filled
                 self.stop_game()
-                if messagebox.askyesno('Outcome', 'Ended in tie.\n\nPC: "You\'ll never win ... not satisfied? Replay!"') is True:
+                if messagebox.askyesno('Outcome', 'Ended in draw.\n\nPC: "You\'ll never win ... not satisfied? Replay!"') is True:
                     self.replay()
                 return True
 
@@ -1208,7 +1208,7 @@ class GameMenu:
         else:
             if len(self.filled_inds) == ttt.board_len ** 2:  # if no one win and the whole board is filled
                 self.stop_game()
-                messagebox.showinfo('Outcome', 'Ended in a tie.')
+                messagebox.showinfo('Outcome', 'Ended in a draw.')
                 return True
 
             else:  # if no one win and the whole board is not filled
@@ -1548,7 +1548,7 @@ class GameMenuS(GameMenu):
                             [],
                             []
                             ]
-        self.board_len_slider.config(from_=4)  # X can force a win if board_len is shorter. The slider will automatically call update_len to update universal vars.
+        self.board_len_slider.config(from_=4)  # X can force a win if board_len is shorter. The slider will automatically call update_len to update cross-file vars.
         self.win_len_slider.config(from_=min(ttt.board_len // 2 + 1, 3))
         self.win_len.set(ttt.win_len)  # reassign as calling superclass __init__ changes tk win_len
         self.load_button.destroy()

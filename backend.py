@@ -4,50 +4,49 @@ import math
 import matplotlib.pyplot as plt
 import networkx as nx
 
-# initialize universal variables
 three_pow = ()
 """
-A pre-calculated universal tuple containing 'board_sz**2' integer. Each integer = the place value of a digit with the same index in a base3 number.
+Cross-file; contains board_sz**2 elements. Each element = the place value of a digit with the same index in a base3 number.
 E.g.: in a base 3 3x3 board:
-    - the element at index 0 = 3^8 (8th place value)
-    - the element at index 8 = 3^0 (0th place value)
+    - the element at index 0 = 3**8 (8th place value)
+    - the element at index 8 = 3**0 (1st place value)
 """
 board_len = 0
-"""A universal integer containing the length of the board."""
+"""Cross-file; contains the length of the board."""
 win_len = 0
-"""A universal integer containing the number of X/O in a row/column/diagonal to win."""
+"""Cross-file; contains the number of X/O in a row/column/diagonal to win."""
 bln_sub1 = 0
-"""A pre-calculated universal integer calculated as: board_len - 1."""
+"""Cross-file; equals board_len - 1."""
 bln_add1 = 0
-"""A pre-calculated universal integer calculated as: board_len + 1."""
+"""Cross-file; equals board_len + 1."""
 max_y_ind = 0
-"""A pre-calculated universal integer calculated as: board_len * (board_len - 1)."""
+"""Cross-file; calculated as: board_len * (board_len - 1)."""
 half_win_len = 0
-"""A pre-calculated universal integer calculated as: win_len // 2."""
+"""Cross-file; equals win_len // 2."""
 bln_sub_hwl = 0
-"""A pre-calculated universal integer calculated as: board_len - (win_len // 2)."""
+"""Cross-file; equals board_len - (win_len // 2)."""
 bln_mul_hwl = 0
-"""A pre-calculated universal integer calculated as: board_len * (win_len // 2)."""
+"""Cross-file; equals board_len * (win_len // 2)."""
 bln_add1_mul_hwl = 0
-"""A pre-calculated universal integer calculated as: (board_len + 1) * (win_len // 2)."""
+"""Cross-file; equals (board_len + 1) * (win_len // 2)."""
 bln_sub1_mul_hwl = 0
-"""A pre-calculated universal integer calculated as: (board_len - 1) * (win_len // 2)."""
+"""Cross-file; equals (board_len - 1) * (win_len // 2)."""
 relative_adj = (
     (-1, -1), (0, -1), (1, -1),  # top-left, top-center, top-right
     (-1, 0), (1, 0),  # left, right
     (-1, 1), (0, 1), (1, 1)  # bottom-left, bottom-center, bottom-right
 )
-"""A pre-calculated universal tuple containing the relative coordinates (x, y) of 8 adjacent cells around a center cell."""
+"""Cross-file; contains the relative coordinates (x, y) of 8 adjacent cells around a center cell."""
 black_table = set()
-"""A universal set that stores nodes that were pre-calculated as black for optimization."""
+"""Cross-file; transposition table that stores nodes seen before as black for optimization."""
 
 # def set_win_len(board_len: int) -> int:
 #     return board_len//4 + 3
 
 
-def set_universals(tk_board_len: int | None = None, tk_win_len: int | None = None):
+def set_vars(tk_board_len: int | None = None, tk_win_len: int | None = None):
     """
-    Assign values to all the universal variables.
+    Assign values to all the cross-file variables.
     """
     global three_pow, board_len, win_len, bln_sub1, bln_add1, max_y_ind, half_win_len, bln_sub_hwl, bln_mul_hwl, bln_add1_mul_hwl, bln_sub1_mul_hwl
 
@@ -76,7 +75,6 @@ def set_universals(tk_board_len: int | None = None, tk_win_len: int | None = Non
 def opp(original: int) -> int:
     """
     (opponent)
-
     Returns 1 when input 2; 2 when input 1.
     """
     return 3 - original
@@ -99,6 +97,13 @@ def get_symbol(board: int, ind: int) -> int:
     Extracts the base3 symbol of the cell of given index.
     """
     return board // three_pow[ind] % 3
+
+
+def move(board: int, plyr: int, ind: int) -> int:
+    """
+    :return: board after placing plyr at ind.
+    """
+    return board + plyr * three_pow[ind]
 
 
 def print_board(board: int, show_axis: bool = True) -> str:
@@ -605,7 +610,7 @@ def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: 
 
 def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bool):
     """
-    Note: This function exploits Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
+    Uses Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
 
     :rtype: collections.Iterable[int]
     :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
@@ -624,7 +629,7 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
 
     def truncate(new_top: int):
         """
-        Slice off a section of stack, starting from new_top (inclusive) to the end.
+        Pop multiple elements in one step, from new_top (inclusive) to the end.
         """
         nonlocal top
         top = new_top
@@ -667,7 +672,6 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
 
                         1. Record the player, board, and simulated index of the popped node.
                         2. Indicate whether the former popped node was white.
-
                             - if the index of the node has a marker -> the node is white.
                             - if the index of the node does not have a marker -> the node is black.
             """
@@ -689,7 +693,7 @@ def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bo
             u_sim_ind, u_pointer = u
             w = stack[u_pointer] if top else (pc, main_board,)  # get info from w to construct u_plyr, u_board, ...
             u_plyr = w[0]
-            u_board = w[1] + u_plyr * three_pow[u_sim_ind]
+            u_board = move(w[1], u_plyr, u_sim_ind)
             v_plyr = opp(u_plyr)
             v_pointer = top
 
@@ -760,10 +764,8 @@ def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: b
         while stack:
             w_board, u_sim_ind, u_simmable_inds, u_plyr, u_eldest_ptr = stack.pop()
 
-            u_board = w_board + u_plyr * three_pow[u_sim_ind]
+            u_board = move(w_board, u_plyr, u_sim_ind)
             tree.add_edge(w_board, u_board, ); edge_labels[(w_board, u_board,)] = u_sim_ind
-            if u_board == 10897 and w_board == 10870:
-                print(stack)
 
             if is_win(u_plyr, w_board, u_sim_ind) or (len(u_simmable_inds) == 0 and u_plyr == pc):
                 black_table.add(w_board)
@@ -774,19 +776,16 @@ def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: b
                         black_table.add(ww_board)
                         truncate(w_eldest_ptr)  # pop w and all its siblings and children
                         if not stack and pc == w_plyr:
-                            print('Root is white 1')
                             return
                         continue
 
                     else:
                         truncate(u_eldest_ptr)  # pop u and all its siblings
                         if not stack and pc == u_plyr:
-                            print('Root is white 2')
                             return
                         continue
 
                 elif pc == u_plyr:
-                    print('Root is white 3')
                     return
 
             elif len(u_simmable_inds) == 0 and is_eldest() and u_plyr == opp(pc):
@@ -800,16 +799,14 @@ def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: b
                     elif w_plyr != u_plyr:
                         truncate(w_eldest_ptr)  # pop w and all its siblings
                         if not stack and pc == w_plyr:
-                            print('Root is white 4')
                             return
                         continue
 
                 elif pc != u_plyr:
-                    print('Root is white 5')
                     return
 
             else:
-                u_board = w_board + u_plyr * three_pow[u_sim_ind]
+                u_board = move(w_board, u_plyr, u_sim_ind)
 
                 v_plyr = opp(u_plyr)
                 v_eldest_ptr = len(stack)
@@ -817,7 +814,6 @@ def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: b
                     stack.append((u_board, v_sim_ind, u_simmable_inds.difference({v_sim_ind}), v_plyr, v_eldest_ptr,))
 
         else:
-            print('Root is black')
             pos = recip_tree_layout(tree, main_board)
             print_graph(tree, pos, edge_labels)
 
@@ -842,7 +838,7 @@ def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, 
                         return False
 
                     else:
-                        v_board = u_board + v_plyr * three_pow[v_sim_ind]  # place v_plyr on the board
+                        v_board = move(u_board, v_plyr, v_sim_ind)
 
                         if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = v_sim_ind
 
