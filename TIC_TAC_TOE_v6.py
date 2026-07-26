@@ -40,8 +40,8 @@ while board_sz == '':
 # initialize the board len and how many slots in a row/column/diagonal to win
 board_sz = int(board_sz)
 filled_slots_ind = []
-win_len = set_win_len(board_sz)
-check_winner_area = set_check_winner_area(board_sz, win_len)
+WIN_LEN = set_win_len(board_sz)
+check_winner_area = set_check_winner_area(board_sz, WIN_LEN)
 
 # initialize the board based on board_sz
 main_board = setup_board(board_sz)
@@ -55,7 +55,7 @@ elif mode == 'pvcx':
     print_board(main_board, board_sz)
     print(f'Computer [X]\'s turn! Please wait...')
     # prev_input = -1 means there is no prev_input yet and the computer will randomly generate a number
-    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(WIN_LEN, 4), set_check_winner_area(board_sz, min(WIN_LEN, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
 elif mode == 'pvco' or mode == 'pvc':
     plyr = 'X'
 
@@ -63,15 +63,15 @@ elif mode == 'pvco' or mode == 'pvc':
 while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
     # human's turn if human starts first
     # noinspection PyUnboundLocalVariable
-    prev_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)
+    prev_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, WIN_LEN, check_winner_area)
     main_board[prev_input] = plyr
 
     # computer's turn regardless computer or human starts first
     print_board(main_board, board_sz)
     print(f'Computer [{opp(plyr)}]\'s turn! Please wait...')
-    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), prev_input, is_debugging=False)] = opp(plyr)
+    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(WIN_LEN, 4), set_check_winner_area(board_sz, min(WIN_LEN, 4)), prev_input, is_debugging=False)] = opp(plyr)
 
-    winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
+    winner = check_winner_anywhere(main_board, board_sz, WIN_LEN, check_winner_area)
     if winner[1] == 'tie':
         print_board(main_board, board_sz)
         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw'))//2) + 'Game ended in a draw')
@@ -90,12 +90,12 @@ while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
 # start of the Player versus Player mode
 while mode == 'pvp':
     # player 'X' turn
-    main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = plyr
+    main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, WIN_LEN, check_winner_area)] = plyr
 
     # player 'O' turn
-    main_board[ask_input(opp(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opp(plyr)
+    main_board[ask_input(opp(plyr), main_board, board_sz, filled_slots_ind, WIN_LEN, check_winner_area)] = opp(plyr)
 
-    winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
+    winner = check_winner_anywhere(main_board, board_sz, WIN_LEN, check_winner_area)
     if winner[1] == 'tie':
         print_board(main_board, board_sz)
         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw.'))//2) + 'Game ended in a draw.' + '\n' + '=' * 50)

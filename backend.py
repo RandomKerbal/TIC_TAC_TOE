@@ -4,152 +4,721 @@ import math
 import matplotlib.pyplot as plt
 import networkx as nx
 
-three_pow = ()
-"""
-Cross-file; contains board_sz**2 elements. Each element = the place value of a digit with the same index in a base3 number.
-E.g.: in a base 3 3x3 board:
-    - the element at index 0 = 3**8 (8th place value)
-    - the element at index 8 = 3**0 (1st place value)
-"""
-board_len = 0
-"""Cross-file; contains the length of the board."""
-win_len = 0
-"""Cross-file; contains the number of X/O in a row/column/diagonal to win."""
-bln_sub1 = 0
-"""Cross-file; equals board_len - 1."""
-bln_add1 = 0
-"""Cross-file; equals board_len + 1."""
-max_y_ind = 0
-"""Cross-file; calculated as: board_len * (board_len - 1)."""
-half_win_len = 0
-"""Cross-file; equals win_len // 2."""
-bln_sub_hwl = 0
-"""Cross-file; equals board_len - (win_len // 2)."""
-bln_mul_hwl = 0
-"""Cross-file; equals board_len * (win_len // 2)."""
-bln_add1_mul_hwl = 0
-"""Cross-file; equals (board_len + 1) * (win_len // 2)."""
-bln_sub1_mul_hwl = 0
-"""Cross-file; equals (board_len - 1) * (win_len // 2)."""
-relative_adj = (
-    (-1, -1), (0, -1), (1, -1),  # top-left, top-center, top-right
-    (-1, 0), (1, 0),  # left, right
-    (-1, 1), (0, 1), (1, 1)  # bottom-left, bottom-center, bottom-right
+BOARD_LEN: int = 0
+"""Cross-file; length of board."""
+
+BOARD_AREA: int = 0
+"""Cross-file; length**2 of board."""
+
+WIN_LEN: int = 0
+"""Cross-file; number of X/O in a row/column/diagonal to win."""
+
+BOTTOM_ROW: int = 0
+"""BOARD_LEN * (BOARD_LEN - 1)"""
+
+HALF_W_LEN: int = 0
+"""WIN_LEN // 2"""
+
+HALF_W_LEN_INV: int = 0
+"""BOARD_LEN - (WIN_LEN // 2)"""
+
+SE_VEC: int = 0
+"""BOARD_LEN + 1"""
+
+SW_VEC: int = 0
+"""BOARD_LEN - 1"""
+
+S_VEC_HALF_W_LEN: int = 0
+"""BOARD_LEN * (WIN_LEN // 2)"""
+
+SE_VEC_HALF_W_LEN: int = 0
+"""SE_VEC * (WIN_LEN // 2)"""
+
+SW_VEC_HALF_W_LEN: int = 0
+"""SW_VEC * (WIN_LEN // 2)"""
+
+ADJ: tuple[tuple[int, int], ...] = (
+    (-1, -1), (0, -1), (1, -1),
+    (-1, 0), (1, 0),
+    (-1, 1), (0, 1), (1, 1)
 )
-"""Cross-file; contains the relative coordinates (x, y) of 8 adjacent cells around a center cell."""
-black_table = set()
-"""Cross-file; transposition table that stores nodes seen before as black for optimization."""
+"""Cross-file; contains adjacent coordinates (x, y) relative to a cell."""
 
-# def set_win_len(board_len: int) -> int:
-#     return board_len//4 + 3
+THREE_POW: tuple[int]
+"""
+Contains BOARD_LEN**2 + 1 elements. The ith element is the place value of digit i in a base3 number.
+For BOARD_LEN = 3,
+    - 0th element is 3**8 (place value of 1st digit)
+    - 8th element is 3**0 (place value of 8th digit)
+"""
+
+win_table: set[int] = set()
+"""Cross-file; transposition table that stores board seen as won."""
+
+WIN_SCORE: int = 1
+
+EMPTY_BOARD: int
+"""Empty board where the first player will be 1."""
 
 
-def set_vars(tk_board_len: int | None = None, tk_win_len: int | None = None):
-    """
-    Assign values to all the cross-file variables.
-    """
-    global three_pow, board_len, win_len, bln_sub1, bln_add1, max_y_ind, half_win_len, bln_sub_hwl, bln_mul_hwl, bln_add1_mul_hwl, bln_sub1_mul_hwl
+# ==============
+#  AI Functions
+# ==============
+
+def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -> None:
+    global THREE_POW, BOARD_LEN, BOARD_AREA, WIN_LEN, SW_VEC, SE_VEC, BOTTOM_ROW, HALF_W_LEN, HALF_W_LEN_INV, S_VEC_HALF_W_LEN, SE_VEC_HALF_W_LEN, SW_VEC_HALF_W_LEN, EMPTY_BOARD
 
     if tk_board_len:
-        three_pow = tuple(3 ** place_val for place_val in range(tk_board_len ** 2 - 1, -1, -1))  # counter is reversed as the order of place values is the reverse of index order
-
-        board_len = tk_board_len
-        bln_sub1 = board_len - 1
-        bln_add1 = board_len + 1
-        max_y_ind = board_len * bln_sub1
-
-        cell_to_line = [[]] * board_len
+        THREE_POW = tuple(3 ** place_val for place_val in range(tk_board_len ** 2, -1, -1))  # counter is reversed since place values increase from left to right
+        BOARD_LEN = tk_board_len
+        BOARD_AREA = BOARD_LEN ** 2
+        SW_VEC = BOARD_LEN - 1
+        SE_VEC = BOARD_LEN + 1
+        BOTTOM_ROW = BOARD_LEN * SW_VEC
+        EMPTY_BOARD = THREE_POW[BOARD_AREA] * 2  # set player before first player as 2
 
     if tk_win_len:
-        win_len = tk_win_len
-        half_win_len = win_len // 2
+        WIN_LEN = tk_win_len
+        HALF_W_LEN = WIN_LEN // 2
 
-    bln_sub_hwl = board_len - half_win_len
-    bln_mul_hwl = board_len * half_win_len
-    bln_add1_mul_hwl = bln_add1 * half_win_len
-    bln_sub1_mul_hwl = bln_sub1 * half_win_len
+    HALF_W_LEN_INV = BOARD_LEN - HALF_W_LEN
+    S_VEC_HALF_W_LEN = BOARD_LEN * HALF_W_LEN
+    SE_VEC_HALF_W_LEN = SE_VEC * HALF_W_LEN
+    SW_VEC_HALF_W_LEN = SW_VEC * HALF_W_LEN
 
-    black_table.clear()
+    win_table.clear()
 
 
-def opp(original: int) -> int:
+def sq_of(y: int, x: int) -> int:
+    return y * BOARD_LEN + x
+
+
+def opp_of(plyr: 1 | 2) -> 1 | 2:
     """
-    (opponent)
-    Returns 1 when input 2; 2 when input 1.
+    :return:
+        Opponent of given player.
     """
-    return 3 - original
+    return 3 - plyr
 
 
-def convert_symbol(base3: int, show_empty: bool = False) -> str:
+def plyr_at(board: int, sq: int) -> 0 | 1 | 2:
     """
-    Converts a symbol from base3 to readable character.
+    :return:
+        Number representation of player at given square.
     """
-    if base3 == 1:
+    return board // THREE_POW[sq] % 3
+
+
+def char_of(plyr: 1 | 2, show_empty: bool = False) -> str:
+    """
+    :return:
+        Letter representation of given player.
+    """
+    if plyr == 1:
         return 'X'
-    elif base3 == 2:
+    elif plyr == 2:
         return 'O'
-    elif base3 == 0 and show_empty:
+    elif plyr == 0 and show_empty:
         return '∟'
 
 
-def get_symbol(board: int, ind: int) -> int:
+def plyr_of(board: int) -> 1 | 2:
     """
-    Extracts the base3 symbol of the cell of given index.
+    :return: Player who made the last move.
     """
-    return board // three_pow[ind] % 3
+    return plyr_at(board, BOARD_AREA)  # board has hidden digit at the end to store last player
 
 
-def move(board: int, plyr: int, ind: int) -> int:
+def place(board: int, sq: int, graph: nx.DiGraph | None = None) -> int:
     """
-    :return: board after placing plyr at ind.
+    :return: Board and graph (optional) after placing given player.
     """
-    return board + plyr * three_pow[ind]
+    plyr: 1 | 2 = plyr_of(board)
+    child_board = (board
+                   + opp_of(plyr) * THREE_POW[sq]
+                   + (opp_of(plyr) - plyr) * THREE_POW[BOARD_AREA])  # update current player
+    if graph is not None:
+        graph.add_edge(board, child_board, label=sq)
+    return child_board
 
 
+def unplace(board: int, sq: int) -> int:
+    return board - plyr_of(board) * THREE_POW[sq]  # don't update current player since for vanish mode
+
+
+def sort_moves(board: int, move: int) -> list[int]:
+    """
+    A move GENERALLY has higher priority if:
+        Square is connected to, or at the back of another square connected to, either end of a line formed by current player.
+        However, priority varies with dist to move and the number of connected lines.
+
+    A move GENERALLY has low priority if:
+        Square has adjacent player. However, priority varies with dist to move and the number of adjacent players.
+
+    Optimization: Sorting allows prunning low-priority moves that are unlikely to change the result.
+    """
+    plyr: 1 | 2 = plyr_of(board)
+    move_y, move_x = divmod(move, BOARD_LEN)
+
+    moves = {}  # key = square, value = priority
+
+    for sq in range(BOARD_AREA):
+        if not plyr_at(board, sq):
+            y, x = divmod(sq, BOARD_LEN)
+            move_d = max(abs(y - move_y), abs(x - move_x))  # calculate Chebyshev distance
+
+            moves[sq] = moves.get(sq, 0) - move_d  # set distance-dependent base priority
+
+            for dir_x, dir_y in ADJ:
+                fwd1_x, fwd1_y = x + dir_x, y + dir_y
+
+                if 0 <= fwd1_x < BOARD_LEN and 0 <= fwd1_y < BOARD_LEN and plyr_at(board, sq_of(fwd1_y, fwd1_x)) == plyr:  # if square has an adjacent player
+                    moves[sq] += BOARD_LEN  # +BOARD_LEN ensures the furthest square with 1 adjacent player has higher priority than the closest isolated square
+
+                    fwd2_x, fwd2_y = fwd1_x + dir_x, fwd1_y + dir_y
+
+                    if 0 <= fwd2_x < BOARD_LEN and 0 <= fwd2_y < BOARD_LEN and plyr_at(board, sq_of(fwd2_y, fwd2_x)) == plyr:  # if square is connected to either end of a line
+                        moves[sq] += BOARD_LEN * 8  # +BOARD_LEN * 8 ensures the furthest square connected to 1 line has higher priority than a square surrounded by 8 players
+
+                        back1_x, back1_y = x - dir_x, y - dir_y
+
+                        if 0 <= back1_x < BOARD_LEN and 0 <= back1_y < BOARD_LEN:  # if square is at the back of another square connected to either end of a line
+                            back1_sq = sq_of(back1_y, back1_x)
+
+                            if not plyr_at(board, back1_sq):
+                                moves[back1_sq] = moves.get(back1_sq, 0) + BOARD_LEN * 8
+
+    return sorted(moves, key=moves.get, reverse=True)
+
+
+def win_dir(board: int, move: int) -> str | None:
+    return [
+        None,
+        "vertically",
+        "horizontally",
+        "from top left to down right",
+        "from top right to down left"
+    ][is_win(board, move)]
+
+
+def is_win(board: int, move: int) -> int:
+    # Optimizations:
+    # 1. only check for the row/col/diagonals connected to the last move
+    # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
+    # 3. precalculate constants
+
+    plyr: 1 | 2 = plyr_of(board)
+    move_y, move_x = divmod(move, BOARD_LEN)
+    start: int
+    end: int
+
+    # check column
+    # is the first block as it is the fastest to complete
+    if ((move_y >= HALF_W_LEN and plyr_at(board, move - S_VEC_HALF_W_LEN) == plyr) or
+            (move_y < HALF_W_LEN_INV and plyr_at(board, move + S_VEC_HALF_W_LEN) == plyr)):
+
+        start = move
+        while (start >= BOARD_LEN) and plyr_at(board, start - BOARD_LEN) == plyr:
+            start -= BOARD_LEN
+        end = move
+        while (end < BOTTOM_ROW) and plyr_at(board, end + BOARD_LEN) == plyr:
+            end += BOARD_LEN
+
+        if end // BOARD_LEN - start // BOARD_LEN + 1 >= WIN_LEN:
+            return 1
+
+    # check row
+    if ((move_x >= HALF_W_LEN and plyr_at(board, move - HALF_W_LEN) == plyr) or
+            (move_x < HALF_W_LEN_INV and plyr_at(board, move + HALF_W_LEN) == plyr)):
+
+        start = move
+        while (start % BOARD_LEN > 0) and plyr_at(board, start - 1) == plyr:
+            start -= 1
+        end = move
+        while (end % BOARD_LEN < SW_VEC) and plyr_at(board, end + 1) == plyr:
+            end += 1
+
+        if end - start + 1 >= WIN_LEN:
+            return 2
+
+    # check top left to down right
+    if ((move_y >= HALF_W_LEN <= move_x and plyr_at(board, move - SE_VEC_HALF_W_LEN) == plyr) or
+            (move_y < HALF_W_LEN_INV > move_x and plyr_at(board, move + SE_VEC_HALF_W_LEN) == plyr)):
+
+        start = move
+        while (start >= BOARD_LEN) and (start % BOARD_LEN > 0) and plyr_at(board, start - SE_VEC) == plyr:
+            start -= SE_VEC
+        end = move
+        while (end < BOTTOM_ROW) and (end % BOARD_LEN < SW_VEC) and plyr_at(board, end + SE_VEC) == plyr:
+            end += SE_VEC
+
+        if (end // BOARD_LEN - start // BOARD_LEN) + 1 >= WIN_LEN:
+            return 3
+
+    # check top right to down left
+    if ((move_y >= HALF_W_LEN and move_x < HALF_W_LEN_INV and plyr_at(board, move - SW_VEC_HALF_W_LEN) == plyr) or
+            (move_y < HALF_W_LEN_INV and move_x >= HALF_W_LEN and plyr_at(board, move + SW_VEC_HALF_W_LEN) == plyr)):
+
+        start = move
+        while (start >= BOARD_LEN) and (start % BOARD_LEN < SW_VEC) and plyr_at(board, start - SW_VEC) == plyr:
+            start -= SW_VEC
+        end = move
+        while (end < BOTTOM_ROW) and (end % BOARD_LEN > 0) and plyr_at(board, end + SW_VEC) == plyr:
+            end += SW_VEC
+
+        if (end // BOARD_LEN - start // BOARD_LEN) + 1 >= WIN_LEN:
+            return 4
+
+    return 0
+
+
+def exhaust(gen: "collections.Iterator[int]") -> int:
+    """
+    Exhaust all yield values in a generator function and get the return value.
+    """
+    try:
+        while True:
+            next(gen)
+    except StopIteration as e:
+        return e.value
+
+
+def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph | None) -> "collections.Iterator[int] | int":
+    """
+    At root, player is human.
+    Uses Alpha-Beta-Negamax-ish Algorithm:
+        Current loses if any child wins.
+        Current wins if all child loses.
+
+    Uses generator function's lazy evaluation when iterated to fake multithreading.
+    :yield:
+        Move in moves in order, until after finding the best move.
+
+    :return:
+        WIN_SCORE: current wins
+        0: current ties
+        -WIN_SCORE: current loses
+    """
+
+    def child_is_leaf() -> bool:
+        return len(moves) == 1  # not 0 since move not popped yet
+
+    child_board: int
+    best_child_score: int = -WIN_SCORE
+
+    for i, move in enumerate(moves):
+        yield move
+        child_board = place(board, move)
+
+        # since any child wins, curr loses
+        if child_board in win_table:
+            return -WIN_SCORE
+
+        if is_win(child_board, move):
+            win_table.add(child_board)
+            return -WIN_SCORE
+
+        # must come after is_win()
+        if child_is_leaf():
+            continue
+
+        del moves[i]  # optimization: don't modify for win & leaf nodes
+
+        best_child_score = max(
+            best_child_score,
+            exhaust(recur_search(
+                place(board, move, graph),
+                moves, False, graph)
+            )
+        )
+        moves.insert(i, move)
+
+        # since any child wins, current loses (alpha-beta prunning with alpha = best_child_score, beta = WIN_SCORE)
+        if best_child_score == WIN_SCORE:
+            win_table.add(child_board)
+
+            if is_root and graph is not None:
+                print_tree(graph, recip_tree_pos(graph, board))
+
+            return -WIN_SCORE
+
+    # since all child lose, current wins
+    if best_child_score == -WIN_SCORE:
+        return WIN_SCORE
+
+    # base case: tie
+    return 0
+
+
+def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "collections.Iterator[int]":
+    """
+    See also :func:`recur_search()` for player at root.
+
+    Algorithm:
+        When traversing down (visit):
+            Current loses if any child wins -> pops current -> no revisit.
+            Current wins if all childs lose -> current stays -> will revisit.
+
+        When traversing up (revisit):
+            All revisited nodes must have won -> parent loses -> pops siblings & parent.
+
+    Inspired by codons in RNA.
+    """
+
+    def child_is_leaf() -> bool:
+        return len(moves) == 1  # not 0 since move not popped yet
+
+    class Node:
+        """
+        :param move: Move that created this child, already placed on board.
+        :param parent_ptr: Only root node's move = None and parent_ptr = None.
+        """
+        move: int | None
+        board: int
+        parent_ptr: int | None
+        is_visited: bool
+
+        def __init__(self, move: int | None, board: int, parent_ptr: int | None):
+            self.move = move
+            self.board = board
+            self.parent_ptr = parent_ptr
+            self.is_visited = False
+
+        def visit(self) -> "collections.Iterator[int]":
+            self.is_visited = True
+
+            if not self.is_root():
+                moves.remove(self.move)  # optimization: don't modify until visit
+
+            curr_ptr: int = s.size - 1
+            child_board: int
+
+            for move in moves:
+                yield move
+                child_board = place(self.board, move, graph)
+
+                # since any child wins, current loses
+                # discard current node & all childs including those already pushed
+                if child_board in win_table:
+                    s.pop_all(curr_ptr)
+                    break
+
+                if is_win(self.board, move):
+                    win_table.add(child_board)
+                    s.pop_all(curr_ptr)
+                    break
+
+                # must come after is_win()
+                if child_is_leaf():
+
+                    # treat human tie leaf as lose
+                    # do not append it to avoid revisit
+                    if plyr_of(child_board) == HUMAN:
+                        continue
+
+                    # treat bot tie leaf as win
+                    else:
+                        s.pop_all(curr_ptr)
+                        break
+
+                s.push(Node(move, child_board, curr_ptr))
+
+        def revisit(self) -> int:
+            s.pop()
+            # node must have won to stay
+            win_table.add(self.board)
+
+            # since parent loses, pop siblings & parent
+            # if root is popped, outer loop (while s.size) will stop
+            s.pop_all(self.parent_ptr)
+            return self.move
+
+        def is_root(self) -> bool:
+            return self.parent_ptr is None
+
+        def parent_is_root(self) -> bool:
+            return self.parent_ptr == 0
+
+        def __repr__(self) -> str:
+            return f"(Move: {self.move}, Player: {char_of(plyr_of(self.board))}, Board: {"Root" if self.is_root() else self.board}{", Visited" if self.is_visited else ""})"
+
+    class Stack:
+        stack: list[Node | None] = [None] * sum(range(1, len(moves) + 1))  # preallocate size. Max size is (n) + (n-1) + (n-2) + ... + 1, where n = len(moves).
+        size: int = 0
+
+        def peek(self) -> Node:
+            return self.stack[self.size - 1]
+
+        def pop(self) -> None:
+            """
+            Pop and add the popped node's move back into moves.
+            """
+            self.size -= 1
+            moves.add(self.stack[self.size].move)
+
+        def pop_all(self, new_size: int) -> None:
+            """
+            Pop multiple elements at once, from the top to new_size (inclusive).
+            Add the last popped node's move back into moves.
+            """
+            self.size = new_size
+            moves.add(self.stack[self.size].move)
+
+        def push(self, node: Node) -> None:
+            self.stack[self.size] = node
+            self.size += 1
+
+        def __repr__(self) -> str:
+            return f"{list(node for i, node in enumerate(self.stack) if i < self.size)}"
+
+    HUMAN: int = plyr_of(root_board)
+    s: Stack = Stack()
+    s.push(Node(None, root_board, None))
+
+    while s.size != 0:
+        curr: Node = s.peek()
+        if curr.is_visited:
+            if curr.parent_is_root():
+                yield curr.revisit()  # final move
+            else:
+                curr.revisit()
+        else:
+            if curr.is_root():
+                yield from curr.visit()  # move in moves
+            else:
+                exhaust(curr.visit())
+
+    if graph:
+        print_tree(graph, recip_tree_pos(graph, root_board))
+
+
+def bot_iter_v2(root_board: int, bot: int, moves: set):
+    for root_move in moves:
+        yield root_move
+
+        stack = [(root_board, root_move, moves.difference({root_move}), bot, eldest_ptr := 0,)]
+
+        def truncate(new_size: int):
+            del stack[new_size:]
+
+        def is_eldest():
+            return eldest_ptr == len(stack)  # if eldest pointer is pointing to its own square
+
+        while stack:
+            parent_board, move, moves, plyr, eldest_ptr = stack.pop()
+
+            board = place(parent_board, plyr, move)
+
+            if is_win(parent_board, plyr, move) or (len(moves) == 0 and plyr == bot):
+                win_table.add(parent_board)
+                if stack:
+                    ww_board, _, _, parent_plyr, parent_eldest_ptr = stack[eldest_ptr - 1]
+
+                    if parent_plyr == plyr:
+                        win_table.add(ww_board)
+                        truncate(parent_eldest_ptr)  # pop parent and all its siblings and children
+                        if not stack and bot == parent_plyr:
+                            return
+                        continue
+
+                    else:
+                        truncate(eldest_ptr)  # pop curr and all its siblings
+                        if not stack and bot == plyr:
+                            return
+                        continue
+
+                elif bot == plyr:
+                    return
+
+            elif len(moves) == 0 and is_eldest() and plyr == opp_of(bot):
+                win_table.add(board)
+                if stack:
+                    ww_board, _, _, parent_plyr, parent_eldest_ptr = stack[-1]
+
+                    if parent_plyr == plyr:
+                        continue
+
+                    elif parent_plyr != plyr:
+                        truncate(parent_eldest_ptr)  # pop parent and all its siblings
+                        if not stack and bot == parent_plyr:
+                            return
+                        continue
+
+                elif bot != plyr:
+                    return
+
+            else:
+                board = place(parent_board, plyr, move)
+
+                child_plyr = opp_of(plyr)
+                child_eldest_ptr = len(stack)
+                for child_move in moves:
+                    stack.push((board, child_move, moves.difference({child_move}), child_plyr, child_eldest_ptr,))
+
+
+def snake_gen_moves(board: int, y0: int, x0: int) -> "collections.Iterator[tuple[int, int]]":
+    for dir_x, dir_y in ADJ:
+        y1 = y0 + dir_y
+        x1 = x0 + dir_x
+
+        if 0 <= y1 < BOARD_LEN and 0 <= x1 < BOARD_LEN and not plyr_at(board, sq_of(y1, x1)):
+            yield y1, x1
+
+
+def snake_search(board: int, y0: int, x0: int, y_child: int, x_child: int, is_root: bool, graph: nx.DiGraph | None) -> "collections.Iterator[int] | int":
+    """
+    :param y0:
+    :param x0: square that the given player last placed
+    :param y_child:
+    :param x_child: square that the other player last placed
+
+    See also :func:`recur_search()`
+    """
+
+    best_child_score: int
+    child_board: int
+
+    for y1, x1 in snake_gen_moves(board, y0, x0):
+        move = sq_of(y1, x1)
+        yield move
+        child_board = place(board, move, graph)
+
+        # base case: win
+        if child_board in win_table:
+            return WIN_SCORE
+
+        if is_win(child_board, move):
+            win_table.add(child_board)
+            return WIN_SCORE
+
+        best_child_score = max(best_child_score, exhaust(snake_search(child_board, y_child, x_child, y1, x1, False, graph)))
+
+        # lose (technically alpha-beta prunning)
+        if best_child_score == WIN_SCORE:
+            win_table.add(child_board)
+            return -WIN_SCORE
+
+    # win
+    if best_child_score == -WIN_SCORE:
+
+        if is_root and graph is not None:
+            print_tree(graph, recip_tree_pos(graph, board))
+
+        return WIN_SCORE
+
+    # base case: tie
+    return 0
+
+
+def prob_ai(root_board: int, moves: list[int], has_graph: bool) -> "collections.Iterator[int]":
+    """
+    Traverse the entire tree to get each root node's weighted win probability ((# win leaf childs - # lose leaf childs) / (# win leaf childs + # lose leaf childs)).
+    Closest to actual machine learning, but least effecient.
+    Has Statraps (Statistical Traps): a node with the least lose childs but always lose if best play.
+
+    See also :func:`recur_search()` for player at root.
+    """
+
+    def traverse(board: int) -> tuple[int, int]:
+        """
+        :return:
+            child_score (# win leaf childs - # lose leaf childs)
+            child_num (# win leaf childs + # lose leaf childs)
+        """
+
+        def is_root() -> bool:
+            return board == root_board
+
+        def score_by_depth() -> int:
+            if plyr_of(child_board) == HUMAN:
+                # reward
+                # len(moves) for depth bonus
+                # //2 to only count the layers with the player's turn
+                # +1 because len(moves) can be 0
+                return len(moves) // 2 + 1
+            else:
+                # penalize
+                return len(moves) // 2 - 1
+
+        child_score: int
+        child_num: int
+
+        for i, move in enumerate(moves):
+            child_board: int = place(board, move)
+
+            # base case: win
+            if is_win(child_board, move):
+                child_score += score_by_depth()
+                child_num += 1
+
+            else:
+                del moves[i]
+                child_score, child_num = (
+                    x + y for x, y in zip(
+                    (child_score, child_num),
+                    traverse(child_board))
+                )
+                moves.insert(i, move)
+
+            if is_root() and child_num > 0:
+                wscores[move] = child_score / child_num
+                child_score = 0
+                child_num = 0
+
+        return child_score, child_num
+
+    wscores = {move: 0.0 for move in moves}  # key = root move, val = its score
+    HUMAN: int = plyr_of(root_board)
+    traverse(root_board)
+
+    if has_graph:
+        plt.Figure()
+        bar = plt.bar(list(wscores.keys()), list(wscores.values()), color="MediumSpringGreen")
+        plt.bar_label(bar, label_type="center")
+        plt.locator_params(axis="x")  # set x tick interval
+        plt.xlabel("Root Move")
+        plt.ylabel("Weighted Win Probability")
+        plt.title(f"{plt.gca().get_ylabel()} of each {plt.gca().get_xlabel()}")
+        plt.show(block=False)
+
+    # list root_move(s) with the max wscore to pick randomly
+    yield random.choice(  # DO NOT use return
+        [move for move, score in
+         wscores.items()
+         if score == max(wscores.values())]
+    )
+    return None
+
+
+# ==================
+# Graphing Functions
+# ==================
 def print_board(board: int, show_axis: bool = True) -> str:
-    """
-    Returns the decoded board as a single string in the following format:
-
-    If 'show_axis' is True,
-
-         1  2  3  ...\n
-    1  ∟ ∟ ∟...\n
-    2  ∟ ∟ ∟...\n
-    3  ∟ ∟ ∟...\n
-    ...
-
-    If 'show_axis' is False,
-
-      ∟ ∟ ∟...\n
-      ∟ ∟ ∟...\n
-      ∟ ∟ ∟...\n
-    ...
-    """
-    output = ''
+    """Does not print to console, only return as string."""
+    output = ""
     if show_axis:
-        # print the col axis
-        output += ' ' * 3
-        for i in range(board_len):
+        # x axis
+        output += " " * 3
+        for i in range(BOARD_LEN):
             str_i = str(i)
-            output += str_i + ' ' * (3 - len(str_i))
-        output += '\n'
+            output += str_i + " " * (3 - len(str_i))
+        output += "\n"
 
-    for i in range(board_len):
+    for y in range(BOARD_LEN):
         if show_axis:
-            # print the row axis
+            # y axis
             str_i = str(i)
-            output += str_i + ' ' * (3 - len(str_i))
+            output += str_i + " " * (3 - len(str_i))
 
-        for ii in range(i*board_len, (i+1)*board_len):
-            output += convert_symbol(get_symbol(board, ii), show_empty=True) + ' ' * 2  # print the symbols in the row
-        output += '\n'
+        for x in range(BOARD_LEN):
+            output += char_of(plyr_at(board, sq_of(y, x)), show_empty=True) + " " * 2  # print rows
+        output += "\n"
 
     return output
 
 
-def print_graph(tree, pos: dict, edge_labels: dict):
-
-    def recapture_bg(*args):
+def print_tree(tree: nx.DiGraph, pos: dict):
+    def recapture_bg(_=None):
         """Retake screenshot after zoom or pan."""
         nonlocal bg
         fig.canvas.draw()  # redraw canvas to get correct bbox
@@ -169,19 +738,20 @@ def print_graph(tree, pos: dict, edge_labels: dict):
             children = list(tree.successors(node))
 
             fig_text.set_text(
-                f'Node: {node}\n'
-                f'Decoded:\n{print_board(node, show_axis=False)}'  # already included \n at the end
-                f'{len(parents)} Parent: {parents}\n'
-                f'{len(parents)} Eldest Sibling: {[next(tree.successors(parent)) for parent in parents]}\n'
-                f'{max(dict(tree.out_degree()).values()) + (pos[node][1] + 1) - len(children)} Skipped Children*\n'  # total # of children of root (assume root has max # of children) - # of layers away from root (root = -1) + # of visited children
-                f'{len(children)} Visited Children: {children}'
+                f"Node: {node}\n"
+                f"Decoded:\n{print_board(node, show_axis=False)}"
+                f"{len(parents)} Parent: {parents}\n"
+                f"{len(parents)} Eldest Sibling: {[next(tree.successors(parent)) for parent in parents]}\n"
+                f"{max(dict(tree.out_degree()).values()) + (pos[node][1] + 1) - len(children)} Skipped Children*\n"  # total # of children of root (assume root has max # of children) - # of layers away from root (root = -1) + # of visited children
+                f"{len(children)} Visited Children: {children}"
             )
 
             # DRAW
             def on_timer():
                 nonlocal frame
-                scale = 1 + 0.5 * math.sin(math.pi * frame / 8)  # k must be integer
-                label.set_fontsize(10 * scale)  # 10 is original size of node
+                k: int = 8  # must be integer
+                scale = 1 + 0.5 * math.sin(math.pi * frame / k)
+                label.set_fontsize(10 * scale)  # 10 is moveal size of node
 
                 fig.canvas.restore_region(bg)  # revert background to erase previous frame
                 fig.draw_artist(fig_text)  # show temporary fig_text while waiting for label animation
@@ -200,80 +770,80 @@ def print_graph(tree, pos: dict, edge_labels: dict):
 
         else:
             fig_text.set_text(
-                f'Total # of Nodes: {tree.number_of_nodes()}'
+                f"Total # of Nodes: {tree.number_of_nodes()}"
             )
             fig.canvas.draw_idle()
 
     def on_move(event):
-        """If mouse hover over a node, change the cursor to hand2."""
+        """If mouse hover over a node, change cursor to hand2."""
         is_node, info = fig_nodes.contains(event)
-        fig.canvas.get_tk_widget().config(cursor='hand2' if is_node else '')
+        fig.canvas.get_tk_widget().config(cursor="hand2" if is_node else "")
 
-    tree_2d = list(tree.nodes)
+    tree_2d: list = list(tree.nodes)
 
     fig = plt.figure()
-    plt.title('Simulated Nodes under the Chosen Initial Node', fontdict={'family': 'Consolas', 'size': 12})
-    plt.axis('off')
+    plt.axis("off")
     plt.tight_layout()
 
     # draw nodes and edges separately to set picker on nodes
     fig_nodes = nx.draw_networkx_nodes(
-        tree, pos, node_shape='s', alpha=0.0
+        tree, pos, node_shape="s", alpha=0.0
     )
+    # noinspection PyTypeChecker
     fig_nodes.set_picker(True)
 
-    fig_labels = {}
+    fig_labels: dict = {}
     for node, (x, y) in pos.items():  # replaced nx.draw_networkx_labels to color each label separately
         fig_labels[node] = plt.text(
             x, y, node,
-            ha='center', va='center',
-            bbox=dict(facecolor='SeaGreen' if node in black_table else 'MediumSpringGreen', boxstyle='round', pad=0.4, linewidth=0.5),
-            color='white' if node in black_table else 'black',
-            family='Arial', weight='bold', size=10
+            ha="center", va="center",
+            bbox=dict(facecolor="SeaGreen" if node in win_table else "MediumSpringGreen", boxstyle="round", pad=0.4, linewidth=0.5),
+            color="white" if node in win_table else "black",
+            family="Arial", weight="bold", size=10
         )
 
     nx.draw_networkx_edges(
         tree, pos, arrows=False, alpha=0.75
     )
     nx.draw_networkx_edge_labels(
-        tree, pos, edge_labels,
-        bbox=dict(facecolor='white', edgecolor='none', alpha=0.5, boxstyle='circle', pad=0),
-        font_color='crimson', font_family='Arial', font_size=10, rotate=False
+        tree, pos, nx.get_edge_attributes(tree, "label"),
+        bbox=dict(facecolor="white", edgecolor="none", alpha=0.5, boxstyle="circle", pad=0),
+        font_color="crimson", font_family="Arial", font_size=10, rotate=False
     )
 
     bg = None
     recapture_bg()  # screenshot background WITHOUT fig_text
 
     fig_text = plt.text(
-        0.0, 0.0, f'Total # of Nodes: {tree.number_of_nodes()}',
+        0.0, 0.0, f"Total # of Nodes: {tree.number_of_nodes()}\nClick a node to show details",
         transform=plt.gca().transAxes,  # use axes fraction for positioning
-        bbox=dict(facecolor='white', edgecolor='gray', alpha=0.8, boxstyle='square', pad=0.75),
-        family='Consolas', linespacing=1.5
+        bbox=dict(facecolor="white", edgecolor="gray", alpha=0.8, boxstyle="square", pad=0.75),
+        family="Consolas", linespacing=1.5
     )
 
-    fig.gca().callbacks.connect('xlim_changed', recapture_bg)
-    fig.gca().callbacks.connect('ylim_changed', recapture_bg)
-    fig.canvas.mpl_connect('resize_event', recapture_bg)
-    fig.canvas.mpl_connect('button_press_event', on_click)
-    fig.canvas.mpl_connect('motion_notify_event', on_move)
+    fig.gca().callbacks.connect("xlim_changed", recapture_bg)
+    fig.gca().callbacks.connect("ylim_changed", recapture_bg)
+    fig.canvas.mpl_connect("resize_event", recapture_bg)
+    fig.canvas.mpl_connect("button_press_event", on_click)
+    fig.canvas.mpl_connect("motion_notify_event", on_move)
     plt.show(block=True)
 
 
-def fac_tree_layout(tree, root=None) -> dict:
+def fac_tree_pos(tree, root=None) -> dict:
     """
-    Creates a hierarchical layout for a directed factorial tree graph. Property of a factorial tree graph:
-        - each node has at least one less children than its parent
-
-    Use case:
-        - when you don't know the maximum number of children, but you know the maximum number of layers
+    Creates a hierarchical layout for a directed factorial tree.
+    In a factorial tree, each node has at least one less children than its parent
+    Use this when you don't know the maximum number of children, but you know the maximum number of layers
 
     :param tree: networkx graph object (must be directed).
     :param root: root node of the tree (if None, chooses an arbitrary node).
-    :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
+    :return:
+        Dictionary with key = node, val = coord of the node saved as a tuple (x, y).
     """
+
     def assign_pos(layer: int, children, parent_x: float):
         """
-        Recursively updating coord of parent nodes and calculating coord of child nodes.
+        Recursively update coord of parent nodes and calculate coord of child nodes.
         """
         if children:
             layer_neg1 = layer - 1
@@ -281,9 +851,9 @@ def fac_tree_layout(tree, root=None) -> dict:
             sep_dist = factorials[layer + 1] / max(1, sep_count)  # separation distance between each child
 
             # assign positions for each child
-            start_x = parent_x - (sep_count/2) * sep_dist
+            start_x = parent_x - (sep_count / 2) * sep_dist
             for i, child in enumerate(children):
-                child_x = start_x + i*sep_dist
+                child_x = start_x + i * sep_dist
                 pos[child] = (child_x, layer_neg1)
                 assign_pos(layer_neg1, list(tree.successors(child)), child_x)
 
@@ -292,37 +862,32 @@ def fac_tree_layout(tree, root=None) -> dict:
 
     root_children = list(tree.successors(root))
     max_layer = len(root_children)  # the maximum number of layers, assuming the bottommost layer is 1
-    factorials = tuple(math.factorial(layer) for layer in range(max_layer+2))
+    factorials = tuple(math.factorial(layer) for layer in range(max_layer + 2))
 
     pos = {root: (0, max_layer)}
     assign_pos(max_layer, root_children, 0.0)
     return pos
 
 
-def recip_tree_layout(tree, root=None) -> dict:
+def recip_tree_pos(tree, root=None) -> dict:
     """
-    Creates a hierarchical layout for a directed reciprocal tree graph. Property of a reciprocal tree graph:
-        - each node from any layer has a maximum of *n* children
+    Creates a hierarchical layout for a directed reciprocal tree.
+    In a reciprocal tree, every node has n or fewer children.
+    Use this when you don't know the maximum number of layers, but you know the maximum number of children.
 
-    Use case:
-        - when you don't know the maximum number of layers, but you know the maximum number of children
-
-    :param tree: networkx graph object (must be directed).
-    :param root: root node of the tree (if None, chooses an arbitrary node).
-    :return: dictionary whose key = node, val = coord of the node saved as a tuple (x, y).
+    See :func:`fac_tree_pos()` for params and return.
     """
+
     def assign_pos(layer: int, children, parent_x: float):
-        """
-        Recursively updating coord of parent nodes and calculating coord of child nodes.
-        """
+        """See :func:`assign_pos()` in :func:`fac_tree_pos()`"""
         if children:
             layer_neg1 = layer - 1
-            sep_dist = max_sep_count**layer  # separation distance between each child. DO NOT use 1/(max_sep_count**layer) as layer is negative.
+            sep_dist = max_sep_count ** layer  # separation distance between each child. DO NOT use 1/(max_sep_count**layer) as layer is negative.
 
             # assign positions for each child
-            start_x = parent_x - (len(children)-1)/2 * sep_dist
+            start_x = parent_x - (len(children) - 1) / 2 * sep_dist
             for i, child in enumerate(children):
-                child_x = start_x + i*sep_dist
+                child_x = start_x + i * sep_dist
                 pos[child] = (child_x, layer_neg1)
                 assign_pos(layer_neg1, list(tree.successors(child)), child_x)
 
@@ -335,635 +900,3 @@ def recip_tree_layout(tree, root=None) -> dict:
     pos = {root: (0, 0)}
     assign_pos(0, root_children, 0.0)
     return pos
-
-
-# ALL FUNCTIONS BELOW ARE FOR THE AI
-def prune(plyr: int, board: int, origin: int) -> list:
-    """
-    Limits indexes that PC can simulate to the 15 empty indexes with the highest priority.
-    Assigns priority to indexes accordingly:
-        1. if index is connected to, or at the back of another index connected to, either end of a line formed by player: within the high priorities; varies with dist to origin and the number of connected lines.
-        2. index has adjacent player cell -> within the low priorities; varies with dist to origin and the number of adjacent player cells.
-    :return: simmable_inds (simulatable indexes): a list containing the indexes that AI can simulate
-    """
-    # convert origin to coords
-    origin_x, origin_y = origin % board_len, origin // board_len
-
-    ind_priority = {}  # key = index of cell, value = priority
-
-    for ind in range(board_len**2):
-        if get_symbol(board, ind) == 0:
-            x, y = ind % board_len, ind // board_len
-            origin_d = max(abs(y - origin_y), abs(x - origin_x))  # calculate Chebyshev distance
-
-            ind_priority[ind] = ind_priority.get(ind, 0) - origin_d  # set distance-dependent base priority
-
-            for dir_x, dir_y in relative_adj:
-                fwd1_x, fwd1_y = x + dir_x, y + dir_y
-
-                if 0 <= fwd1_x < board_len and 0 <= fwd1_y < board_len and get_symbol(board, fwd1_y * board_len + fwd1_x) == plyr:  # if ind has an adjacent player cell
-                    ind_priority[ind] += board_len  # +board_len ensures the furthest index with 1 adjacent player cell has higher priority than the closest lone index
-
-                    fwd2_x, fwd2_y = fwd1_x + dir_x, fwd1_y + dir_y
-
-                    if 0 <= fwd2_x < board_len and 0 <= fwd2_y < board_len and get_symbol(board, fwd2_y * board_len + fwd2_x) == plyr:  # if ind is connected to either end of a line formed by player
-                        ind_priority[ind] += board_len * 8  # +board_len*8 ensures the furthest index connected to 1 line formed by player has higher priority than an index surrounded by 8 player cells
-
-                        back1_x, back1_y = x - dir_x, y - dir_y
-
-                        if 0 <= back1_x < board_len and 0 <= back1_y < board_len:  # if ind is at the back of another ind connected to either end of a line formed by player
-                            back1_ind = back1_y * board_len + back1_x
-
-                            if get_symbol(board, back1_ind) == 0:
-                                ind_priority[back1_ind] = ind_priority.get(back1_ind, 0) + board_len*8
-
-    # print(f'\nIndex Priority: {ind_priority}')
-
-    simmable_inds = sorted(ind_priority, key=ind_priority.get, reverse=True)
-
-    return simmable_inds
-
-
-def plyr_win_formation(plyr: int, board: int, origin: int) -> str | None:
-
-    origin_x = origin % board_len
-    origin_y = origin // board_len
-
-    # check column
-    # I put check column as the first block as it is the fastest to complete
-    if (origin_y >= half_win_len and get_symbol(board, origin - bln_mul_hwl) == plyr) or (origin_y < bln_sub_hwl and get_symbol(board, origin + bln_mul_hwl) == plyr):
-
-        start = origin
-        while (start >= board_len) and get_symbol(board, start - board_len) == plyr:
-            start -= board_len
-        end = origin
-        while (end < max_y_ind) and get_symbol(board, end + board_len) == plyr:
-            end += board_len
-
-        if end // board_len - start // board_len + 1 >= win_len:
-            return 'vertically'
-
-    # check row
-    if (origin_x >= half_win_len and get_symbol(board, origin - half_win_len) == plyr) or (origin_x < bln_sub_hwl and get_symbol(board, origin + half_win_len) == plyr):
-
-        start = origin
-        while (start % board_len > 0) and get_symbol(board, start - 1) == plyr:
-            start -= 1
-        end = origin
-        while (end % board_len < bln_sub1) and get_symbol(board, end + 1) == plyr:
-            end += 1
-
-        if end - start + 1 >= win_len:
-            return 'horizontally'
-
-    # check top left to down right
-    if (origin_y >= half_win_len <= origin_x and get_symbol(board, origin - bln_add1_mul_hwl) == plyr) or (
-            origin_y < bln_sub_hwl > origin_x and get_symbol(board, origin + bln_add1_mul_hwl) == plyr):
-
-        start = origin
-        while (start >= board_len) and (start % board_len > 0) and get_symbol(board, start - bln_add1) == plyr:
-            start -= bln_add1
-        end = origin
-        while (end < max_y_ind) and (end % board_len < bln_sub1) and get_symbol(board, end + bln_add1) == plyr:
-            end += bln_add1
-
-        if (end // board_len - start // board_len) + 1 >= win_len:
-            return 'from top left to down right'
-
-    # check top right to down left
-    if (origin_y >= half_win_len and origin_x < bln_sub_hwl and get_symbol(board, origin - bln_sub1_mul_hwl) == plyr) or (
-            origin_y < bln_sub_hwl and origin_x >= half_win_len and get_symbol(board, origin + bln_sub1_mul_hwl) == plyr):
-
-        start = origin
-        while (start >= board_len) and (start % board_len < bln_sub1) and get_symbol(board, start - bln_sub1) == plyr:
-            start -= bln_sub1
-        end = origin
-        while (end < max_y_ind) and (end % board_len > 0) and get_symbol(board, end + bln_sub1) == plyr:
-            end += bln_sub1
-
-        if (end // board_len - start // board_len + 1) >= win_len:
-            return 'from top right to down left'
-
-    return None
-
-
-def is_win(plyr: int, board: int, origin: int) -> bool:
-    """
-    Note: This function works even if the origin cell on the board is empty.
-    :param plyr: player who made the move at 'origin'
-    :param board: same as board in pc_input_recur
-    :param origin: latest move made on the board
-    """
-    # OPTIMIZATION:
-    # 1. only check for the row/col/diagonals connected to the origin
-    # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
-    # 3. pre-calculate only once: half_win_len, bln_sub1, bln_add1, bln_sub_hwl, max_row_ind, origin_col, origin_row
-
-    origin_x = origin % board_len
-    origin_y = origin // board_len
-
-    # check column
-    # I put check column as the first block as it is the fastest to complete
-    if (origin_y >= half_win_len and get_symbol(board, origin - bln_mul_hwl) == plyr) or (origin_y < bln_sub_hwl and get_symbol(board, origin + bln_mul_hwl) == plyr):
-
-        start = origin
-        while (start >= board_len) and get_symbol(board, start - board_len) == plyr:
-            start -= board_len
-        end = origin
-        while (end < max_y_ind) and get_symbol(board, end + board_len) == plyr:
-            end += board_len
-
-        if end // board_len - start // board_len + 1 >= win_len:
-            return True
-
-    # check row
-    if (origin_x >= half_win_len and get_symbol(board, origin - half_win_len) == plyr) or (origin_x < bln_sub_hwl and get_symbol(board, origin + half_win_len) == plyr):
-
-        start = origin
-        while (start % board_len > 0) and get_symbol(board, start - 1) == plyr:
-            start -= 1
-        end = origin
-        while (end % board_len < bln_sub1) and get_symbol(board, end + 1) == plyr:
-            end += 1
-
-        if end - start + 1 >= win_len:
-            return True
-
-    # check top left to down right
-    if (origin_y >= half_win_len <= origin_x and get_symbol(board, origin - bln_add1_mul_hwl) == plyr) or (
-            origin_y < bln_sub_hwl > origin_x and get_symbol(board, origin + bln_add1_mul_hwl) == plyr):
-
-        start = origin
-        while (start >= board_len) and (start % board_len > 0) and get_symbol(board, start - bln_add1) == plyr:
-            start -= bln_add1
-        end = origin
-        while (end < max_y_ind) and (end % board_len < bln_sub1) and get_symbol(board, end + bln_add1) == plyr:
-            end += bln_add1
-
-        if (end // board_len - start // board_len) + 1 >= win_len:
-            return True
-
-    # check top right to down left
-    if (origin_y >= half_win_len and origin_x < bln_sub_hwl and get_symbol(board, origin - bln_sub1_mul_hwl) == plyr) or (
-            origin_y < bln_sub_hwl and origin_x >= half_win_len and get_symbol(board, origin + bln_sub1_mul_hwl) == plyr):
-
-        start = origin
-        while (start >= board_len) and (start % board_len < bln_sub1) and get_symbol(board, start - bln_sub1) == plyr:
-            start -= bln_sub1
-        end = origin
-        while (end < max_y_ind) and (end % board_len > 0) and get_symbol(board, end + bln_sub1) == plyr:
-            end += bln_sub1
-
-        if (end // board_len - start // board_len) + 1 >= win_len:
-            return True
-
-    return False
-
-
-def pc_input_recur(pc: int, main_board: int, simmable_inds: list, is_debugging: bool):
-    """
-    Note: This function exploits Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
-
-    :rtype: collections.Iterable[int]
-    :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
-    """
-
-    def is_white(u_board: int, u_plyr: int) -> bool:
-        """
-        'u' = current node, prefix 'u_' = belong to current node
-
-        'v' = child node, prefix 'v_' = belong to child node
-
-        'w' = parent node, prefix 'w_' = belong to parent node
-
-        Finds the path where:
-
-            - The PC has at least 1 winning move whenever it's the human's turn.
-            - The human has 0 winning move whenever it's the PC's turn.
-
-        Returns:
-            True:
-                When all children are 'black', meaning their parent's player will win, so their parent is 'white'.
-
-                - **Black**: This node lost for whoever is playing at that layer.
-                - **White**: This node won for whoever is playing at that layer.
-
-            False:
-                When any children are 'white', meaning their parent's player will lose, so their parent is 'black'.
-
-        :param u_board: the board at the parent node
-        :param u_plyr: the plyr who made the move u_origin on the u_board
-
-        """
-        v_plyr = opp(u_plyr)
-
-        if len(simmable_inds) == 1:  # if v is at the bottommost layer
-            if v_plyr == pc:  # if pc is next turn -> pc can only win/tie -> v must be white -> u must be black
-                black_table.add(u_board)
-                return False
-
-            else:  # if human is next turn -> human can win/tie/loose -> check
-                for sim_ind in simmable_inds:
-                    if is_win(v_plyr, u_board, sim_ind):  # OPTIMIZATION: v_board is not generated at the bottommost layer
-                        black_table.add(u_board)
-                        return False
-
-        else:
-            for i, sim_ind in enumerate(simmable_inds):
-                del simmable_inds[i]
-                v_board = u_board + v_plyr*three_pow[sim_ind]
-
-                if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = sim_ind
-
-                if v_board not in black_table and (is_win(v_plyr, u_board, sim_ind) or is_white(v_board, v_plyr)):
-                    simmable_inds.insert(i, sim_ind)
-                    black_table.add(u_board)
-                    return False
-
-                simmable_inds.insert(i, sim_ind)
-
-        return True
-
-    for i, root_sim_ind in enumerate(simmable_inds):
-        yield root_sim_ind
-
-        if len(simmable_inds) == 1 or is_win(pc, main_board, root_sim_ind):
-            return  # root_sim_ind is already returned by 'yield'
-
-        else:
-            del simmable_inds[i]
-            root_board = main_board + pc*three_pow[root_sim_ind]
-
-            if is_debugging: tree = nx.DiGraph(); edge_labels = {}; tree.add_edge(main_board, root_board,)
-
-            if root_board not in black_table and is_white(root_board, pc):
-                simmable_inds.insert(i, root_sim_ind)
-
-                if is_debugging:  # noinspection PyUnboundLocalVariable
-                    pos = recip_tree_layout(tree, main_board)
-                    print_graph(tree, pos, edge_labels)
-
-                return  # root_sim_ind is already returned by 'yield'
-
-            simmable_inds.insert(i, root_sim_ind)
-
-
-def pc_input_iter(pc: int, main_board: int, simmable_inds: set, is_debugging: bool):
-    """
-    Uses Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
-
-    :rtype: collections.Iterable[int]
-    :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
-    """
-    stack: list[None | tuple] = [None] * sum(range(1, len(simmable_inds) + 1))  # Preallocate list size. The largest possible size is (n) + (n-1) + (n-2) + ... + 1, where n is len(simmable_inds).
-
-    def pop() -> tuple:
-        nonlocal top
-        top -= 1
-        return stack[top]
-
-    def append(node: tuple):
-        nonlocal top
-        stack[top] = node
-        top += 1
-
-    def truncate(new_top: int):
-        """
-        Pop multiple elements in one step, from new_top (inclusive) to the end.
-        """
-        nonlocal top
-        top = new_top
-
-    for root_sim_ind in simmable_inds.copy():
-        yield root_sim_ind
-
-        if is_debugging: tree = nx.DiGraph(); edge_labels = {}
-
-        top = 0  # reset stack
-        append((root_sim_ind, None,))
-
-        while top:
-            u = pop()
-            """            
-            'u' = current node, prefix 'u_' = belong to current node
-
-            'v' = child node, prefix 'v_' = belong to child node
-
-            'w' = parent node, prefix 'w_' = belong to parent node
-
-            A node can be either of 2 types:
-                1. Typical Node:
-                    - A typical node is a tuple containing 2 elements:
-
-                        - index 0 = simulated index
-                        - index 1 (aka pointer) = index of previous marker
-
-                    - The information on the player at this node and, the board at parent node, is stored in the previous marker.
-
-                2. Marker:
-                    - A 'marker' is a tuple containing 4 elements:
-
-                        - index 0 = opponent of the former popped node
-                        - index 1 = board of the former popped node
-                        - index 2 = simulated index of the former popped node
-                        - index 3 (aka pointer) = index of previous marker
-
-                    - A marker replaces a node that can have children and has been popped. It has 2 uses:
-
-                        1. Record the player, board, and simulated index of the popped node.
-                        2. Indicate whether the former popped node was white.
-                            - if the index of the node has a marker -> the node is white.
-                            - if the index of the node does not have a marker -> the node is black.
-            """
-
-            if len(u) == 4:  # if node is marker
-                simmable_inds.add(u[2])
-                if top:
-                    # skip siblings
-                    truncate(u[3] + 1)
-
-                    # skip w
-                    w = pop()
-                    black_table.add(w[1])  # since u is white, its w must be black
-                    simmable_inds.add(w[2])
-                    if not top:
-                        break
-                continue
-
-            u_sim_ind, u_pointer = u
-            w = stack[u_pointer] if top else (pc, main_board,)  # get info from w to construct u_plyr, u_board, ...
-            u_plyr = w[0]
-            u_board = move(w[1], u_plyr, u_sim_ind)
-            v_plyr = opp(u_plyr)
-            v_pointer = top
-
-            if is_debugging: tree.add_edge(w[1], u_board,); edge_labels[(w[1], u_board,)] = u_sim_ind
-
-            if u_board in black_table:
-                if not top:
-                    break
-                continue
-
-            elif len(simmable_inds) == 2:  # if v is at the bottommost layer
-                if v_plyr == pc:  # if pc is next turn -> pc can only win/tie -> v must be white -> u must be black
-                    continue
-
-                # if human is next turn -> human can win/tie/loose -> check
-                simmable_inds.remove(u_sim_ind)
-
-                for v_sim_ind in simmable_inds:
-                    if is_win(v_plyr, u_board, v_sim_ind):  # OPTIMIZATION: v_board is not generated
-                        break
-                else:  # if inner loop did NOT break -> all v is black; if inner loop DID break -> GOTO end of loop
-                    append((v_plyr, u_board, u_sim_ind, u_pointer,))  # append marker
-                    continue
-
-            else:
-                simmable_inds.remove(u_sim_ind)
-
-                append((v_plyr, u_board, u_sim_ind, u_pointer,))  # append marker
-
-                for v_sim_ind in simmable_inds:
-                    if is_win(v_plyr, u_board, v_sim_ind):  # OPTIMIZATION: v_board is not generated
-                        truncate(v_pointer)  # pop all v and u
-                        break  # GOTO end of outer loop
-                    else:
-                        append((v_sim_ind, v_pointer,))  # append v
-
-                else:  # if inner loop did NOT break -> no v is white; if inner loop DID break -> GOTO end of loop
-                    continue
-
-            black_table.add(u_board)
-            simmable_inds.add(u_sim_ind)
-            if not top:
-                break
-
-        else:
-            if is_debugging:
-                pos = recip_tree_layout(tree, main_board)
-                print_graph(tree, pos, edge_labels)
-
-            return  # root_sim_ind is already returned by 'yield'
-
-
-def pc_input_iter_(pc: int, main_board: int, simmable_inds: set, is_debugging: bool):
-
-    for root_sim_ind in simmable_inds:
-        yield root_sim_ind
-
-        tree = nx.DiGraph(); edge_labels = {}
-
-        stack = [(main_board, root_sim_ind, simmable_inds.difference({root_sim_ind}), pc, eldest_ptr := 0,)]
-
-        def truncate(new_top: int):
-            del stack[new_top:]
-
-        def is_eldest():
-            return u_eldest_ptr == len(stack)  # if eldest pointer is pointing to its own index
-
-        while stack:
-            w_board, u_sim_ind, u_simmable_inds, u_plyr, u_eldest_ptr = stack.pop()
-
-            u_board = move(w_board, u_plyr, u_sim_ind)
-            tree.add_edge(w_board, u_board, ); edge_labels[(w_board, u_board,)] = u_sim_ind
-
-            if is_win(u_plyr, w_board, u_sim_ind) or (len(u_simmable_inds) == 0 and u_plyr == pc):
-                black_table.add(w_board)
-                if stack:
-                    ww_board, _, _, w_plyr, w_eldest_ptr = stack[u_eldest_ptr-1]
-
-                    if w_plyr == u_plyr:
-                        black_table.add(ww_board)
-                        truncate(w_eldest_ptr)  # pop w and all its siblings and children
-                        if not stack and pc == w_plyr:
-                            return
-                        continue
-
-                    else:
-                        truncate(u_eldest_ptr)  # pop u and all its siblings
-                        if not stack and pc == u_plyr:
-                            return
-                        continue
-
-                elif pc == u_plyr:
-                    return
-
-            elif len(u_simmable_inds) == 0 and is_eldest() and u_plyr == opp(pc):
-                black_table.add(u_board)
-                if stack:
-                    ww_board, _, _, w_plyr, w_eldest_ptr = stack[-1]
-
-                    if w_plyr == u_plyr:
-                        continue
-
-                    elif w_plyr != u_plyr:
-                        truncate(w_eldest_ptr)  # pop w and all its siblings
-                        if not stack and pc == w_plyr:
-                            return
-                        continue
-
-                elif pc != u_plyr:
-                    return
-
-            else:
-                u_board = move(w_board, u_plyr, u_sim_ind)
-
-                v_plyr = opp(u_plyr)
-                v_eldest_ptr = len(stack)
-                for v_sim_ind in u_simmable_inds:
-                    stack.append((u_board, v_sim_ind, u_simmable_inds.difference({v_sim_ind}), v_plyr, v_eldest_ptr,))
-
-        else:
-            pos = recip_tree_layout(tree, main_board)
-            print_graph(tree, pos, edge_labels)
-
-
-def snake_pc_input(pc: int, main_board: int, pc_y: int, pc_x: int, plyr_y: int, plyr_x: int, is_debugging: bool):
-
-    def is_white(u_board: int, u_plyr: int, grand_u_y: int, grand_u_x: int, u_y: int, u_x: int) -> bool:
-        v_plyr = opp(u_plyr)
-        has_valid = False
-
-        for dir_x, dir_y in relative_adj:
-            v_x = grand_u_x + dir_x
-            v_y = grand_u_y + dir_y
-
-            if 0 <= v_x < board_len and 0 <= v_y < board_len:
-                v_sim_ind = v_y * board_len + v_x
-
-                if get_symbol(u_board, v_sim_ind) == 0:
-                    has_valid = True
-
-                    if is_win(v_plyr, u_board, v_sim_ind):  # TODO: make is_win accept origin row, col
-                        return False
-
-                    else:
-                        v_board = move(u_board, v_plyr, v_sim_ind)
-
-                        if is_debugging: tree.add_edge(u_board, v_board, ); edge_labels[(u_board, v_board,)] = v_sim_ind
-
-                        # or if any v is white and is not at the bottommost layer yet
-                        if is_white(v_board, v_plyr, u_y, u_x, v_y, v_x):
-                            return False
-
-        return has_valid
-
-    for dir_x, dir_y in relative_adj:
-        v_x = pc_x + dir_x
-        v_y = pc_y + dir_y
-
-        if 0 <= v_x < board_len and 0 <= v_y < board_len:
-            root_sim_ind = v_y * board_len + v_x
-
-            if get_symbol(main_board, root_sim_ind) == 0:
-
-                if is_win(pc, main_board, root_sim_ind):
-                    return root_sim_ind
-
-                else:
-                    if is_debugging: tree = nx.DiGraph(); edge_labels = {}
-
-                    root_board = main_board + pc*three_pow[root_sim_ind]
-
-                    if is_white(root_board, pc, plyr_y, plyr_x, v_y, v_x):
-                        if is_debugging:  # noinspection PyUnboundLocalVariable
-                            tree.add_edge(main_board, root_board, )
-                            pos = recip_tree_layout(tree, main_board)
-                            print_graph(tree, pos, edge_labels)
-
-                        return root_sim_ind
-
-
-def czy_pc_input(pc: int, main_board: int, simmable_inds: list, is_debugging: bool):
-    """
-    Note: This function exploits Python generator function's 'lazy' evaluation (pauses until next element is called), together with iterating over this function using a 'for' loop, to achieve multithreading.
-
-    :rtype: collections.Iterable[int]
-    :return: a generator object containing the index of root nodes that are already simulated. The last element of the generator is the chosen move.
-    """
-
-    def recur(u_board: int, pc: int, u_origin: int) -> bool:
-
-        _is_win = is_win(pc, u_board, u_origin)
-
-        if _is_win:  # this layer is always pc
-            win_probs[root_sim_ind] += len(simmable_inds) + 1  # +1 because len(simmable_inds) can be 0
-
-        elif _is_win is False and simmable_inds:  # if this node has no winner and not tie yet: continue branching down
-            plyr = opp(pc)
-
-            for i, sim_ind in enumerate(simmable_inds):
-                del simmable_inds[i]
-
-                v_board = u_board + plyr*three_pow[sim_ind]
-                _is_win = is_win(plyr, v_board, sim_ind)
-
-                if _is_win:  # this layer is always player
-                    win_probs[root_sim_ind] -= len(simmable_inds) - 2
-
-                    simmable_inds.insert(i, sim_ind)
-                    return False
-
-                elif _is_win is False and simmable_inds:
-
-                    if u_origin == root_sim_ind:  # if this is the highest simulated layer
-                        all_v_lost = True
-
-                    for ii, sim_ind_ii in enumerate(simmable_inds):
-                        del simmable_inds[ii]
-
-                        v_ii_board = v_board + pc*three_pow[sim_ind]
-
-                        if recur(v_ii_board, pc, sim_ind_ii) is None and u_origin == root_sim_ind:
-                            all_v_lost = False
-
-                            simmable_inds.insert(ii, sim_ind_ii)
-                            break
-
-                        simmable_inds.insert(ii, sim_ind_ii)
-
-                    if u_origin == root_sim_ind and all_v_lost:
-                        del win_probs[root_sim_ind]
-                        # print(f'Deathtrap Found: Index {root_sim_ind}')
-
-                        simmable_inds.insert(i, sim_ind)
-                        return False
-
-                simmable_inds.insert(i, sim_ind)
-
-    def pick_init_move(plyr: int, outcomes: dict) -> int:
-        # find which root_sim_ind results in the most winning leaves
-        max_win_prob = max(outcomes.values())
-
-        # moves_pool creates a list of root_sim_ind containing the same highest win_prob to be picked randomly
-        moves_pool = [key for key, value in outcomes.items() if value == max_win_prob]
-        move = moves_pool[random.randint(0, len(moves_pool) - 1)]
-
-        return move
-
-    win_probs = {ind: 0 for ind in simmable_inds}   # key = init_move, val = win_probability of the init_move
-
-    for i, root_sim_ind in enumerate(simmable_inds):
-        yield root_sim_ind
-
-        del simmable_inds[i]
-
-        root_board = main_board + pc*three_pow[root_sim_ind]
-        recur(root_board, pc, root_sim_ind)
-
-        simmable_inds.insert(i, root_sim_ind)
-
-    fin_move = pick_init_move(pc, win_probs)
-
-    if is_debugging:
-        plt.figure()
-        bar = plt.bar(list(win_probs.keys()), list(win_probs.values()), color='MediumSpringGreen')
-        plt.bar_label(bar, label_type='center')
-        plt.locator_params(axis='x')  # sets the tick interval of graph
-        plt.title('Computer\'s Risk Analysis of each Initial Node')
-        plt.xlabel('Initial Move')
-        plt.ylabel('Winning Probability')
-        plt.show(block=False)
-
-    yield fin_move
-    return
