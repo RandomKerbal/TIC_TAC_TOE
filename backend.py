@@ -76,10 +76,12 @@ def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -
         SE_VEC = BOARD_LEN + 1
         BOTTOM_ROW = BOARD_LEN * SW_VEC
         EMPTY_BOARD = THREE_POW[BOARD_AREA] * 2  # set player before first player as 2
+        win_table.clear()
 
     if tk_win_len:
         WIN_LEN = tk_win_len
         HALF_W_LEN = WIN_LEN // 2
+        win_table.clear()
 
     HALF_W_LEN_INV = BOARD_LEN - HALF_W_LEN
     S_VEC_HALF_W_LEN = BOARD_LEN * HALF_W_LEN
@@ -288,7 +290,7 @@ def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph 
     At root, player is human.
     Uses Alpha-Beta-Negamax-ish Algorithm:
         Current loses if any child wins.
-        Current wins if all child loses.
+        Current wins if all childs loses.
 
     Uses generator function's lazy evaluation when iterated to fake multithreading.
     :yield:
@@ -310,7 +312,7 @@ def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph 
         yield move
         child_board = place(board, move)
 
-        # since any child wins, curr loses
+        # since any child wins, current loses
         if child_board in win_table:
             return -WIN_SCORE
 
@@ -322,7 +324,8 @@ def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph 
         if child_is_leaf():
             continue
 
-        del moves[i]  # optimization: don't modify for win & leaf nodes
+        # optimization: don't modify moves[] for win & leaf nodes
+        del moves[i]
 
         best_child_score = max(
             best_child_score,
@@ -342,7 +345,7 @@ def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph 
 
             return -WIN_SCORE
 
-    # since all child lose, current wins
+    # since all childs lose, current wins
     if best_child_score == -WIN_SCORE:
         return WIN_SCORE
 
@@ -388,7 +391,8 @@ def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "
             self.is_visited = True
 
             if not self.is_root():
-                moves.remove(self.move)  # optimization: don't modify until visit
+                # optimization: don't modify moves[] until visit
+                moves.remove(self.move)
 
             curr_ptr: int = s.size - 1
             child_board: int
@@ -490,70 +494,6 @@ def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "
 
     if graph:
         print_tree(graph, recip_tree_pos(graph, root_board))
-
-
-def bot_iter_v2(root_board: int, bot: int, moves: set):
-    for root_move in moves:
-        yield root_move
-
-        stack = [(root_board, root_move, moves.difference({root_move}), bot, eldest_ptr := 0,)]
-
-        def truncate(new_size: int):
-            del stack[new_size:]
-
-        def is_eldest():
-            return eldest_ptr == len(stack)  # if eldest pointer is pointing to its own square
-
-        while stack:
-            parent_board, move, moves, plyr, eldest_ptr = stack.pop()
-
-            board = place(parent_board, plyr, move)
-
-            if is_win(parent_board, plyr, move) or (len(moves) == 0 and plyr == bot):
-                win_table.add(parent_board)
-                if stack:
-                    ww_board, _, _, parent_plyr, parent_eldest_ptr = stack[eldest_ptr - 1]
-
-                    if parent_plyr == plyr:
-                        win_table.add(ww_board)
-                        truncate(parent_eldest_ptr)  # pop parent and all its siblings and children
-                        if not stack and bot == parent_plyr:
-                            return
-                        continue
-
-                    else:
-                        truncate(eldest_ptr)  # pop curr and all its siblings
-                        if not stack and bot == plyr:
-                            return
-                        continue
-
-                elif bot == plyr:
-                    return
-
-            elif len(moves) == 0 and is_eldest() and plyr == opp_of(bot):
-                win_table.add(board)
-                if stack:
-                    ww_board, _, _, parent_plyr, parent_eldest_ptr = stack[-1]
-
-                    if parent_plyr == plyr:
-                        continue
-
-                    elif parent_plyr != plyr:
-                        truncate(parent_eldest_ptr)  # pop parent and all its siblings
-                        if not stack and bot == parent_plyr:
-                            return
-                        continue
-
-                elif bot != plyr:
-                    return
-
-            else:
-                board = place(parent_board, plyr, move)
-
-                child_plyr = opp_of(plyr)
-                child_eldest_ptr = len(stack)
-                for child_move in moves:
-                    stack.push((board, child_move, moves.difference({child_move}), child_plyr, child_eldest_ptr,))
 
 
 def snake_gen_moves(board: int, y0: int, x0: int) -> "collections.Iterator[tuple[int, int]]":
