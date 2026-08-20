@@ -62,10 +62,7 @@ EMPTY_BOARD: int
 """Empty board where the first player will be 1."""
 
 
-# ==============
-#  AI Functions
-# ==============
-
+# === AI Functions ===
 def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -> None:
     global THREE_POW, BOARD_LEN, BOARD_AREA, WIN_LEN, SW_VEC, SE_VEC, BOTTOM_ROW, HALF_W_LEN, HALF_W_LEN_INV, S_VEC_HALF_W_LEN, SE_VEC_HALF_W_LEN, SW_VEC_HALF_W_LEN, EMPTY_BOARD
 
@@ -341,11 +338,6 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Call
     return 0
 
 
-# TODO: recur ai descp: can distinguish between tie and win. iter ai: cannot distinguish between tie and win
-# TODO iter ai is faster than recur ai
-# TODO: descp: if you play against the snake ai in non-snake modes, ai will still play according to snake rules.
-
-
 def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
     """
     See also :func:`recur_search()` for player at root.
@@ -520,6 +512,7 @@ def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD:
 
         child_board = place(BOARD, child_move, tree)
 
+        # noinspection PyTypeChecker
         if snake_search(child_board, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, highlight) == WIN_SCORE:
             t_table[BOARD] = -WIN_SCORE
             return
@@ -604,12 +597,13 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], hi
         def score_by_depth() -> int:
             if plyr_of(child_board) == HUMAN:
                 # penalize
-                # len(moves) for depth bonus
-                # //2 to only count the layers that are the player's turn
-                # -1 because len(moves) can be 0
-                return len(moves) // 2 - 1
+                # -2 so loss is more impactful than win
+                return len(moves) // 2 - 2
             else:
                 # reward
+                # len(moves) for depth bonus
+                # //2 to only count the layers that are the player's turn
+                # +1 because len(moves) can be 0
                 return len(moves) // 2 + 1
 
         child_board: int
@@ -655,9 +649,7 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], hi
     )
 
 
-# ==================
-# Graphing Functions
-# ==================
+# === Graphing Functions ===
 def print_board(board: int, show_axis: bool = True) -> str:
     """Does not print to console, only return as string."""
     output = ""
@@ -665,15 +657,13 @@ def print_board(board: int, show_axis: bool = True) -> str:
         # x axis
         output += " " * 3
         for i in range(BOARD_LEN):
-            str_i = str(i)
-            output += str_i + " " * (3 - len(str_i))
+            output += str(i) + " " * (3 - len(str(i)))
         output += "\n"
 
     for y in range(BOARD_LEN):
         if show_axis:
             # y axis
-            str_i = str(i)
-            output += str_i + " " * (3 - len(str_i))
+            output += str(y) + " " * (3 - len(str(y)))
 
         for x in range(BOARD_LEN):
             output += char_of(plyr_at(board, sq_of(y, x)), show_empty=True) + " " * 2  # print rows

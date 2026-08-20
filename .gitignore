@@ -7,7 +7,7 @@ __pycache__/
 *.spec
 *.cfg
 
-New Check Winner Algo.py
-New Iterative Search Algo.py
+unused/new_check_winner_algo.py
+unused/new_iterative_search_algo.py
 PC INPUT RECUR 100%.py
 TEST.py
