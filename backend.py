@@ -1,7 +1,8 @@
 import collections
+import operator
 import random
-import math
-import matplotlib.pyplot as plt
+from collections.abc import Callable
+
 import networkx as nx
 
 BOARD_LEN: int = 0
@@ -52,8 +53,8 @@ For BOARD_LEN = 3,
     - 8th element is 3**0 (place value of 8th digit)
 """
 
-win_table: set[int] = set()
-"""Cross-file; transposition table that stores board seen as won."""
+t_table: dict[int, int] = dict()
+"""Cross-file; transposition table that stores score of seen boards."""
 
 WIN_SCORE: int = 1
 
@@ -76,26 +77,24 @@ def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -
         SE_VEC = BOARD_LEN + 1
         BOTTOM_ROW = BOARD_LEN * SW_VEC
         EMPTY_BOARD = THREE_POW[BOARD_AREA] * 2  # set player before first player as 2
-        win_table.clear()
 
     if tk_win_len:
         WIN_LEN = tk_win_len
         HALF_W_LEN = WIN_LEN // 2
-        win_table.clear()
 
     HALF_W_LEN_INV = BOARD_LEN - HALF_W_LEN
     S_VEC_HALF_W_LEN = BOARD_LEN * HALF_W_LEN
     SE_VEC_HALF_W_LEN = SE_VEC * HALF_W_LEN
     SW_VEC_HALF_W_LEN = SW_VEC * HALF_W_LEN
 
-    win_table.clear()
+    t_table.clear()
 
 
 def sq_of(y: int, x: int) -> int:
     return y * BOARD_LEN + x
 
 
-def opp_of(plyr: 1 | 2) -> 1 | 2:
+def opp_of(plyr: int) -> 1 | 2:
     """
     :return:
         Opponent of given player.
@@ -106,15 +105,15 @@ def opp_of(plyr: 1 | 2) -> 1 | 2:
 def plyr_at(board: int, sq: int) -> 0 | 1 | 2:
     """
     :return:
-        Number representation of player at given square.
+        Number representating player at given square.
     """
     return board // THREE_POW[sq] % 3
 
 
-def char_of(plyr: 1 | 2, show_empty: bool = False) -> str:
+def char_of(plyr: int, show_empty: bool = False) -> str:
     """
     :return:
-        Letter representation of given player.
+        Letter representationg given player.
     """
     if plyr == 1:
         return 'X'
@@ -131,16 +130,17 @@ def plyr_of(board: int) -> 1 | 2:
     return plyr_at(board, BOARD_AREA)  # board has hidden digit at the end to store last player
 
 
-def place(board: int, sq: int, graph: nx.DiGraph | None = None) -> int:
+def place(board: int, move: int, tree: nx.DiGraph | None = None) -> int:
     """
-    :return: Board and graph (optional) after placing given player.
+    :return: board after placing given move.
+    By reference: updated tree (optional).
     """
-    plyr: 1 | 2 = plyr_of(board)
+    plyr: int = plyr_of(board)
     child_board = (board
-                   + opp_of(plyr) * THREE_POW[sq]
+                   + opp_of(plyr) * THREE_POW[move]
                    + (opp_of(plyr) - plyr) * THREE_POW[BOARD_AREA])  # update current player
-    if graph is not None:
-        graph.add_edge(board, child_board, label=sq)
+    if tree is not None:
+        tree.add_edge(board, child_board, label=move)
     return child_board
 
 
@@ -148,21 +148,21 @@ def unplace(board: int, sq: int) -> int:
     return board - plyr_of(board) * THREE_POW[sq]  # don't update current player since for vanish mode
 
 
-def sort_moves(board: int, move: int) -> list[int]:
+def gen_moves(board: int, move: int) -> list[int]:
     """
+    Optimization: Moves are sorted to prune low-priority moves that are unlikely to change the result.
+
     A move GENERALLY has higher priority if:
         Square is connected to, or at the back of another square connected to, either end of a line formed by current player.
         However, priority varies with dist to move and the number of connected lines.
 
     A move GENERALLY has low priority if:
         Square has adjacent player. However, priority varies with dist to move and the number of adjacent players.
-
-    Optimization: Sorting allows prunning low-priority moves that are unlikely to change the result.
     """
-    plyr: 1 | 2 = plyr_of(board)
+    plyr: int = plyr_of(board)
     move_y, move_x = divmod(move, BOARD_LEN)
 
-    moves = {}  # key = square, value = priority
+    moves = dict()  # key = square, value = priority
 
     for sq in range(BOARD_AREA):
         if not plyr_at(board, sq):
@@ -209,7 +209,7 @@ def is_win(board: int, move: int) -> int:
     # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
     # 3. precalculate constants
 
-    plyr: 1 | 2 = plyr_of(board)
+    plyr: int = plyr_of(board)
     move_y, move_x = divmod(move, BOARD_LEN)
     start: int
     end: int
@@ -274,27 +274,13 @@ def is_win(board: int, move: int) -> int:
     return 0
 
 
-def exhaust(gen: "collections.Iterator[int]") -> int:
-    """
-    Exhaust all yield values in a generator function and get the return value.
-    """
-    try:
-        while True:
-            next(gen)
-    except StopIteration as e:
-        return e.value
-
-
-def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph | None) -> "collections.Iterator[int] | int":
+def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
     """
     At root, player is human.
-    Uses Alpha-Beta-Negamax-ish Algorithm:
+    Uses special case of Alpha-Beta-Negamax Algorithm:
         Current loses if any child wins.
-        Current wins if all childs loses.
-
-    Uses generator function's lazy evaluation when iterated to fake multithreading.
-    :yield:
-        Move in moves in order, until after finding the best move.
+        Current wins if all childs lose.
+        Current ties if any child ties and all other childs lose.
 
     :return:
         WIN_SCORE: current wins
@@ -306,54 +292,61 @@ def recur_search(board: int, moves: list[int], is_root: bool, graph: nx.DiGraph 
         return len(moves) == 1  # not 0 since move not popped yet
 
     child_board: int
-    best_child_score: int = -WIN_SCORE
+    child_score: int
+    tie_child_move: int | None = None
 
-    for i, move in enumerate(moves):
-        yield move
-        child_board = place(board, move)
+    for i, child_move in enumerate(moves):
+        highlight(child_move, BOARD)
 
-        # since any child wins, current loses
-        if child_board in win_table:
+        child_board = place(BOARD, child_move, tree)
+
+        if child_board in t_table:
+            child_score = t_table[child_board]
+
+        # base case: if any child wins, current loses
+        elif is_win(child_board, child_move):
+            t_table[child_board] = WIN_SCORE
+            child_score = WIN_SCORE
+
+        # base case: if child tie
+        elif child_is_leaf():
+            t_table[child_board] = 0
+            child_score = 0
+
+        else:
+            del moves[i]  # optimization: don't modify moves[] for win & leaf nodes
+            child_score = recur_search(child_board, moves, tree, highlight)
+            moves.insert(i, child_move)
+
+        # if any child wins, current loses
+        # no need to check later childs (alpha-beta prunning with alpha = child_score, beta = WIN_SCORE)
+        if child_score == WIN_SCORE:
+            t_table[BOARD] = -WIN_SCORE
             return -WIN_SCORE
 
-        if is_win(child_board, move):
-            win_table.add(child_board)
-            return -WIN_SCORE
+        # if child tie, save move in case no child win
+        if child_score == 0 and tie_child_move is None:
+            tie_child_move = child_move
 
-        # must come after is_win()
-        if child_is_leaf():
-            continue
-
-        # optimization: don't modify moves[] for win & leaf nodes
-        del moves[i]
-
-        best_child_score = max(
-            best_child_score,
-            exhaust(recur_search(
-                place(board, move, graph),
-                moves, False, graph)
-            )
-        )
-        moves.insert(i, move)
-
-        # since any child wins, current loses (alpha-beta prunning with alpha = best_child_score, beta = WIN_SCORE)
-        if best_child_score == WIN_SCORE:
-            win_table.add(child_board)
-
-            if is_root and graph is not None:
-                print_tree(graph, recip_tree_pos(graph, board))
-
-            return -WIN_SCORE
-
-    # since all childs lose, current wins
-    if best_child_score == -WIN_SCORE:
+    # no child tie means all childs lose
+    # if all childs lose, current wins
+    if tie_child_move is None:
+        t_table[BOARD] = WIN_SCORE
         return WIN_SCORE
 
-    # base case: tie
+    # tie_child_move exists means some child tie
+    # if any child is tie,
+    highlight(tie_child_move, BOARD)
+    t_table[BOARD] = 0
     return 0
 
 
-def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "collections.Iterator[int]":
+# TODO: recur ai descp: can distinguish between tie and win. iter ai: cannot distinguish between tie and win
+# TODO iter ai is faster than recur ai
+# TODO: descp: if you play against the snake ai in non-snake modes, ai will still play according to snake rules.
+
+
+def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
     """
     See also :func:`recur_search()` for player at root.
 
@@ -373,78 +366,90 @@ def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "
 
     class Node:
         """
-        :param move: Move that created this child, already placed on board.
-        :param parent_ptr: Only root node's move = None and parent_ptr = None.
+        :param MOVE: Move that created this child, already placed on board.
+        :param PARENT_PTR: Only root node's move = None and parent_ptr = None.
         """
-        move: int | None
-        board: int
-        parent_ptr: int | None
+        MOVE: int | None
+        BOARD: int
+        PARENT_PTR: int | None
         is_visited: bool
 
-        def __init__(self, move: int | None, board: int, parent_ptr: int | None):
-            self.move = move
-            self.board = board
-            self.parent_ptr = parent_ptr
+        def __init__(self, MOVE: int | None, BOARD: int, PARENT_PTR: int | None):
+            self.MOVE = MOVE
+            self.BOARD = BOARD
+            self.PARENT_PTR = PARENT_PTR
             self.is_visited = False
 
-        def visit(self) -> "collections.Iterator[int]":
+        def visit(self):
             self.is_visited = True
 
-            if not self.is_root():
-                # optimization: don't modify moves[] until visit
-                moves.remove(self.move)
+            # discard() won't raise error if MOVE is not in moves[]
+            # use discard() since MOVE is None at root
+            # optimization: don't modify moves[] until visit
+            moves.discard(self.MOVE)
 
-            curr_ptr: int = s.size - 1
+            CURR_PTR: int = s.size - 1
             child_board: int
 
-            for move in moves:
-                yield move
-                child_board = place(self.board, move, graph)
+            for child_move in moves:
+                highlight(child_move, self.BOARD)
 
-                # since any child wins, current loses
-                # discard current node & all childs including those already pushed
-                if child_board in win_table:
-                    s.pop_all(curr_ptr)
-                    break
+                child_board = place(self.BOARD, child_move, tree)
 
-                if is_win(self.board, move):
-                    win_table.add(child_board)
-                    s.pop_all(curr_ptr)
-                    break
+                if child_board in t_table:
 
-                # must come after is_win()
-                if child_is_leaf():
-
-                    # treat human tie leaf as lose
-                    # do not append it to avoid revisit
-                    if plyr_of(child_board) == HUMAN:
-                        continue
-
-                    # treat bot tie leaf as win
-                    else:
-                        s.pop_all(curr_ptr)
+                    # if any child wins
+                    if t_table[child_board] == WIN_SCORE:
+                        s.pop_all(CURR_PTR)
                         break
 
-                s.push(Node(move, child_board, curr_ptr))
+                    # if child loses
+                    # no tie child in iter search
+                    else:
+                        continue
+
+                # if any child wins, current loses
+                # discard current node & all childs including those already pushed
+                if is_win(child_board, child_move):
+                    t_table[child_board] = WIN_SCORE
+                    s.pop_all(CURR_PTR)
+                    break
+
+                # if child tie
+                if child_is_leaf():
+
+                    # treat human tie as lose
+                    # do not append it to avoid revisit
+                    if plyr_of(child_board) == HUMAN:
+                        t_table[child_board] = -WIN_SCORE
+                        continue
+
+                    # treat bot tie as win
+                    else:
+                        t_table[child_board] = WIN_SCORE
+                        s.pop_all(CURR_PTR)
+                        break
+
+                s.push(Node(child_move, child_board, CURR_PTR))
 
         def revisit(self) -> int:
             s.pop()
             # node must have won to stay
-            win_table.add(self.board)
+            t_table[self.BOARD] = WIN_SCORE
 
-            # since parent loses, pop siblings & parent
+            # pop siblings & parent, since parent loses
             # if root is popped, outer loop (while s.size) will stop
-            s.pop_all(self.parent_ptr)
-            return self.move
+            s.pop_all(self.PARENT_PTR)
+            return self.MOVE
 
         def is_root(self) -> bool:
-            return self.parent_ptr is None
+            return self.PARENT_PTR is None
 
         def parent_is_root(self) -> bool:
-            return self.parent_ptr == 0
+            return self.PARENT_PTR == 0
 
         def __repr__(self) -> str:
-            return f"(Move: {self.move}, Player: {char_of(plyr_of(self.board))}, Board: {"Root" if self.is_root() else self.board}{", Visited" if self.is_visited else ""})"
+            return f"(Move: {self.MOVE}, Player: {char_of(plyr_of(self.BOARD))}, Board: {"Root" if self.is_root() else self.BOARD}{", Visited" if self.is_visited else ""})"
 
     class Stack:
         stack: list[Node | None] = [None] * sum(range(1, len(moves) + 1))  # preallocate size. Max size is (n) + (n-1) + (n-2) + ... + 1, where n = len(moves).
@@ -458,15 +463,18 @@ def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "
             Pop and add the popped node's move back into moves.
             """
             self.size -= 1
-            moves.add(self.stack[self.size].move)
+            moves.add(self.stack[self.size].MOVE)
 
         def pop_all(self, new_size: int) -> None:
             """
             Pop multiple elements at once, from the top to new_size (inclusive).
-            Add the last popped node's move back into moves.
+            Additional Tasks:
+                1. Add the last popped node's move back into moves.
+                2. Add the last popped node to transposition table as lose.
             """
             self.size = new_size
-            moves.add(self.stack[self.size].move)
+            moves.add(self.stack[self.size].MOVE)
+            t_table[self.stack[self.size].BOARD] = -WIN_SCORE
 
         def push(self, node: Node) -> None:
             self.stack[self.size] = node
@@ -475,91 +483,115 @@ def iter_search(root_board: int, moves: set[int], graph: nx.DiGraph | None) -> "
         def __repr__(self) -> str:
             return f"{list(node for i, node in enumerate(self.stack) if i < self.size)}"
 
-    HUMAN: int = plyr_of(root_board)
+    HUMAN: int = plyr_of(ROOT_BOARD)
     s: Stack = Stack()
-    s.push(Node(None, root_board, None))
+    s.push(Node(None, ROOT_BOARD, None))
 
     while s.size != 0:
         curr: Node = s.peek()
         if curr.is_visited:
             if curr.parent_is_root():
-                yield curr.revisit()  # final move
+                MOVE: int = curr.revisit()  # final move
+                highlight(MOVE, ROOT_BOARD)
+                return MOVE
             else:
                 curr.revisit()
         else:
-            if curr.is_root():
-                yield from curr.visit()  # move in moves
-            else:
-                exhaust(curr.visit())
-
-    if graph:
-        print_tree(graph, recip_tree_pos(graph, root_board))
+            curr.visit()
 
 
-def snake_gen_moves(board: int, y0: int, x0: int) -> "collections.Iterator[tuple[int, int]]":
-    for dir_x, dir_y in ADJ:
-        y1 = y0 + dir_y
-        x1 = x0 + dir_x
+def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> "collections.Iterator[tuple[int, int]]":
+    y1: int
+    x1: int
 
-        if 0 <= y1 < BOARD_LEN and 0 <= x1 < BOARD_LEN and not plyr_at(board, sq_of(y1, x1)):
+    for DIR_X, DIR_Y in ADJ:
+        y1 = Y0 + DIR_Y
+        x1 = X0 + DIR_X
+
+        if 0 <= y1 < BOARD_LEN and 0 <= x1 < BOARD_LEN and not plyr_at(BOARD, sq_of(y1, x1)):
             yield y1, x1
 
 
-def snake_search(board: int, y0: int, x0: int, y_child: int, x_child: int, is_root: bool, graph: nx.DiGraph | None) -> "collections.Iterator[int] | int":
+def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> None:
+    child_board: int
+
+    for child_move in MOVES:
+        highlight(child_move, BOARD)
+
+        child_board = place(BOARD, child_move, tree)
+
+        if snake_search(child_board, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, highlight) == WIN_SCORE:
+            t_table[BOARD] = -WIN_SCORE
+            return
+
+    t_table[BOARD] = WIN_SCORE
+
+
+def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
     """
-    :param y0:
-    :param x0: square that the given player last placed
-    :param y_child:
-    :param x_child: square that the other player last placed
+    :param Y0:
+    :param X0: square that the current player last placed
+    :param Y_CHILD:
+    :param X_CHILD: square that the child player last placed
 
     See also :func:`recur_search()`
     """
 
-    best_child_score: int
-    child_board: int
+    def child_is_stuck() -> bool:
+        # no child and any square is empty
+        return child_move is None and any(not plyr_at(BOARD, sq) for sq in range(BOARD_AREA))
 
-    for y1, x1 in snake_gen_moves(board, y0, x0):
-        move = sq_of(y1, x1)
-        yield move
-        child_board = place(board, move, graph)
+    child_board: int
+    child_score: int
+    child_move: int | None = None
+    tie_child_move: int | None = None
+
+    for y1, x1 in snake_gen_moves(BOARD, Y0, X0):
+        child_move = sq_of(y1, x1)
+
+        highlight(child_move, BOARD)
+
+        child_board = place(BOARD, child_move, tree)
+
+        if child_board in t_table:
+            child_score = t_table[child_board]
 
         # base case: win
-        if child_board in win_table:
-            return WIN_SCORE
+        elif is_win(child_board, child_move):
+            t_table[child_board] = WIN_SCORE
+            child_score = WIN_SCORE
 
-        if is_win(child_board, move):
-            win_table.add(child_board)
-            return WIN_SCORE
+        else:
+            child_score = snake_search(child_board, Y_CHILD, X_CHILD, y1, x1, tree, highlight)
 
-        best_child_score = max(best_child_score, exhaust(snake_search(child_board, y_child, x_child, y1, x1, False, graph)))
-
-        # lose (technically alpha-beta prunning)
-        if best_child_score == WIN_SCORE:
-            win_table.add(child_board)
+        # lose
+        if child_score == WIN_SCORE:
+            t_table[BOARD] = -WIN_SCORE
             return -WIN_SCORE
 
-    # win
-    if best_child_score == -WIN_SCORE:
-
-        if is_root and graph is not None:
-            print_tree(graph, recip_tree_pos(graph, board))
-
+    # if child stuck or if all childs lose, current win
+    if child_is_stuck() or tie_child_move is None:
+        t_table[BOARD] = WIN_SCORE
         return WIN_SCORE
 
-    # base case: tie
+    # tie
+    highlight(tie_child_move, BOARD)
+    t_table[BOARD] = 0
     return 0
 
 
-def prob_ai(root_board: int, moves: list[int], has_graph: bool) -> "collections.Iterator[int]":
+def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], highlight: Callable[[int, int], None]) -> None:
     """
+    :param wscores: key = root move, val = its weighted score.
+
     Traverse the entire tree to get each root node's weighted win probability ((# win leaf childs - # lose leaf childs) / (# win leaf childs + # lose leaf childs)).
-    Closest to actual machine learning, but least effecient.
-    Has Statraps (Statistical Traps): a node with the least lose childs but always lose if best play.
+    Closest to actual machine learning, but least effecient among all AIs.
+    Has Statistical Traps: a node with the least lose childs but always lose if best play.
 
     See also :func:`recur_search()` for player at root.
     """
 
-    def traverse(board: int) -> tuple[int, int]:
+    def traverse(BOARD: int) -> tuple[int, int]:
         """
         :return:
             child_score (# win leaf childs - # lose leaf childs)
@@ -567,67 +599,60 @@ def prob_ai(root_board: int, moves: list[int], has_graph: bool) -> "collections.
         """
 
         def is_root() -> bool:
-            return board == root_board
+            return BOARD == ROOT_BOARD
 
         def score_by_depth() -> int:
             if plyr_of(child_board) == HUMAN:
-                # reward
-                # len(moves) for depth bonus
-                # //2 to only count the layers with the player's turn
-                # +1 because len(moves) can be 0
-                return len(moves) // 2 + 1
-            else:
                 # penalize
+                # len(moves) for depth bonus
+                # //2 to only count the layers that are the player's turn
+                # -1 because len(moves) can be 0
                 return len(moves) // 2 - 1
+            else:
+                # reward
+                return len(moves) // 2 + 1
 
-        child_score: int
-        child_num: int
+        child_board: int
+        child_score: int = 0
+        child_num: int = 0
 
-        for i, move in enumerate(moves):
-            child_board: int = place(board, move)
+        for i, child_move in enumerate(moves):
+            highlight(child_move, BOARD)
+
+            child_board = place(BOARD, child_move)
 
             # base case: win
-            if is_win(child_board, move):
+            if is_win(child_board, child_move):
                 child_score += score_by_depth()
                 child_num += 1
 
             else:
                 del moves[i]
-                child_score, child_num = (
-                    x + y for x, y in zip(
+                child_score, child_num = map(
+                    operator.add,
                     (child_score, child_num),
-                    traverse(child_board))
+                    traverse(child_board)
                 )
-                moves.insert(i, move)
+                moves.insert(i, child_move)
 
             if is_root() and child_num > 0:
-                wscores[move] = child_score / child_num
+                wscores[child_move] = child_score / child_num
                 child_score = 0
                 child_num = 0
 
         return child_score, child_num
 
-    wscores = {move: 0.0 for move in moves}  # key = root move, val = its score
-    HUMAN: int = plyr_of(root_board)
-    traverse(root_board)
+    HUMAN: int = plyr_of(ROOT_BOARD)
+    traverse(ROOT_BOARD)
 
-    if has_graph:
-        plt.Figure()
-        bar = plt.bar(list(wscores.keys()), list(wscores.values()), color="MediumSpringGreen")
-        plt.bar_label(bar, label_type="center")
-        plt.locator_params(axis="x")  # set x tick interval
-        plt.xlabel("Root Move")
-        plt.ylabel("Weighted Win Probability")
-        plt.title(f"{plt.gca().get_ylabel()} of each {plt.gca().get_xlabel()}")
-        plt.show(block=False)
-
-    # list root_move(s) with the max wscore to pick randomly
-    yield random.choice(  # DO NOT use return
-        [move for move, score in
-         wscores.items()
-         if score == max(wscores.values())]
+    # pick random move from root moves with highest wscore
+    # use highlight(), NOT return
+    highlight(
+        random.choice(
+            list(move for move, score in wscores.items() if score == max(wscores.values()))
+        ),
+        ROOT_BOARD
     )
-    return None
 
 
 # ==================
@@ -657,159 +682,47 @@ def print_board(board: int, show_axis: bool = True) -> str:
     return output
 
 
-def print_tree(tree: nx.DiGraph, pos: dict):
-    def recapture_bg(_=None):
-        """Retake screenshot after zoom or pan."""
-        nonlocal bg
-        fig.canvas.draw()  # redraw canvas to get correct bbox
-        bg = fig.canvas.copy_from_bbox(fig.bbox)
-
-    def on_click(event):
-        """If mouse clicked on a node, update fig_text to show its detailed information and animate scaling of clicked node."""
-        is_node, info = fig_nodes.contains(event)
-
-        if is_node:  # if clicked on a node
-            # get the node under cursor and its label
-            node = tree_2d[info['ind'][0]]
-            label = fig_labels[node]
-
-            # UPDATE FIG_TEXT
-            parents = list(tree.predecessors(node))
-            children = list(tree.successors(node))
-
-            fig_text.set_text(
-                f"Node: {node}\n"
-                f"Decoded:\n{print_board(node, show_axis=False)}"
-                f"{len(parents)} Parent: {parents}\n"
-                f"{len(parents)} Eldest Sibling: {[next(tree.successors(parent)) for parent in parents]}\n"
-                f"{max(dict(tree.out_degree()).values()) + (pos[node][1] + 1) - len(children)} Skipped Children*\n"  # total # of children of root (assume root has max # of children) - # of layers away from root (root = -1) + # of visited children
-                f"{len(children)} Visited Children: {children}"
-            )
-
-            # DRAW
-            def on_timer():
-                nonlocal frame
-                k: int = 8  # must be integer
-                scale = 1 + 0.5 * math.sin(math.pi * frame / k)
-                label.set_fontsize(10 * scale)  # 10 is moveal size of node
-
-                fig.canvas.restore_region(bg)  # revert background to erase previous frame
-                fig.draw_artist(fig_text)  # show temporary fig_text while waiting for label animation
-                fig.draw_artist(label)
-                fig.canvas.blit(fig.bbox)
-
-                frame += 1
-                if frame > 8:
-                    timer.stop()
-                    fig.canvas.draw_idle()
-                    return
-
-            frame = 0
-            timer = fig.canvas.new_timer(interval=30, callbacks=[(on_timer, (), {})])
-            timer.start()
-
-        else:
-            fig_text.set_text(
-                f"Total # of Nodes: {tree.number_of_nodes()}"
-            )
-            fig.canvas.draw_idle()
-
-    def on_move(event):
-        """If mouse hover over a node, change cursor to hand2."""
-        is_node, info = fig_nodes.contains(event)
-        fig.canvas.get_tk_widget().config(cursor="hand2" if is_node else "")
-
-    tree_2d: list = list(tree.nodes)
-
-    fig = plt.figure()
-    plt.axis("off")
-    plt.tight_layout()
-
-    # draw nodes and edges separately to set picker on nodes
-    fig_nodes = nx.draw_networkx_nodes(
-        tree, pos, node_shape="s", alpha=0.0
-    )
-    # noinspection PyTypeChecker
-    fig_nodes.set_picker(True)
-
-    fig_labels: dict = {}
-    for node, (x, y) in pos.items():  # replaced nx.draw_networkx_labels to color each label separately
-        fig_labels[node] = plt.text(
-            x, y, node,
-            ha="center", va="center",
-            bbox=dict(facecolor="SeaGreen" if node in win_table else "MediumSpringGreen", boxstyle="round", pad=0.4, linewidth=0.5),
-            color="white" if node in win_table else "black",
-            family="Arial", weight="bold", size=10
-        )
-
-    nx.draw_networkx_edges(
-        tree, pos, arrows=False, alpha=0.75
-    )
-    nx.draw_networkx_edge_labels(
-        tree, pos, nx.get_edge_attributes(tree, "label"),
-        bbox=dict(facecolor="white", edgecolor="none", alpha=0.5, boxstyle="circle", pad=0),
-        font_color="crimson", font_family="Arial", font_size=10, rotate=False
-    )
-
-    bg = None
-    recapture_bg()  # screenshot background WITHOUT fig_text
-
-    fig_text = plt.text(
-        0.0, 0.0, f"Total # of Nodes: {tree.number_of_nodes()}\nClick a node to show details",
-        transform=plt.gca().transAxes,  # use axes fraction for positioning
-        bbox=dict(facecolor="white", edgecolor="gray", alpha=0.8, boxstyle="square", pad=0.75),
-        family="Consolas", linespacing=1.5
-    )
-
-    fig.gca().callbacks.connect("xlim_changed", recapture_bg)
-    fig.gca().callbacks.connect("ylim_changed", recapture_bg)
-    fig.canvas.mpl_connect("resize_event", recapture_bg)
-    fig.canvas.mpl_connect("button_press_event", on_click)
-    fig.canvas.mpl_connect("motion_notify_event", on_move)
-    plt.show(block=True)
+# def fac_tree_pos(tree) -> dict:
+#     """
+#     Creates a hierarchical layout for a directed factorial tree.
+#     In a factorial tree, each node has at least one less children than its parent
+#     Use this when you don't know the maximum number of children, but you know the maximum number of layers
+# 
+#     :param tree: networkx object (must be directed).
+#     :param root: root node of the tree (if None, chooses an arbitrary node).
+#     :return:
+#         Dictionary with key = node, val = coord of the node saved as a tuple (x, y).
+#     """
+# 
+#     def assign_pos(layer: int, children, parent_x: float):
+#         """
+#         Recursively update coord of parent nodes and calculate coord of child nodes.
+#         """
+#         if children:
+#             layer_neg1 = layer - 1
+#             sep_count = len(children) - 1  # total number of separations between children
+#             sep_dist = factorials[layer + 1] / max(1, sep_count)  # separation distance between each child
+# 
+#             # assign positions for each child
+#             start_x = parent_x - (sep_count / 2) * sep_dist
+#             for i, child in enumerate(children):
+#                 child_x = start_x + i * sep_dist
+#                 pos[child] = (child_x, layer_neg1)
+#                 assign_pos(layer_neg1, list(tree.successors(child)), child_x)
+# 
+#     # select the first node as root
+#     root = next(iter(tree))
+# 
+#     root_children = list(tree.successors(root))
+#     max_layer = len(root_children)  # the maximum number of layers, assuming the bottommost layer = 1
+#     factorials = tuple(math.factorial(layer) for layer in range(max_layer + 2))
+# 
+#     pos = {root: (0, max_layer)}
+#     assign_pos(max_layer, root_children, 0.0)
+#     return pos
 
 
-def fac_tree_pos(tree, root=None) -> dict:
-    """
-    Creates a hierarchical layout for a directed factorial tree.
-    In a factorial tree, each node has at least one less children than its parent
-    Use this when you don't know the maximum number of children, but you know the maximum number of layers
-
-    :param tree: networkx graph object (must be directed).
-    :param root: root node of the tree (if None, chooses an arbitrary node).
-    :return:
-        Dictionary with key = node, val = coord of the node saved as a tuple (x, y).
-    """
-
-    def assign_pos(layer: int, children, parent_x: float):
-        """
-        Recursively update coord of parent nodes and calculate coord of child nodes.
-        """
-        if children:
-            layer_neg1 = layer - 1
-            sep_count = len(children) - 1  # total number of separations between children
-            sep_dist = factorials[layer + 1] / max(1, sep_count)  # separation distance between each child
-
-            # assign positions for each child
-            start_x = parent_x - (sep_count / 2) * sep_dist
-            for i, child in enumerate(children):
-                child_x = start_x + i * sep_dist
-                pos[child] = (child_x, layer_neg1)
-                assign_pos(layer_neg1, list(tree.successors(child)), child_x)
-
-    if root is None:
-        root = next(iter(tree))  # select an arbitrary root if not provided
-
-    root_children = list(tree.successors(root))
-    max_layer = len(root_children)  # the maximum number of layers, assuming the bottommost layer is 1
-    factorials = tuple(math.factorial(layer) for layer in range(max_layer + 2))
-
-    pos = {root: (0, max_layer)}
-    assign_pos(max_layer, root_children, 0.0)
-    return pos
-
-
-def recip_tree_pos(tree, root=None) -> dict:
+def recip_tree_pos(tree: nx.DiGraph) -> dict[..., tuple[float, float]]:
     """
     Creates a hierarchical layout for a directed reciprocal tree.
     In a reciprocal tree, every node has n or fewer children.
@@ -831,8 +744,9 @@ def recip_tree_pos(tree, root=None) -> dict:
                 pos[child] = (child_x, layer_neg1)
                 assign_pos(layer_neg1, list(tree.successors(child)), child_x)
 
-    if root is None:
-        root = next(iter(tree))  # select an arbitrary root if not provided
+    # select the first node as root
+    # tree is never empty
+    root = next(iter(tree))
 
     max_sep_count = max(degree for _, degree in tree.degree()) - 1  # the maximum number of separations between children of any node (maximum number of children - 1)
     root_children = list(tree.successors(root))
