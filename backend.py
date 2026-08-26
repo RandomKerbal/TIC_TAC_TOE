@@ -4,6 +4,7 @@ import random
 from collections.abc import Callable
 
 import networkx as nx
+from matplotlib.transforms import Bbox
 
 BOARD_LEN: int = 0
 """Cross-file; length of board."""
@@ -62,7 +63,7 @@ EMPTY_BOARD: int
 """Empty board where the first player will be 1."""
 
 
-# === AI Functions ===
+# === AI_NAMES Functions ===
 def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -> None:
     global THREE_POW, BOARD_LEN, BOARD_AREA, WIN_LEN, SW_VEC, SE_VEC, BOTTOM_ROW, HALF_W_LEN, HALF_W_LEN_INV, S_VEC_HALF_W_LEN, SE_VEC_HALF_W_LEN, SW_VEC_HALF_W_LEN, EMPTY_BOARD
 
@@ -137,7 +138,8 @@ def place(board: int, move: int, tree: nx.DiGraph | None = None) -> int:
                    + opp_of(plyr) * THREE_POW[move]
                    + (opp_of(plyr) - plyr) * THREE_POW[BOARD_AREA])  # update current player
     if tree is not None:
-        tree.add_edge(board, child_board, label=move)
+        tree.add_edge(board, child_board, move=move)
+
     return child_board
 
 
@@ -473,7 +475,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: C
             self.size += 1
 
         def __repr__(self) -> str:
-            return f"{list(node for i, node in enumerate(self.stack) if i < self.size)}"
+            return f"{tuple(node for i, node in enumerate(self.stack) if i < self.size)}"
 
     HUMAN: int = plyr_of(ROOT_BOARD)
     s: Stack = Stack()
@@ -643,17 +645,17 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], hi
     # use highlight(), NOT return
     highlight(
         random.choice(
-            list(move for move, score in wscores.items() if score == max(wscores.values()))
+            tuple(move for move, score in wscores.items() if score == max(wscores.values()))
         ),
         ROOT_BOARD
     )
 
 
 # === Graphing Functions ===
-def print_board(board: int, show_axis: bool = True) -> str:
+def print_board(BOARD: int, SHOW_AXES: bool = True) -> str:
     """Does not print to console, only return as string."""
     output = ""
-    if show_axis:
+    if SHOW_AXES:
         # x axis
         output += " " * 3
         for i in range(BOARD_LEN):
@@ -661,86 +663,71 @@ def print_board(board: int, show_axis: bool = True) -> str:
         output += "\n"
 
     for y in range(BOARD_LEN):
-        if show_axis:
+        if SHOW_AXES:
             # y axis
             output += str(y) + " " * (3 - len(str(y)))
 
         for x in range(BOARD_LEN):
-            output += char_of(plyr_at(board, sq_of(y, x)), show_empty=True) + " " * 2  # print rows
+            output += char_of(plyr_at(BOARD, sq_of(y, x)), show_empty=True) + " " * 2  # print rows
         output += "\n"
 
     return output
 
 
-# def fac_tree_pos(tree) -> dict:
-#     """
-#     Creates a hierarchical layout for a directed factorial tree.
-#     In a factorial tree, each node has at least one less children than its parent
-#     Use this when you don't know the maximum number of children, but you know the maximum number of layers
-# 
-#     :param tree: networkx object (must be directed).
-#     :param root: root node of the tree (if None, chooses an arbitrary node).
-#     :return:
-#         Dictionary with key = node, val = coord of the node saved as a tuple (x, y).
-#     """
-# 
-#     def assign_pos(layer: int, children, parent_x: float):
-#         """
-#         Recursively update coord of parent nodes and calculate coord of child nodes.
-#         """
-#         if children:
-#             layer_neg1 = layer - 1
-#             sep_count = len(children) - 1  # total number of separations between children
-#             sep_dist = factorials[layer + 1] / max(1, sep_count)  # separation distance between each child
-# 
-#             # assign positions for each child
-#             start_x = parent_x - (sep_count / 2) * sep_dist
-#             for i, child in enumerate(children):
-#                 child_x = start_x + i * sep_dist
-#                 pos[child] = (child_x, layer_neg1)
-#                 assign_pos(layer_neg1, list(tree.successors(child)), child_x)
-# 
-#     # select the first node as root
-#     root = next(iter(tree))
-# 
-#     root_children = list(tree.successors(root))
-#     max_layer = len(root_children)  # the maximum number of layers, assuming the bottommost layer = 1
-#     factorials = tuple(math.factorial(layer) for layer in range(max_layer + 2))
-# 
-#     pos = {root: (0, max_layer)}
-#     assign_pos(max_layer, root_children, 0.0)
-#     return pos
+def midpoint(P0: tuple[float, float], P1: tuple[float, float]) -> tuple[float, float]:
+    return (
+        (P0[0] + P1[0]) / 2,
+        (P0[1] + P1[1]) / 2
+    )
 
 
-def recip_tree_pos(tree: nx.DiGraph) -> dict[..., tuple[float, float]]:
+def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> tuple[tuple[float, float], ...] | None:
     """
-    Creates a hierarchical layout for a directed reciprocal tree.
-    In a reciprocal tree, every node has n or fewer children.
-    Use this when you don't know the maximum number of layers, but you know the maximum number of children.
-
-    See :func:`fac_tree_pos()` for params and return.
+    Return section of a line segment inside a rectangle.
+    Point is defined by P0, P1. Rectangle is defined by matplotlib Bbox.
+    :rtype: object
     """
 
-    def assign_pos(layer: int, children, parent_x: float):
-        """See :func:`assign_pos()` in :func:`fac_tree_pos()`"""
-        if children:
-            layer_neg1 = layer - 1
-            sep_dist = max_sep_count ** layer  # separation distance between each child. DO NOT use 1/(max_sep_count**layer) as layer is negative.
+    X_MIN: float = BBOX.x0
+    X_MAX: float = BBOX.x1
+    Y_MIN: float = BBOX.y0
+    Y_MAX: float = BBOX.y1
+    X0: float = P0[0]
+    Y0: float = P0[1]
+    t0: float = 0.0
+    t1: float = 1.0
 
-            # assign positions for each child
-            start_x = parent_x - (len(children) - 1) / 2 * sep_dist
-            for i, child in enumerate(children):
-                child_x = start_x + i * sep_dist
-                pos[child] = (child_x, layer_neg1)
-                assign_pos(layer_neg1, list(tree.successors(child)), child_x)
+    dx, dy = map(
+        operator.sub,
+        P1,
+        P0
+    )
 
-    # select the first node as root
-    # tree is never empty
-    root = next(iter(tree))
+    for p, q in (
+            (-dx, X0 - X_MIN),
+            (dx, X_MAX - X0),
+            (-dy, Y0 - Y_MIN),
+            (dy, Y_MAX - Y0),
+    ):
+        if p == 0:
+            if q < 0:
+                return None
+            continue
 
-    max_sep_count = max(degree for _, degree in tree.degree()) - 1  # the maximum number of separations between children of any node (maximum number of children - 1)
-    root_children = list(tree.successors(root))
+        r = q / p
 
-    pos = {root: (0, 0)}
-    assign_pos(0, root_children, 0.0)
-    return pos
+        if p < 0:
+            if r > t1:
+                return None
+            if r > t0:
+                t0 = r
+        else:
+            if r < t0:
+                return None
+            if r < t1:
+                t1 = r
+
+    return (
+        (X0 + t0 * dx, Y0 + t0 * dy),
+        (X0 + t1 * dx, Y0 + t1 * dy)
+    )

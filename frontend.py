@@ -8,33 +8,80 @@ from tkinter import messagebox
 
 import matplotlib.pyplot as plt
 import networkx as nx
+from matplotlib.animation import FuncAnimation
+from matplotlib.artist import Artist
+from matplotlib.axes import Axes
+from matplotlib.backend_bases import MouseEvent
+from matplotlib.collections import PathCollection, LineCollection
+from matplotlib.font_manager import FontProperties
+from matplotlib.legend import Legend
+from matplotlib.patches import Patch
+from matplotlib.path import Path
+from matplotlib.text import Text
+from matplotlib.textpath import TextPath
+from matplotlib.transforms import IdentityTransform, Affine2D, Bbox
 
 import backend as tt
-
-RECUR_AND_OR_AI: str = "Recursive And-Or AI"
-ITER_AND_OR_AI: str = "Iterative And-Or AI"
-RECUR_PROB_AI: str = "Recursive Probability AI"
-RECUR_SNAKE_AI: str = "Recursive Snake AI"
-AI: tuple[str, str, str, str] = (RECUR_AND_OR_AI, ITER_AND_OR_AI, RECUR_PROB_AI, RECUR_SNAKE_AI)
 
 
 class Settings:
     """Settings persist across menus."""
 
+    RECUR_AND_OR_AI_NAME: str = "Recursive And-Or AI"
+    ITER_AND_OR_AI_NAME: str = "Iterative And-Or AI"
+    RECUR_PROB_AI_NAME: str = "Recursive Probability AI"
+    RECUR_SNAKE_AI_NAME: str = "Recursive Snake AI"
+    AI_NAMES: tuple[str, str, str, str] = (RECUR_AND_OR_AI_NAME, ITER_AND_OR_AI_NAME, RECUR_PROB_AI_NAME, RECUR_SNAKE_AI_NAME)
+    SHOW_QFRONT_TEXT = "Show queue front"
+    DEFAULT_TIME: float = 10
+    MAX_TIME_ENTRY_SCALE: int = 5
+    MIN_BOARD_LEN: int = 3
+    MAX_NODE_FRAME: int = 8
+
+    # matplotlib colors, not tkinter
+    NODE_COLORS: dict[int | None, str] = {
+        -tt.WIN_SCORE: "Tomato",
+        0: "Yellow",
+        tt.WIN_SCORE: "MediumSpringGreen",
+        None: "White"
+    }
+    NODE_SIZE: float = 70.0
+    EDGE_ALPHA: float = 0.75
+    WINDOW_DIM: str = "700x420"
+    MENU_FONT: tuple[str, int] = ("FixedSys", 15)
+    MENU_LABEL_CFG: dict = {
+        "background": "Black",
+        "foreground": "Sea Green1"
+    }
+    MENU_BUTTON_CFG: dict = {
+        "font": MENU_FONT,
+        "cursor": "hand2",
+        "overrelief": tk.SUNKEN,
+        "activeforeground": "White",
+        "activebackground": "Sea Green",
+        "background": "Sea Green1",
+        "foreground": "Black",
+        "borderwidth": 5
+    }
+    COLOR_FRAME_CFG: dict = {
+        "font": ("FixedSys", 20, "bold"),
+        "foreground": "Sea Green1",
+        "background": "Black",
+        "borderwidth": 3,
+        "relief": tk.RIDGE
+    }
+
     def __init__(self):
-        self.board_len: tk.IntVar = tk.IntVar(value=3)
-        self.win_len: tk.IntVar = tk.IntVar(value=3)
+        self.board_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
+        self.win_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
         self.board_zoom: tk.IntVar = tk.IntVar(value=5)
-        self.ai_type: tk.StringVar = tk.StringVar(value=RECUR_AND_OR_AI)
+        self.ai_type: tk.StringVar = tk.StringVar(value=Settings.RECUR_AND_OR_AI_NAME)
         self.show_ind: tk.BooleanVar = tk.BooleanVar(value=False)
-        self.queue_len: tk.IntVar = tk.IntVar(value=3)
+        self.queue_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
         self.show_qfront: tk.BooleanVar = tk.BooleanVar(value=False)
         self.is_pvc: bool = True
-        self.INIT_TIME: float = 10
-        self.board_font: tuple[str, int, str] = ("", 0, "")
-        self.time_font: tuple[str, int, str] = ("", 0, "")
-        self.MENU_FONT: tuple[str, int] = ("FixedSys", 15)
-        self.WINDOW_DIM: str = "700x420"
+        self.board_font: tuple[str, int, str] = ('', 0, '')
+        self.time_font: tuple[str, int, str] = ('', 0, '')
         self.colors: list[dict] = [
             # general features
             {
@@ -59,33 +106,7 @@ class Settings:
                 "snake_body": "Dark Slate Gray1",
             }
         ]
-        # matplotlib colors, not tkinter
-        self.WIN_COLOR: str = "MediumSpringGreen"
-        self.TIE_COLOR: str = "Yellow"
-        self.LOSE_COLOR: str = "Tomato"
-
-        self.MENU_LABEL_CFG: dict = {
-            "background": "Black",
-            "foreground": "Sea Green1"
-        }
-        self.MENU_BUTTON_CFG: dict = {
-            "font":  self.MENU_FONT,
-            "cursor": "hand2",
-            "overrelief": tk.SUNKEN,
-            "activeforeground": "white",
-            "activebackground": "Sea Green",
-            "background": "Sea Green1",
-            "foreground": "Black",
-            "borderwidth": 5
-        }
-        self.COLOR_FRAME_CFG: dict = {
-            "font": ("FixedSys", 20, "bold"),
-            "foreground": "Sea Green1",
-            "background": "Black",
-            "borderwidth": 3,
-            "relief": tk.RIDGE
-        }
-        self.TOOLBAR_BUTTON_CFG: dict = {
+        self.toolbar_button_cfg: dict = {
             "font": ("Helvetica", 10),
             "background": self.colors[0]["foreground"],
             "activebackground": self.colors[0]["foreground"],
@@ -95,7 +116,7 @@ class Settings:
             "width": 6,
             "borderwidth": 5
         }
-        self.SETTINGS_SLIDER_CFG: dict = {
+        self.slider_cfg: dict = {
             "background": self.colors[0]["foreground"],
             "activebackground": self.colors[0]["foreground"],
             "troughcolor": self.colors[0]["background"],
@@ -104,13 +125,13 @@ class Settings:
             "length": 100,
             "cursor": "sb_h_double_arrow"
         }
-        self.SETTINGS_CHECKBOX_CFG: dict = {
+        self.checkbox_cfg: dict = {
             "background": self.colors[0]["foreground"],
             "activebackground": self.colors[0]["background"],
             "selectcolor": self.colors[0]["background"],
             "cursor": "hand2"
         }
-        self.TURN_LABEL_CFG: dict = {
+        self.turn_label_cfg: dict = {
             "font": ("Helvetica", 10, "bold"),
             "foreground": self.colors[1]["char"],
             "background": self.colors[0]["background"],
@@ -120,23 +141,21 @@ class Settings:
 
 
 class MainMenu:
-    root: tk.Tk
-    settings: Settings
 
     def __init__(self, root: tk.Tk, settings: Settings):
-        self.root = root
-        self.settings = settings
+        self.root: tk.Tk = root
+        self.settings: Settings = settings
         self.line1 = tk.Label(
             self.root,
             text='=' * 999,
             font="TkFixedFont",
-            **self.settings.MENU_LABEL_CFG
+            **Settings.MENU_LABEL_CFG
         )
         self.line2 = tk.Label(
             self.root,
             text='=' * 999,
             font="TkFixedFont",
-            **self.settings.MENU_LABEL_CFG
+            **Settings.MENU_LABEL_CFG
         )
         self.title_label = tk.Label(
             self.root,
@@ -150,13 +169,13 @@ class MainMenu:
             font="TkFixedFont",
             justify=tk.LEFT,
             anchor=tk.NW,
-            **self.settings.MENU_LABEL_CFG
+            **Settings.MENU_LABEL_CFG
         )
         self.subtitle_label = tk.Label(
             self.root,
             font="TkFixedFont",
             justify=tk.LEFT,
-            **self.settings.MENU_LABEL_CFG
+            **Settings.MENU_LABEL_CFG
         )
         SUBTITLE = "   99% Made by CZY           4 Original Modes               4 Distinct AIs        "
 
@@ -164,25 +183,25 @@ class MainMenu:
             self.root,
             text="Single Player",
             command=lambda: self.to_submenu(True),
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.pvp_button = tk.Button(
             self.root,
             text="Multi Player",
             command=lambda: self.to_submenu(False),
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.changelog_button = tk.Button(
             self.root,
             text="Changelog",
             command=changelog,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.exit_button = tk.Button(
             self.root,
             text="Exit",
             command=self.exit,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.exit_button.pack(side=tk.BOTTOM, fill=tk.X)
         self.changelog_button.pack(side=tk.BOTTOM, fill=tk.X)
@@ -228,8 +247,8 @@ class MainMenu:
         # disables the close window button
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
 
-        self.root.title(VER)
-        self.root.geometry(self.settings.WINDOW_DIM)
+        self.root.title(VERSION_TEXT)
+        self.root.geometry(Settings.WINDOW_DIM)
         self.root.config(background="Black")
 
     def to_submenu(self, is_pvc: bool) -> None:
@@ -251,73 +270,75 @@ class MainMenu:
 
 
 class SubMenu:
-    root: tk.Tk
-    settings: Settings
 
     def __init__(self, root: tk.Tk, settings: Settings):
-        self.root = root
-        self.settings = settings
+        self.root: tk.Tk = root
+        self.settings: Settings = settings
         self.title_label = tk.Label(
             self.root,
             text="\nChoose a Mode",
             font=("FixedSys", 25, "bold", "underline"),
-            **self.settings.MENU_LABEL_CFG
+            **Settings.MENU_LABEL_CFG
         )
         self.default_button = tk.Button(
             self.root,
             text="Traditional",
             width=25,
             command=lambda: self.to_gamemenu(GameMenu),
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.default_help_button = tk.Button(
             self.root,
             bitmap="question",
-            width=30,
+            height=28,
+            width=32,
             command=default_help,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.time_button = tk.Button(
             self.root,
             text="Timed Trial",
             width=25,
             command=lambda: self.to_gamemenu(GameMenuT),
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.time_help_button = tk.Button(
             self.root,
             bitmap="question",
-            width=30,
+            height=28,
+            width=32,
             command=time_help,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.vanish_button = tk.Button(
             self.root,
             text="Vanishing Moves",
             width=25,
             command=lambda: self.to_gamemenu(GameMenuV),
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.vanish_help_button = tk.Button(
             self.root,
             bitmap="question",
-            width=30,
+            height=28,
+            width=32,
             command=vanish_help,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.snake_button = tk.Button(
             self.root,
             text="Snake",
             width=25,
             command=lambda: self.to_gamemenu(GameMenuS),
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.snake_help_button = tk.Button(
             self.root,
             bitmap="question",
-            width=30,
+            height=28,
+            width=32,
             command=snake_help,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.bottom_frame = tk.Frame(
             self.root,
@@ -329,20 +350,21 @@ class SubMenu:
             text="Back",
             command=self.to_mainmenu,
             width=12,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.settings_button = tk.Button(
             self.bottom_frame,
             text="⚙",
             command=self.to_settings,
-            width=12,
-            **self.settings.MENU_BUTTON_CFG
+            width=11,
+            font=("FixedSys", 13, "bold"),
+            **dict(item for item in Settings.MENU_BUTTON_CFG.items() if item[0] != "font")
         )
 
         # disables the close window button
         self.root.protocol("WM_DELETE_WINDOW", lambda: MainMenu.exit(self))
 
-        # center buttons horizontally by giving a weight to all columns except the ones with the button
+        # center buttons horizontally by giving same weight to all columns except the ones with the button
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_columnconfigure(3, weight=1)
 
@@ -383,71 +405,69 @@ class ColMenu:
     :ivar color_frames: index 0 stores LabelFrame for general features; index 1 for X features; index 2 for O features
     :ivar color_entries: index 0 stores colors for general features; index 1 for X features; index 2 for O features
     """
-    root: tk.Tk
-    settings: Settings
-    color_frames: list
-    color_entries: list[dict]
 
     def __init__(self, root: tk.Tk, settings: Settings):
-        self.root = root
-        self.settings = settings
-        self.color_frames = [
+        self.root: tk.Tk = root
+        self.settings: Settings = settings
+        self.color_frames: tuple = (
             tk.LabelFrame(
                 self.root,
                 text="General",
-                **self.settings.COLOR_FRAME_CFG
+                **Settings.COLOR_FRAME_CFG
             ),
             tk.LabelFrame(
                 self.root,
                 text="X colors",
-                **self.settings.COLOR_FRAME_CFG
+                **Settings.COLOR_FRAME_CFG
             ),
             tk.LabelFrame(
                 self.root,
                 text="O colors",
-                **self.settings.COLOR_FRAME_CFG
+                **Settings.COLOR_FRAME_CFG
             )
-        ]
+        )
         self.exit_button = tk.Button(
             self.root,
             text="Save and Exit",
             width=25,
             command=self.to_submenu,
-            **self.settings.MENU_BUTTON_CFG
+            **Settings.MENU_BUTTON_CFG
         )
         self.color_frames[1].grid(row=0, column=1, pady=(10, 5))
         self.color_frames[2].grid(row=0, column=2, pady=(10, 5))
         self.color_frames[0].grid(row=1, column=1, columnspan=2, pady=5)
         self.exit_button.grid(row=2, column=1, columnspan=2, pady=10)
 
-        self.color_entries = [{}, {}, {}]
+        self.color_entries: list[dict] = [dict(), dict(), dict()]
+        color_label: tk.Label
+        color_entry: tk.Entry
 
         for plyr, feats in enumerate(self.settings.colors):  # plyr = general, X, O
             for row, (feat, color) in enumerate(feats.items()):
-                col_label = tk.Label(
+                color_label = tk.Label(
                     self.color_frames[plyr],
                     text=feat,
-                    font=self.settings.MENU_FONT,
-                    **self.settings.MENU_LABEL_CFG
+                    font=Settings.MENU_FONT,
+                    **Settings.MENU_LABEL_CFG
                 )
-                col_entry = tk.Entry(
+                color_entry = tk.Entry(
                     self.color_frames[plyr],
                     textvariable=tk.StringVar(value=color),
                     borderwidth=1,
-                    font=self.settings.MENU_FONT,
+                    font=Settings.MENU_FONT,
                     cursor="xterm",
                     foreground="Black",
                     background=color
                 )
 
-                col_label.grid(row=row, column=0, padx=10)
-                col_entry.grid(row=row, column=1)
+                color_label.grid(row=row, column=0, padx=10)
+                color_entry.grid(row=row, column=1)
 
                 # make the key release event update bg of textbox
-                col_entry.bind("<KeyRelease>", lambda _, _plyr=plyr, _feat=feat: self.update_col(_plyr, _feat))
-                self.color_entries[plyr][feat] = col_entry
+                color_entry.bind("<KeyRelease>", lambda _, _plyr=plyr, _feat=feat: self.update_color(_plyr, _feat))
+                self.color_entries[plyr][feat] = color_entry
 
-    def update_col(self, plyr: int, feat: str) -> None:
+    def update_color(self, plyr: int, feat: str) -> None:
         try:
             # try to set background color of the text widget
             self.color_entries[plyr][feat].config(bg=self.color_entries[plyr][feat].get())
@@ -476,10 +496,11 @@ class ColMenu:
 
 
 class LoadMenu:
-    def __init__(self, root: tk.Tk, parent: "GameMenu"):
+
+    def __init__(self, parent: 'GameMenu'):
         self.parent = parent
         self.toplevel = tk.Toplevel(
-            root,
+            parent.root,
             background=parent.settings.colors[0]["foreground"]
         )
         self.board_label = tk.Label(
@@ -542,7 +563,7 @@ class GameMenu:
     def __init__(self, root: tk.Tk, settings: Settings):
         self.root: tk.Tk = root
         self.settings: Settings = settings
-        self.root.bind("<Configure>", self.update_scrollbars)  # update_scrollbars when window is resized
+        self.root.bind("<Configure>", self.update_scrollbars)  # update_scrollbars when resize window
         self.root.bind("<MouseWheel>", self.scroll_vertical)  # scroll canvas vertically when any part of window has mouse wheel input
         self.root.bind("<Shift-MouseWheel>", self.scroll_horizontal)  # scroll canvas horizontally when any part of window has mouse wheel input
 
@@ -608,45 +629,45 @@ class GameMenu:
                 self.board_frame,
                 text="X turn",
                 width=13,
-                **self.settings.TURN_LABEL_CFG
+                **self.settings.turn_label_cfg
             ),
             # index 2 is O's
             tk.Label(
                 self.board_frame,
                 text="O turn",
                 width=13,
-                **self.settings.TURN_LABEL_CFG
+                **self.settings.turn_label_cfg
             )
         ]
         self.back_button = tk.Button(
             self.toolbar_frame,
             text="Back",
             command=self.to_submenu,
-            **self.settings.TOOLBAR_BUTTON_CFG
+            **self.settings.toolbar_button_cfg
         )
         self.new_game_button = tk.Button(
             self.toolbar_frame,
             text="Replay",
             state=tk.DISABLED,
             command=lambda: self.new_game(tt.EMPTY_BOARD),
-            **self.settings.TOOLBAR_BUTTON_CFG
+            **self.settings.toolbar_button_cfg
         )
         self.load_button = tk.Button(
             self.toolbar_frame,
             text="Load",
-            command=lambda: LoadMenu(self.root, self),
-            **self.settings.TOOLBAR_BUTTON_CFG
+            command=lambda: LoadMenu(self),
+            **self.settings.toolbar_button_cfg
         )
         self.cheat_button = tk.Button(
             self.toolbar_frame,
             text="Cheat",
             command=self.ai_play,
-            **self.settings.TOOLBAR_BUTTON_CFG
+            **self.settings.toolbar_button_cfg
         )
         self.hide_button = tk.Button(
             self.handle_frame,
             text="❮",
-            font=self.settings.MENU_FONT,
+            font=Settings.MENU_FONT,
             background=self.settings.colors[0]["foreground"],
             activebackground=self.settings.colors[0]["foreground"],
             cursor="hand2",
@@ -663,10 +684,10 @@ class GameMenu:
         self.board_len_slider = tk.Scale(
             self.settings_frame,
             variable=self.settings.board_len,
-            from_=3,
+            from_=Settings.MIN_BOARD_LEN,
             to=19,
             command=self.update_len,
-            **self.settings.SETTINGS_SLIDER_CFG
+            **self.settings.slider_cfg
         )
         self.win_len_label = tk.Label(
             self.settings_frame,
@@ -676,8 +697,11 @@ class GameMenu:
         self.win_len_slider = tk.Scale(
             self.settings_frame,
             variable=self.settings.win_len,
-            command=lambda win_len: tt.set_consts(tk_win_len=int(win_len)),  # val is automatically passed by slider when it changes and is a str
-            **self.settings.SETTINGS_SLIDER_CFG
+            **self.settings.slider_cfg,
+
+            # new value is automatically passed by slider when it changes
+            # cast since new value is str
+            command=lambda win_len: tt.set_consts(tk_win_len=int(win_len))
         )
         self.board_zoom_label = tk.Label(
             self.settings_frame,
@@ -690,18 +714,18 @@ class GameMenu:
             from_=4,
             to=13,
             command=self.update_zoom,
-            **self.settings.SETTINGS_SLIDER_CFG
+            **self.settings.slider_cfg
         )
         self.ai_first_checkbox = tk.Checkbutton(
             self.settings_frame,
-            text="Computer starts first",
+            text="AI starts first",
             command=self.ai_play,
-            **self.settings.SETTINGS_CHECKBOX_CFG
+            **self.settings.checkbox_cfg
         )
         self.ai_dropdown = tk.OptionMenu(
             self.settings_frame,
             self.settings.ai_type,
-            *AI
+            *Settings.AI_NAMES
         )
         self.ai_dropdown.config(
             background=self.settings.colors[0]["foreground"],
@@ -710,7 +734,7 @@ class GameMenu:
             cursor="hand2",
             relief=tk.GROOVE,
             borderwidth=4,
-            width=len(max(AI, key=len)) - 3
+            width=len(max(Settings.AI_NAMES, key=len)) - 3
         )
 
         self.is_dropdown_open: bool = False
@@ -728,7 +752,7 @@ class GameMenu:
             cursor="hand2",
             relief=tk.GROOVE,
             borderwidth=4,
-            width=len(max(AI, key=len)) - 2,
+            width=len(max(Settings.AI_NAMES, key=len)) - 2,
             command=self.print_graph
         )
         self.ind_checkbox = tk.Checkbutton(
@@ -736,7 +760,7 @@ class GameMenu:
             text="Show indexes & AI moves",
             variable=self.settings.show_ind,
             command=self.update_ind_and_highlight,
-            **self.settings.SETTINGS_CHECKBOX_CFG
+            **self.settings.checkbox_cfg
         )
         self.log = tk.Text(
             self.settings_frame,
@@ -837,9 +861,9 @@ class GameMenu:
 
     def update_ai_type(self) -> None:
         tt.t_table.clear()
-        self.log_insert("Cleared Ttable")
+        self.print_log("Cleared Ttable")
 
-        if self.settings.ai_type.get() == RECUR_PROB_AI:
+        if self.settings.ai_type.get() == Settings.RECUR_PROB_AI_NAME:
             self.graph_button.config(text="Show search histogram\n(impacts performance)")
         else:
             self.graph_button.config(text="Show search tree\n(impacts performance)")
@@ -904,7 +928,7 @@ class GameMenu:
         """
         # 1.
         tt.set_consts(tk_board_len=self.settings.board_len.get())
-        self.log_insert("Cleared Ttable")
+        self.print_log("Cleared Ttable")
 
         # 2.
         # create buttons if BOARD_AREA increased
@@ -1001,7 +1025,6 @@ class GameMenu:
 
             # DO NOT exclude first move since first move can win with loaded board
             if not self.check_result_pvc(False):
-
                 # need place_pretasks() in case need unhighlight last move
                 self.ai_play()
 
@@ -1032,12 +1055,12 @@ class GameMenu:
             background=self.settings.colors[0]["new_move"],
             state=tk.DISABLED
         )
-        self.log_insert(None)
+        self.print_log(None)
 
     def ai_thread_start(self) -> None:
         self.ai_thread = threading.Thread(target=self.ai_thread_work, daemon=True)
         self.ai_thread.start()
-        self.log_insert(f"Spawned thread:\n{self.ai_thread.name}")
+        self.print_log(f"Spawned thread:\n{self.ai_thread.name}")
         self.poll_ai()
 
     def ai_thread_work(self) -> None:
@@ -1081,7 +1104,7 @@ class GameMenu:
             args: tuple
 
             # if AI is snake and placed before, no need ai_moves
-            if self.settings.ai_type.get() == RECUR_SNAKE_AI and len(self.moved) >= 3:
+            if self.settings.ai_type.get() == Settings.RECUR_SNAKE_AI_NAME and len(self.moved) >= 3:
                 ai = tt.snake_search
                 self.graph = nx.DiGraph()
                 args = (
@@ -1098,27 +1121,27 @@ class GameMenu:
             else:
                 PREV_AI_MOVES: set[int | None] = set(self.ai_moves)
                 self.ai_moves = tt.gen_moves(self.board, self.moved[-2])
-                self.log_insert(f"AI moves:\n{self.ai_moves}")
+                self.print_log(f"AI moves:\n{self.ai_moves}")
 
-                if self.settings.ai_type.get() == RECUR_AND_OR_AI:
+                if self.settings.ai_type.get() == Settings.RECUR_AND_OR_AI_NAME:
                     ai = tt.recur_search
                     self.ai_moves = self.ai_moves[:15]  # can only search 15 squares in reasonable time
                     self.graph = nx.DiGraph()
                     args = (self.ai_moves.copy(),)  # must copy so AI thread doesn't refill main thread's ai_moves after end_game()
 
-                elif self.settings.ai_type.get() == ITER_AND_OR_AI:
+                elif self.settings.ai_type.get() == Settings.ITER_AND_OR_AI_NAME:
                     ai = tt.iter_search
                     self.ai_moves = self.ai_moves[:17]
                     self.graph = nx.DiGraph()
                     args = (set(self.ai_moves),)
 
-                elif self.settings.ai_type.get() == RECUR_PROB_AI:
+                elif self.settings.ai_type.get() == Settings.RECUR_PROB_AI_NAME:
                     ai = tt.prob_search
                     self.ai_moves = self.ai_moves[:10]
                     self.graph = dict.fromkeys(self.ai_moves, 0)
                     args = (self.ai_moves.copy(),)
 
-                elif self.settings.ai_type.get() == RECUR_SNAKE_AI:
+                elif self.settings.ai_type.get() == Settings.RECUR_SNAKE_AI_NAME:
                     ai = tt.snake_search_first_move
                     self.ai_moves = self.ai_moves[:16]
                     self.graph = nx.DiGraph()
@@ -1130,12 +1153,12 @@ class GameMenu:
                 # if prunned board different from last search, t_table is unusable
                 if not set(self.ai_moves).issubset(PREV_AI_MOVES):
                     tt.t_table.clear()
-                    self.log_insert("Cleared Ttable")
+                    self.print_log("Cleared Ttable")
 
             # unhighlight last ai_moves, highlight new ones
             self.update_ind_and_highlight()
 
-            self.log_insert("Searching...")
+            self.print_log("Searching...")
             # noinspection PyUnboundLocalVariable,PyTypeChecker
             ai(self.board, *args, self.graph, temp_highlight)
 
@@ -1153,12 +1176,12 @@ class GameMenu:
             return
 
         # thread ended normally
-        self.log_insert(f"Thread ended:\n{self.ai_thread.name}")
+        self.print_log(f"Thread ended:\n{self.ai_thread.name}")
 
         # moved[-1] is AI's move
         if self.moved[-1] is None:
             self.lock_board()
-            messagebox.showinfo("Result", "Computer resigns.\n\nAI: 'I have already computed my inevitable fate ...'")
+            messagebox.showinfo("Result", "AI resigns.\n\nAI: 'I have already computed my inevitable fate ...'")
             return
 
         self.place()
@@ -1179,7 +1202,7 @@ class GameMenu:
             self.lock_board()
             self.set_end_flags()
             if IS_AI:
-                if messagebox.askyesno("Result", f"Computer won {WIN_DIR}!\n\nAI: 'Shouldn\'t humans be smarter?'") is True:
+                if messagebox.askyesno("Result", f"AI won {WIN_DIR}!\n\nAI: 'Shouldn\'t humans be smarter?'") is True:
                     self.new_game(tt.EMPTY_BOARD)
             else:
                 if messagebox.askyesno("Result", f"You won {WIN_DIR}!\n\nAI: 'NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!'") is True:
@@ -1242,7 +1265,7 @@ class GameMenu:
                 widget.destroy()
 
             # set window to the SubMenu resolution & color
-            self.root.geometry(self.settings.WINDOW_DIM)
+            self.root.geometry(Settings.WINDOW_DIM)
             self.root.config(background="Black")
             SubMenu(self.root, self.settings)
             return True
@@ -1292,14 +1315,14 @@ class GameMenu:
             self.update_turn()
             self.update_ind_and_highlight()
             self.unlock_settings()
-            self.log_insert("Reset game menu")
-            self.log_insert(None)
+            self.print_log("Reset game menu")
+            self.print_log(None)
             self.unlock_board()
             return True
 
         return False
 
-    def log_insert(self, TEXT: str | None):
+    def print_log(self, TEXT: str | None):
         BEGIN: str = self.log.index(f"{tk.END}-1c")
 
         # common case
@@ -1309,7 +1332,7 @@ class GameMenu:
                 f"Move: {self.moved[-1] if self.moved else None}\n" +
                 f"Last player: {tt.plyr_of(self.board)}\n" +
                 f"Board: {self.board}\n" +
-                f"Ttable size: {len(tt.t_table)}\n\n"
+                f"Ttable len: {len(tt.t_table)}\n\n"
             )
 
         else:
@@ -1329,202 +1352,68 @@ class GameMenu:
             messagebox.showinfo("Warning", f"Perform an AI search first!")
             return
 
-        if self.settings.ai_type.get() == RECUR_PROB_AI:
+        if self.settings.ai_type.get() == Settings.RECUR_PROB_AI_NAME:
             self.print_histogram()
         else:
-            self.print_tree()
+            TreePrinter(self)
 
     def print_histogram(self) -> None:
         plt.figure(num="Histogram")
         bar = plt.bar(
             tuple(self.graph.keys()),
             tuple(self.graph.values()),
-            color=tuple(self.settings.WIN_COLOR if wscore >= 0 else self.settings.LOSE_COLOR for wscore in self.graph.values()),
+            color=tuple(Settings.NODE_COLORS[tt.WIN_SCORE] if wscore >= 0 else Settings.NODE_COLORS[-tt.WIN_SCORE] for wscore in self.graph.values()),
             edgecolor="Black",
             linewidth=1,
-            zorder=2  # show bars above x-axis
+            zorder=2  # show above x-axis
         )
         plt.bar_label(bar, label_type=tk.CENTER)
         plt.locator_params(axis=tk.X)  # set x tick interval
         plt.axhline(  # draw x-axis
             color="Silver",
             linewidth=1,
-            zorder=1  # show x-axis below bars
+            zorder=1  # show below bars
         )
         plt.xlabel("Root Move")
         plt.ylabel("Weighted Win Probability")
         plt.title(f"{plt.gca().get_ylabel()} of each {plt.gca().get_xlabel()}")
         plt.show()
 
-    def print_tree(self) -> None:
-        def recapture_bg(_=None) -> None:
-            """Retake screenshot after zoom or pan."""
-            nonlocal bg
-            fig.canvas.draw()  # redraw canvas to get correct bbox
-            bg = fig.canvas.copy_from_bbox(fig.bbox)
-
-        def update_infobox(event) -> None:
-            """If clicked on a node, update infobox to show its detailed information and animate scaling of clicked node."""
-            IS_NODE, INFO = fig_nodes.contains(event)
-
-            # if clicked on a node
-            if IS_NODE:
-                # get the node under cursor and its label
-                NODE = NODES[INFO["ind"][0]]
-                NEG_DEPTH: int = int(POS[NODE][1])
-                LABEL: plt.Text = fig_labels[NODE]
-
-                # update infobox
-                PARENTS = tuple(self.graph.predecessors(NODE))
-                CHILDS = tuple(self.graph.successors(NODE))
-
-                infobox.set_text(
-                    f"Node: {NODE}\n"
-                    f"Decoded:\n{tt.print_board(NODE, False)}"
-                    f"Last Player: {tt.char_of(tt.plyr_of(NODE))}\n"
-                    f"{len(PARENTS)} Parent: {PARENTS}\n"
-                    f"{len(PARENTS)} Eldest Sibling: {[next(self.graph.successors(parent)) for parent in PARENTS]}\n"
-                    
-                    # total # of children of root (assume root has max # of children) - depth + # of visited children
-                    # doesn't work for snake mode since assume factorial tree layout.
-                    f"{len(self.ai_moves) + NEG_DEPTH - len(CHILDS)} Skipped Children\n"
-
-                    f"{len(CHILDS)} Visited Children: {CHILDS}"
-                )
-
-                def update_scale(frame: int) -> None:
-                    if frame > MAX_FRAME:
-                        fig.canvas.draw_idle()
-                        return
-
-                    SCALE: float = 1 + 0.5 * math.sin(math.pi * frame / MAX_FRAME)
-                    LABEL.set_fontsize(10 * SCALE)  # 10 is moveal size of node
-
-                    fig.canvas.restore_region(bg)  # revert background to erase last frame
-                    fig.draw_artist(infobox)  # show temporary infobox while waiting for label animation
-                    fig.draw_artist(LABEL)
-                    fig.canvas.blit(fig.bbox)
-                    self.root.after(20, update_scale, frame + 1)
-
-                MAX_FRAME: int = 8
-                self.root.after(20, update_scale, 0)
-
-            # if not clicked on a node
-            else:
-                infobox.set_text(EMPTY_INFOBOX_TEXT)
-                fig.canvas.draw_idle()
-
-        def update_cursor(event) -> None:
-            """If mouse hover over a node, change cursor to hand2."""
-            IS_NODE, _ = fig_nodes.contains(event)
-            fig.canvas.get_tk_widget().config(cursor="hand2" if IS_NODE else "")
-
-        EMPTY_INFOBOX_TEXT: str = f"Total # of Nodes: {self.graph.number_of_nodes()}\nClick a node for more details!"
-        NODES: tuple = tuple(self.graph.nodes)
-        POS: dict[..., tuple[float, float]] = tt.recip_tree_pos(self.graph)
-        fig = plt.figure(num="Depth-first-search Tree")
-
-        # draw nodes and edges separately to set picker on nodes
-        fig_nodes = nx.draw_networkx_nodes(
-            self.graph,
-            POS,
-            node_shape='s',
-            alpha=0.0
-        )
-        # noinspection PyTypeChecker
-        fig_nodes.set_picker(True)
-
-        # use fig_labels insead of nx.draw_networkx_labels to color each label separately
-        fig_labels: dict = dict()
-        node_col: str
-        for node, (x, y) in POS.items():
-            # node not in t_table is possible during iter search
-            if node not in tt.t_table:
-                node_col = "White"
-            elif tt.t_table[node] == tt.WIN_SCORE:
-                node_col = self.settings.WIN_COLOR
-            elif tt.t_table[node] == 0:
-                node_col = self.settings.TIE_COLOR
-            else:
-                node_col = self.settings.LOSE_COLOR
-
-            fig_labels[node] = plt.text(
-                x, y, node,
-                ha=tk.CENTER,
-                va=tk.CENTER,
-                bbox=dict(facecolor=node_col, boxstyle="round", pad=0.4, linewidth=0.5),
-                color="Black",
-                family="Arial",
-                weight="bold",
-                size=10
-            )
-
-        nx.draw_networkx_edges(
-            self.graph, POS, arrows=False, alpha=0.75
-        )
-        nx.draw_networkx_edge_labels(
-            self.graph, POS, nx.get_edge_attributes(self.graph, "label"),
-            bbox=dict(facecolor="white", edgecolor="none", alpha=0.5, boxstyle="circle", pad=0),
-            font_color="Black",
-            font_family="Arial",
-            # font_size=10,
-            rotate=False
-        )
-
-        bg = None
-        recapture_bg()  # screenshot background WITHOUT infobox
-
-        infobox = plt.text(
-            0.0, 0.0, EMPTY_INFOBOX_TEXT,
-            transform=plt.gca().transAxes,  # use axes fraction for positioning
-            bbox=dict(facecolor="white", edgecolor="gray", alpha=0.8, boxstyle="square", pad=0.75),
-            family="Consolas",
-            linespacing=1.5
-        )
-
-        plt.axis(False)
-        plt.tight_layout()
-        fig.gca().callbacks.connect("xlim_changed", recapture_bg)
-        fig.gca().callbacks.connect("ylim_changed", recapture_bg)
-        fig.canvas.mpl_connect("resize_event", recapture_bg)
-        fig.canvas.mpl_connect("button_press_event", update_infobox)
-        fig.canvas.mpl_connect("motion_notify_event", update_cursor)
-        plt.show()
-
 
 class GameMenuT(GameMenu):
     """
-    :ivar label_scale: Inflation of the active timer, used for animation. Resets to 0 at the beginning of each turn.
-    :ivar time: How much time each player still has: index 1 is X's; index 2 is O's.
+    :ivar entry_scale: inflation of the active timer, used for animation. Resets to 0 at the beginning of each turn.
+    :ivar time: how much time each player still has: index 1 is X's, index 2 is O's.
     """
 
     def __init__(self, root: tk.Tk, settings: Settings):
-        self.is_countdown: bool = True
-        self.label_scale: int = 0
+
+        self.is_countdown: bool | None = None
+        self.entry_scale: int = 0
 
         super().__init__(root, settings)
 
     def __init_child__(self):
         self.time = [
             None,
-            tk.DoubleVar(value=self.settings.INIT_TIME),
-            tk.DoubleVar(value=self.settings.INIT_TIME)
+            tk.DoubleVar(value=Settings.DEFAULT_TIME),
+            tk.DoubleVar(value=Settings.DEFAULT_TIME)
         ]
-        self.trace1 = self.time[1].trace_add("write", lambda _, __, ___: self.validate(self.time[1]))
-        self.trace2 = self.time[2].trace_add("write", lambda _, __, ___: self.validate(self.time[2]))
+        self.trace1 = self.time[1].trace_add("write", lambda _, __, ___: self.validate(1))
+        self.trace2 = self.time[2].trace_add("write", lambda _, __, ___: self.validate(2))
 
         # change widget class of turn_labels from Label to LabelFrame
         self.turn_labels[1].destroy()
         self.turn_labels[2].destroy()
         self.turn_labels[1] = tk.LabelFrame(
             self.board_frame,
-            text="X turn",
-            **self.settings.TURN_LABEL_CFG
+            text="X timer",
+            **self.settings.turn_label_cfg
         )
         self.turn_labels[2] = tk.LabelFrame(
             self.board_frame,
-            text="O turn",
-            **self.settings.TURN_LABEL_CFG
+            text="O timer",
+            **self.settings.turn_label_cfg
         )
 
         self.time_entry = [
@@ -1570,6 +1459,7 @@ class GameMenuT(GameMenu):
 
         self.time_entry[1].config(state=tk.DISABLED)
         self.time_entry[2].config(state=tk.DISABLED)
+        self.is_countdown = True
         self.countdown()
 
     def unlock_settings(self) -> None:
@@ -1577,21 +1467,21 @@ class GameMenuT(GameMenu):
 
         self.time_entry[1].config(state=tk.NORMAL)
         self.time_entry[2].config(state=tk.NORMAL)
-        self.time[1].set(self.settings.INIT_TIME)
-        self.time[2].set(self.settings.INIT_TIME)
+        self.time[1].set(Settings.DEFAULT_TIME)
+        self.time[2].set(Settings.DEFAULT_TIME)
 
         # reset time_entry inflation
         self.update_zoom()
 
-    def validate(self, VAR: tk.DoubleVar) -> None:
+    def validate(self, PLYR: int) -> None:
+        # try to convert entered time to float
         try:
-            # try to convert the remain time to float
-            VAR.get()
+            self.time[PLYR].get()
 
+        # if time is not float
         except tk.TclError:
-            # if the remain time is not float, show a messagebox and reset the value
-            messagebox.askretrycancel("Warning", f"Enter a decimal number!")
-            VAR.set(self.settings.INIT_TIME)
+            messagebox.askretrycancel("Warning", f"Enter a decimal number for {tt.char_of(PLYR)} timer!")
+            self.time[PLYR].set(Settings.DEFAULT_TIME)
 
     def countdown(self) -> None:
         """Recursively decrement time."""
@@ -1609,12 +1499,13 @@ class GameMenuT(GameMenu):
             self.set_end_flags()
             return
 
-        # animate inflate of the current plyr's timer
-        # max scale must be odd number for ease-out
-        self.label_scale = min(self.label_scale + 2, 5)
+        # update scale of current plyr's timer
+        # update entry_scale after time_entry in case update_turn() resets scale
+        # max scale must be odd number for ease-out effect
         self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
-            font=("Courier", self.settings.board_zoom.get() * 3 + 2 + self.label_scale, "bold")
+            font=("Courier", self.settings.board_zoom.get() * 3 + 2 + self.entry_scale, "bold")
         )
+        self.entry_scale = min(self.entry_scale + 2, Settings.MAX_TIME_ENTRY_SCALE)
 
         # if X has under 5 secs left
         if TIME < 5.0:
@@ -1622,7 +1513,7 @@ class GameMenuT(GameMenu):
             if TIME % 1 < 0.4:
                 self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
                     relief=tk.SUNKEN,
-                    disabledbackground="white",
+                    disabledbackground="White",
                 )
             else:
                 self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
@@ -1644,8 +1535,8 @@ class GameMenuT(GameMenu):
         """
         Overload to include disable timer entry, switch timer and add bonus time.
         """
-        # reset inflate animation
-        self.label_scale = 0
+        # reset timer scale
+        self.entry_scale = 0
 
         super().update_turn()
 
@@ -1660,7 +1551,7 @@ class GameMenuT(GameMenu):
         self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
             relief=tk.SUNKEN,
             disabledforeground=self.settings.colors[tt.opp_of(tt.plyr_of(self.board))]["char"],
-            disabledbackground="white"
+            disabledbackground="White"
         )
 
         if self.moved:
@@ -1689,14 +1580,14 @@ class GameMenuV(GameMenu):
         self.queue_len_slider = tk.Scale(
             self.settings_frame,
             variable=self.settings.queue_len,
-            **self.settings.SETTINGS_SLIDER_CFG
+            **self.settings.slider_cfg
         )
         self.show_qfront_checkbox = tk.Checkbutton(
             self.settings_frame,
-            text="Show queue front",
+            text=Settings.SHOW_QFRONT_TEXT,
             variable=self.settings.show_qfront,
             command=self.update_qfront_highlight,
-            **self.settings.SETTINGS_CHECKBOX_CFG
+            **self.settings.checkbox_cfg
         )
 
         self.queue_len_label.grid(row=2, column=1, sticky=tk.E)
@@ -1717,7 +1608,7 @@ class GameMenuV(GameMenu):
 
     def update_qfront_highlight(self) -> None:
 
-        # queue_len is # moves allowed for each player
+        # queue_len is # moves allowed PER player
         # FULL_QUEUE_LEN is for both players
         FULL_QUEUE_LEN: int = 2 * self.settings.queue_len.get()
 
@@ -1732,7 +1623,6 @@ class GameMenuV(GameMenu):
         FULL_QUEUE_LEN: int = 2 * self.settings.queue_len.get()
 
         if len(self.moved) > FULL_QUEUE_LEN:
-
             POP_MOVE: int = self.moved.pop(0)
             self.board = tt.unplace(self.board, POP_MOVE)
             self.board_buttons[POP_MOVE].config(
@@ -1740,7 +1630,7 @@ class GameMenuV(GameMenu):
                 background=self.settings.colors[0]["board_button"],
                 state=tk.NORMAL
             )
-            self.log_insert(
+            self.print_log(
                 f"Pop move: {POP_MOVE}\n" +
                 f"Queue:\n{self.moved}"
             )
@@ -1765,7 +1655,7 @@ class GameMenuS(GameMenu):
     def __init_child__(self):
         # X always win if board_len is < 4. The slider automatically call update_len() to update cross-file vars.
         self.board_len_slider.config(from_=4)
-        self.settings.ai_type.set(RECUR_SNAKE_AI)
+        self.settings.ai_type.set(Settings.RECUR_SNAKE_AI_NAME)
 
     def update_len(self, _=None) -> None:
         super().update_len()
@@ -1821,28 +1711,357 @@ class GameMenuS(GameMenu):
                     )
 
 
+class TreePrinter:
+
+    def __init__(self, parent: GameMenu):
+
+        self.root = parent.root
+        self.tree = parent.graph
+        self.ai_moves = parent.ai_moves
+        self.print_log = parent.print_log
+        self.NODES: tuple[int] = tuple(self.tree.nodes)
+        self.TREE_INFO: str = (
+                f"Total # Nodes: {len(self.NODES)}\n" +
+                "Click a node for more details!"
+        )
+        LEGEND_HANDLES: tuple[Patch] = (
+            Patch(facecolor=f"{Settings.NODE_COLORS[-tt.WIN_SCORE]}", edgecolor="Black", label="Lose"),
+            Patch(facecolor=f"{Settings.NODE_COLORS[0]}", edgecolor="Black", label="Tie"),
+            Patch(facecolor=f"{Settings.NODE_COLORS[tt.WIN_SCORE]}", edgecolor="Black", label="Win"),
+            Patch(facecolor=f"{Settings.NODE_COLORS[None]}", edgecolor="Black", label="Unvisited"),
+
+            # use last legend to show node/tree info
+            Patch(facecolor=tk.NONE, label=self.TREE_INFO)
+        )
+        self.fig = plt.figure(num="Depth-first-search Tree", layout="constrained")
+        self.ax: Axes = plt.gca()
+        self.ax.axis(False)
+
+        # store node attributes in nx.DiGraph instead of new lists
+        self.set_nodes_pos()
+        self.set_nodes_attrs()
+        self.set_edges_attrs()
+
+        # draw all nodes as one artist
+        # optimization: did not draw one artist per node
+        self.nodes_collection: PathCollection = PathCollection(
+            paths=(Path.unit_circle(),),
+            offset_transform=self.ax.transData,  # treat offsets as data coords instead of pixel coords
+            transform=IdentityTransform(),  # prevent any other transformations
+            edgecolors=(0, 0, 0, Settings.EDGE_ALPHA),
+            picker=True,
+            zorder=3,  # show above edges
+            **self.get_nodes_attrs()
+        )
+        self.ax.add_collection(self.nodes_collection)
+
+        # draw all edges as one artist
+        self.EDGES_COLLECTION: LineCollection = nx.draw_networkx_edges(
+            self.tree,
+            nx.get_node_attributes(self.tree, "pos"),
+            alpha=Settings.EDGE_ALPHA,
+            arrows=False
+        )
+
+        # draw all edge labels as one artist
+        self.e_labels_collection: PathCollection = PathCollection(
+            offset_transform=self.ax.transData,
+            transform=IdentityTransform(),
+            facecolors="Black",
+            sizes=(Settings.NODE_SIZE * 2,),
+            zorder=2,  # show above background
+            **self.get_edges_attrs()
+        )
+        self.ax.add_collection(self.e_labels_collection)
+
+        # draw all edge label backgrounds as one artist
+        self.e_labels_bg_collection: PathCollection = PathCollection(
+            paths=(Path.unit_circle(),),
+            offsets=tuple(nx.get_edge_attributes(self.tree, "pos").values()),
+            offset_transform=self.ax.transData,
+            transform=IdentityTransform(),
+            facecolors="White",
+            sizes=(Settings.NODE_SIZE * 0.4,),
+            alpha=Settings.EDGE_ALPHA,
+            zorder=1
+        )
+        self.ax.add_collection(self.e_labels_bg_collection)
+
+        self.legend: Legend = self.ax.legend(
+            handles=LEGEND_HANDLES,
+            loc="lower left",
+            handlelength=1,
+            handleheight=1,
+            handletextpad=0.5,
+            prop=FontProperties(family="Consolas")
+        )
+        self.info_text: Text = self.legend.get_texts()[-1]
+        self.info_text.set_position((-19, 0))
+
+        self.func_animation: 'Callable | None' = None
+
+        self.ax.callbacks.connect("xlim_changed", self.repos_edge_labels)
+        self.ax.callbacks.connect("ylim_changed", self.repos_edge_labels)
+        self.fig.canvas.mpl_connect("button_press_event", self.update_info_text)
+        self.fig.canvas.mpl_connect("motion_notify_event", self.update_cursor)
+        parent.print_log(f"No.of artists: {len(self.ax.get_children())}")
+        plt.show()
+
+    def update_info_text(self, event: MouseEvent) -> None:
+        """
+        If clicked on node, update info_text to show information about the node.
+        If not, update info_text to show information about the tree.
+        """
+        IS_NODE, INFO = self.nodes_collection.contains(event)
+
+        # if clicked on node
+        if IS_NODE:
+            # get the node under cursor and its label
+            IND: int = INFO["ind"][0]
+            NODE: int = self.NODES[IND]
+            attrs: dict = self.tree.nodes[NODE]
+            DEPTH: int = attrs["pos"][1]
+            PARENTS = tuple(self.tree.predecessors(NODE))
+            CHILDS = tuple(self.tree.successors(NODE))
+
+            # copy node to clipboard
+            self.root.clipboard_clear()
+            self.root.clipboard_append(NODE)
+            self.root.update()
+            self.print_log(f"Copied to clipboard:\n{NODE}")
+
+            self.info_text.set_text(
+                f"Board:\n{tt.print_board(NODE, False)}" +
+                f"Last Player: {tt.char_of(tt.plyr_of(NODE))}\n" +
+                f"Board in Base10: {NODE}\n" +
+
+                # can have multiple parent due to transposition
+                f"{len(PARENTS)} Parent(s): {", ".join(map(str, PARENTS))}\n" +
+
+                f"{len(CHILDS)} Visited Child(s): {", ".join(map(str, CHILDS))}\n" +
+
+                # total # childs of root (assume root has max # childs) - depth + # visited childs
+                # since DEPTH is negative, + DEPTH instead of - DEPTH
+                # doesn't work for snake AI since assume permutation tree
+                f"{len(self.ai_moves) + DEPTH - len(CHILDS)} Skipped Child(s)"
+            )
+            # no need draw_idle() since FuncAnimation() automatically redraw
+
+            # MUST assign FuncAnimation() to variable that lasts the entire animation so it is not garbage-collected
+            self.func_animation = FuncAnimation(
+                self.fig,
+                self.update_node_scale,
+                fargs=(attrs,),
+                frames=Settings.MAX_NODE_FRAME + 1,  # +1 since frames is exclusive
+                interval=0,
+                blit=True,
+                repeat=False
+            )
+
+        # if not clicked on node
+        else:
+            self.info_text.set_text(self.TREE_INFO)
+            self.fig.canvas.draw_idle()
+
+    def update_node_scale(self, FRAME: int, attrs: dict) -> tuple[Artist, ...]:
+        """
+        :return: iterable of artists that were changed, required by FuncAnimation() to blit.
+        """
+        SCALE: float = (
+            Settings.NODE_SIZE
+            + 100 * math.sin(
+                    math.pi * math.sqrt(FRAME / Settings.MAX_NODE_FRAME)
+            )
+        )
+        attrs["size"] = SCALE
+        self.nodes_collection.set_sizes(tuple(nx.get_node_attributes(self.tree, "size").values()))
+
+        return self.nodes_collection, self.legend
+
+    def update_cursor(self, EVENT: MouseEvent) -> None:
+        """If mouse hover over node, change cursor to hand2."""
+
+        IS_NODE, _ = self.nodes_collection.contains(EVENT)
+        self.fig.canvas.get_tk_widget().config(cursor="hand2" if IS_NODE else '')
+
+    def repos_edge_labels(self, _):
+
+        # get window size in pixel coords
+        BBOX: Bbox = self.ax.get_window_extent()
+
+        for parent, child, attrs in self.tree.edges(data=True):
+
+            # transform into pixel coords
+            p0 = self.ax.transData.transform(self.tree.nodes[parent]["pos"])
+            p1 = self.ax.transData.transform(self.tree.nodes[child]["pos"])
+
+            TRIMMED: tuple[tuple[float, float]] = tt.trim_line(
+                p0, p1,
+                BBOX
+            )
+            if TRIMMED is not None:
+                # center label at midpoint of visible section
+                # then transform back to data coords
+                NEW_POS: tuple[float, float] = self.ax.transData.inverted().transform(
+                    tt.midpoint(
+                        *TRIMMED
+                    )
+                )
+                self.tree[parent][child]["pos"] = NEW_POS
+
+        LABELS_POS: tuple[tuple[float, float]] = tuple(nx.get_edge_attributes(self.tree, "pos").values())
+        self.e_labels_collection.set_offsets(LABELS_POS)
+        self.e_labels_bg_collection.set_offsets(LABELS_POS)
+        self.fig.canvas.draw_idle()
+
+    def set_nodes_pos(self) -> None:
+        """
+        Set position (x,y) for each node.
+        Store node position in the "pos" attribute of each node.
+        """
+
+        def traverse(NODE: int, X: float, Y: float, SUBTREE_WIDTH: float):
+            """
+            Recursively store coord of current node, and calculate coord of child nodes.
+            :param NODE: current node, root of the subtree in SUBTREE_WIDTH.
+            """
+            self.tree.nodes[NODE]["pos"] = (X, Y)
+
+            # only childs without pos yet
+            CHILDS: tuple[int] = tuple(node for node in self.tree.successors(NODE) if "pos" not in self.tree.nodes[node])
+            if CHILDS:
+                INTERVAL_CNT: int = len(CHILDS) - 1
+
+                # x-dist between each child
+                CHILD_DELTA_X: float = SUBTREE_WIDTH / (INTERVAL_CNT + PAD_WIDTH * 2)
+
+                # x-coord of leftmost child
+                LEFTMOST_X: float = X - SUBTREE_WIDTH / 2 + PAD_WIDTH * CHILD_DELTA_X
+
+                # assign positions for each unvisited child
+                for i, child in enumerate(CHILDS):
+                    traverse(child, LEFTMOST_X + CHILD_DELTA_X * i, Y - 1, CHILD_DELTA_X)
+
+        # every subtree has two pads on both side, this is for one side
+        # this is relative to CHILD_DELTA_X
+        # absolute pad width = 0.5 * CHILD_DELTA_X
+        PAD_WIDTH: float = 0.5
+
+        # select the first node as root
+        # no need to check if tree is empty
+        ROOT: int = next(iter(self.tree))
+        traverse(ROOT, 0.0, 0, 1)
+
+    def set_nodes_attrs(self) -> None:
+        """
+        Attributes added for each node:
+            1. color
+            2. size
+        """
+        node_color: str
+
+        for node, attrs in self.tree.nodes(data=True):
+
+            # node not in t_table is possible during iter search
+            if node not in tt.t_table:
+                node_color = Settings.NODE_COLORS[None]
+            else:
+                node_color = Settings.NODE_COLORS[tt.t_table[node]]
+
+            attrs["color"] = node_color
+            attrs["size"] = Settings.NODE_SIZE
+
+    def set_edges_attrs(self) -> None:
+        """
+        Attributes added for each edge:
+            1. pos
+            2. textpath: path of label text
+        """
+
+        # create TextPath for label texts
+        textpaths: dict[int, TextPath] = {
+            move: TextPath(
+                (0, 0),
+                str(move),
+                prop=FontProperties(size=1)
+            )
+            for move in self.ai_moves
+        }
+        # since TextPath((0, 0), ...) has origin at the text's baseline, it's offset from the label position
+        # use Affine2D to center it around (0, 0)
+        for move, textpath in textpaths.items():
+            mid_x: int
+            mid_y: int
+            bbox: Bbox = textpath.get_extents()
+            mid_x, mid_y = tt.midpoint((bbox.x0, bbox.y0), (bbox.x1, bbox.y1))
+
+            textpaths[move] = textpath.transformed(
+                Affine2D().translate(
+                    -mid_x, -mid_y
+                )
+            )
+
+        for parent, child, attrs in self.tree.edges(data=True):
+            # place label in between parent and child
+            attrs["pos"] = tt.midpoint(
+                self.tree.nodes[parent]["pos"],
+                self.tree.nodes[child]["pos"]
+            )
+            attrs["textpath"] = textpaths[attrs["move"]]
+
+    def get_nodes_attrs(self) -> dict[str, list]:
+        offsets: list[tuple[float, float]] = []
+        facecolors: list[str] = []
+        sizes: list[float] = []
+
+        for _, attrs in self.tree.nodes(data=True):
+            offsets.append(attrs["pos"])
+            facecolors.append(attrs["color"])
+            sizes.append(attrs["size"])
+
+        return {
+            "offsets": offsets,
+            "facecolors": facecolors,
+            "sizes": sizes
+        }
+
+    def get_edges_attrs(self) -> dict[str, list]:
+        offsets: list[tuple[float, float]] = []
+        paths: list[TextPath] = []
+
+        for _, _, attrs in self.tree.edges(data=True):
+            paths.append(attrs["textpath"])
+            offsets.append(attrs["pos"])
+
+        return {
+            "offsets": offsets,
+            "paths": paths
+        }
+
+
 # === Help Pop-ups ===
-FOR_MORE_DETAILS: str = "For more details, read the ⍰ of the Traditional mode."
+MORE_INFO_TEXT: str = "For more information, read the ⍰ of the Traditional mode."
+VERSION_TEXT: str = "Tic Tac Toe v18"
 
 
 def default_help() -> None:
     messagebox.showinfo("Help",
-                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between 2 and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {RECUR_AND_OR_AI} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {ITER_AND_OR_AI} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {RECUR_AND_OR_AI}.\n\nThe {RECUR_PROB_AI} has statistical traps and traverses the entire tree, making it the weakest and slowest AI. However, it is significant since it is my first original AI.\n\nThe {RECUR_SNAKE_AI} uses the same algorithm as the {RECUR_AND_OR_AI}, and follows snake rules even if not in Snake mode.")
+                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AND_OR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {Settings.ITER_AND_OR_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AND_OR_AI_NAME}.\n\nThe {Settings.RECUR_PROB_AI_NAME} has statistical traps and traverses the entire tree, making it the weakest and slowest AI. However, it is significant since it is my first original AI.\n\nThe {Settings.RECUR_SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AND_OR_AI_NAME}, and follows snake rules even if not in Snake mode.")
 
 
 def time_help() -> None:
     messagebox.showinfo("Help",
-                        f"Each player has a certain amount of time to complete the game. At the start, you can set the time.\n\nAfter each move, you earn 1 extra second!\n\nThe AIs don't know there's a time limit, but they might get faster after a few games.\n\n{FOR_MORE_DETAILS}")
+                        f"Each player has a certain amount of time to complete the game. At the start, you can set the time.\n\nAfter each move, you earn 1 extra second!\n\nThe AIs don't know there's a time limit, but they might get faster after a few games.\n\n{MORE_INFO_TEXT}")
 
 
 def vanish_help() -> None:
     messagebox.showinfo("Help",
-                        f"After a certain number of moves, your oldest move will vanish!\n\nPoor memory? Enable 'Show queue front' to highlight your oldest move in yellow.\n\nThe number of moves you can have on the board at any time is determined by 'Queue length'. What is a queue you asked? Go study computer science!\n\nBefore you go, here's a tip: the AIs don't know that moves vanish!\n\n{FOR_MORE_DETAILS}")
+                        f"After a certain number of moves, your oldest move will vanish!\n\nPoor memory? Enable '{Settings.SHOW_QFRONT_TEXT}' to highlight your oldest move in yellow.\n\nThe number of moves you can have on the board at any time is determined by 'Queue length'. What is a queue you asked? Go study computer science!\n\nBefore you go, here's a tip: the AIs don't know that moves vanish!\n\n{MORE_INFO_TEXT}")
 
 
 def snake_help() -> None:
     messagebox.showinfo("Help",
-                        f"For your first move, you can place wherever you want.\n\nAfterwards, you can only place around your last move ( your snake's head ). Watch where your snake is going, as turning around can take some time.\n\nBesides winning traditionally, you can also win by trapping your opponent in a corner! I recommend playing on a 7x7 or larger board.\n\n{FOR_MORE_DETAILS}")
+                        f"For your first move, you can place wherever you want.\n\nAfterwards, you can only place around your last move ( your snake's head ). Watch where your snake is going, as turning around can take some time.\n\nBesides winning traditionally, you can also win by trapping your opponent in a corner! I recommend playing on a 7x7 or larger board.\n\n{MORE_INFO_TEXT}")
 
 
 def changelog() -> None:
@@ -1867,8 +2086,6 @@ v16, v17, v18: see GitHub\n
 
 
 if __name__ == "__main__":
-    VER: str = "Tic Tac Toe v18"
-
-    root = tk.Tk()
-    MainMenu(root, Settings())
-    root.mainloop()
+    _root = tk.Tk()
+    MainMenu(_root, Settings())
+    _root.mainloop()

@@ -97,7 +97,7 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
     #     NO, NO, NO, NO, NO
 
     # OPTIMIZATION STRATEGY:
-    # Instead of checking every slot to find those that r outside the checked area, I give the AI indexes of slots that r outside.
+    # Instead of checking every slot to find those that r outside the checked area, I give the AI_NAMES indexes of slots that r outside.
     for origin in check_winner_area:
         # OPTIMIZATION STRATEGIES (numbered):
         # 1. Use 'not in' as it is faster than .count()
@@ -147,7 +147,7 @@ def check_winner_anywhere(board: list, board_sz: int, win_len: int, check_winner
     return ' ', ' ',
 
 
-# ALL FUNCTIONS BELOW ARE FOR THE AI
+# ALL FUNCTIONS BELOW ARE FOR THE AI_NAMES
 def ask_input(plyr: str, main_board: list, board_sz: int, win_len: int, check_winner_area: list) -> int:
     while check_winner_anywhere(main_board, board_sz, win_len, check_winner_area) == (' ', ' ',):
         print_board(main_board, board_sz)
@@ -286,7 +286,7 @@ def pc_input(pc: str, main_board: list, board_sz: int, win_len: int, check_winne
         # branches a parent node down by 1 layer
         # returns a list of all possible moves that the player could play next
         # OPTIMIZATION STRATEGIES:
-        # instead of every time checking all slots in the parent node for empty slots for simulation, I give the AI indexes of all slots that r empty
+        # instead of every time checking all slots in the parent node for empty slots for simulation, I give the AI_NAMES indexes of all slots that r empty
         children = [
             nxt_plyr
         ]
