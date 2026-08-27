@@ -910,8 +910,9 @@ class GameMenu:
         2. Color/uncolor buttons with ai_moves.
         """
         for sq, button in enumerate(self.board_buttons):
-            # if empty
-            if not tt.plyr_at(self.board, sq):
+
+            # if empty and not currently searched by AI
+            if not tt.plyr_at(self.board, sq) and (not self.moved or sq != self.moved[-1]):
                 button.config(
                     text=sq if self.settings.show_ind_and_aimoves.get() else '',
                     background=self.settings.colors[0][
@@ -1114,7 +1115,7 @@ class GameMenu:
 
                 if self.settings.ai_type.get() == Settings.RECUR_AI_NAME:
                     AI = tt.recur_search
-                    self.ai_moves = self.ai_moves[:15]  # can only search 15 squares in reasonable time
+                    self.ai_moves = self.ai_moves[:14]  # can only search 14 squares in reasonable time
                     self.graph = nx.DiGraph()
                     args = (self.ai_moves.copy(),)  # must copy so AI thread doesn't refill main thread's ai_moves after end_game()
 
@@ -1369,9 +1370,9 @@ class GameMenu:
         )
         plt.bar_label(bar, label_type=tk.CENTER)
         plt.locator_params(axis=tk.X)  # set x tick interval
-        plt.axhline(  # draw x-axis
-            color="Silver",
-            linewidth=1,
+        plt.axhline(  # draw y=0
+            color="Black",
+            linewidth=0.5,
             zorder=1  # show below bars
         )
         plt.xlabel("Root Move")
