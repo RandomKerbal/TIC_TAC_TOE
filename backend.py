@@ -1,4 +1,5 @@
 import collections
+import math
 import operator
 import random
 from collections.abc import Callable
@@ -589,15 +590,16 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
     return 0
 
 
-def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], send: Callable[[int], None]) -> None:
+def prob_search(ROOT_BOARD: int, moves: list[int], nscores: dict[int, float], send: Callable[[int], None]) -> None:
     """
-    :param wscores: key = root move, val = its weighted score.
+    :param nscores: (normalized score) key = root move, val = its normalized score.
 
-    Traverse the entire tree to get each root node's weighted win probability ((# win leaf childs - # lose leaf childs) / (# win leaf childs + # lose leaf childs)).
-    Closest to actual machine learning, but least effecient among all AIs.
+    Traverse the entire tree to get each root child's normalized score:
+    (# win leaf childs - # lose leaf childs) / (# win leaf childs + # lose leaf childs)
+
     Has Statistical Traps: a node with the least lose childs but lose if best play.
 
-    See also :func:`recur_search()`.
+    :return: Final move is returned via send() instead.
     """
 
     def traverse(BOARD: int) -> tuple[int, int]:
@@ -613,12 +615,14 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], se
         def score_by_depth() -> int:
             if plyr_of(child_board) == HUMAN:
                 # penalize
-                # -2 so loss is more impactful than win
+                # -2 so lose is more impactful than win
                 return len(moves) // 2 - 2
+
+            # if plyr == BOT
             else:
                 # reward
                 # len(moves) for depth bonus
-                # //2 to only count the layers that are the player's turn
+                # //2 to only count the depths with the player's turn
                 # +1 because len(moves) can be 0
                 return len(moves) // 2 + 1
 
@@ -648,7 +652,7 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], se
                 moves.insert(i, child_move)
 
             if is_root() and child_num > 0:
-                wscores[child_move] = child_score / child_num
+                nscores[child_move] = child_score / child_num
                 child_score = 0
                 child_num = 0
 
@@ -657,18 +661,16 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], se
     HUMAN: int = plyr_of(ROOT_BOARD)
     traverse(ROOT_BOARD)
 
-    # pick random move from root moves with highest wscore
-    # use send(), NOT return
+    # pick random move from root moves with highest nscore
     send(
         random.choice(
-            tuple(move for move, score in wscores.items() if score == max(wscores.values()))
+            tuple(move for move, score in nscores.items() if score == max(nscores.values()))
         )
     )
 
 
-# === Graphing Functions ===
 def print_board(BOARD: int, SHOW_AXES: bool = True) -> str:
-    """Does not print to console, only return as string."""
+    """Return as string instead of printing to console."""
     output = ""
     if SHOW_AXES:
         # x axis

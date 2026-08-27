@@ -264,8 +264,7 @@ class MainMenu:
 
     def exit(self: "MainMenu | SubMenu | GameMenu") -> None:
         messagebox.showinfo("Afterword",
-                            "Thank you for playing TIC-TAC-TOE!\n\nI independently spent over a year building and updating this app.\n\nIn this project, I designed the AI that finds the highest win probability, arranged the GUI elements in the most ergonomic way, optimized the algorithms, fixed bugs, and learned tkinter.\n\nHope you enjoyed it!")
-
+                            "Thank you for playing TIC-TAC-TOE!\n\nI independently spent over a year building and updating this app.\n\nIn this project, I developed the AI that finds the highest win probability, arranged the GUI elements in the most ergonomic way, optimized the algorithms, fixed bugs, and learned tkinter.\n\nHope you enjoyed it!")
         self.root.destroy()
 
 
@@ -827,7 +826,7 @@ class GameMenu:
             self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
         self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 13))
         self.log.grid(columnspan=2, row=11, column=1, sticky=tk.NSEW)
-        self.log_clear.place(relx=1.0, rely=0.0, anchor=tk.NE)  # take the NE corner, stick to top-right corner of parent
+        self.log_clear.place(relx=1.0, rely=1.0, anchor=tk.SE)  # take the SE corner, stick to bottom-right corner of parent
 
         self.__init_child__()
 
@@ -872,6 +871,8 @@ class GameMenu:
     def update_ai_type(self) -> None:
         tt.t_table.clear()
         self.print_log("Cleared Ttable")
+        self.print_log(f"Selected AI:\n{self.settings.ai_type.get()}")
+        self.graph = None
 
         if self.settings.ai_type.get() == Settings.PROB_AI_NAME:
             self.graph_button.config(text="Show search histogram\n(impacts performance)")
@@ -1160,7 +1161,8 @@ class GameMenu:
             # uncolor last ai_moves, color new ones
             self.root.after(0, self.update_ind_and_aimoves_buttons)
 
-            self.print_log(f"AI moves:\n{self.ai_moves}\n\nSearching...")
+            self.print_log(f"AI moves:\n{self.ai_moves}")
+            self.print_log("Searching...")
             AI(self.board, *args, self.graph, send)
 
         self.root.after(0, self.ai_thread_end)
@@ -1370,7 +1372,7 @@ class GameMenu:
             TreePrinter(self)
 
     def print_histogram(self) -> None:
-        plt.figure(num="Histogram")
+        fig = plt.figure(num="Histogram" + str(len(plt.get_fignums()) + 1))
         bar = plt.bar(
             tuple(self.graph.keys()),
             tuple(self.graph.values()),
@@ -1379,7 +1381,10 @@ class GameMenu:
             linewidth=0.5,
             zorder=2  # show above x-axis
         )
-        plt.bar_label(bar, label_type=tk.CENTER)
+        plt.bar_label(
+            bar,
+            label_type=tk.CENTER
+        )
         plt.locator_params(axis=tk.X)  # set x tick interval
         plt.axhline(  # draw y=0
             color="Black",
@@ -1387,8 +1392,8 @@ class GameMenu:
             zorder=1  # show below bars
         )
         plt.xlabel("Root Move")
-        plt.ylabel("Weighted Win Probability")
-        plt.title(f"{plt.gca().get_ylabel()} of each {plt.gca().get_xlabel()}")
+        plt.ylabel("Normalized Score")
+        plt.title(f"{plt.gca().get_ylabel()} of Each {plt.gca().get_xlabel()}")
         plt.show()
 
 
@@ -1742,7 +1747,10 @@ class TreePrinter:
             # use last legend to show node/tree info
             Patch(facecolor=tk.NONE, label=self.TREE_INFO)
         )
-        self.fig = plt.figure(num="Depth-first-search Tree", layout="constrained")
+        self.fig = plt.figure(
+            num="Depth-first-search Tree" + str(len(plt.get_fignums()) + 1),
+            layout="constrained"
+        )
         self.ax: Axes = plt.gca()
         self.ax.axis(False)
 
@@ -1825,8 +1833,9 @@ class TreePrinter:
 
         # if clicked on node
         if IS_NODE:
-            # get the node under cursor & its label
-            IND: int = INFO["ind"][0]
+            # last index in INFO["ind"] is the highest node's
+            IND: int = INFO["ind"][-1]
+
             NODE: int = self.NODES[IND]
             attrs: dict = self.tree.nodes[NODE]
             DEPTH: int = attrs["pos"][1]
@@ -2057,7 +2066,7 @@ VERSION_TEXT: str = "Tic Tac Toe v18"
 
 def default_help() -> None:
     messagebox.showinfo("Help",
-                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {Settings.ITER_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AI_NAME}.\n\nThe {Settings.PROB_AI_NAME} has statistical traps and traverses the entire tree, making it the weakest and slowest AI. However, it is significant since it is my first original AI.\n\nThe {Settings.SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AI_NAME}, and follows snake rules even if not in Snake mode.")
+                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {Settings.ITER_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AI_NAME}.\n\nThe {Settings.PROB_AI_NAME} has statistical traps and traverses the entire tree, making it the weakest and slowest AI. However, it is special since it is my first original AI and closest to machine learning.\n\nThe {Settings.SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AI_NAME}, and follows snake rules even if not in Snake mode.")
 
 
 def time_help() -> None:
