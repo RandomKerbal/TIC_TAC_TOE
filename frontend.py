@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.backend_bases import MouseEvent
-from matplotlib.collections import PathCollection, LineCollection
+from matplotlib.collections import PathCollection
 from matplotlib.font_manager import FontProperties
 from matplotlib.legend import Legend
 from matplotlib.patches import Patch
@@ -498,7 +498,7 @@ class ColMenu:
 class LoadMenu:
 
     def __init__(self, parent: 'GameMenu'):
-        self.parent = parent
+        self.parent: GameMenu = parent
         self.toplevel = tk.Toplevel(
             parent.root,
             background=parent.settings.colors[0]["foreground"]
@@ -772,11 +772,20 @@ class GameMenu:
             width=27,
             takefocus=False  # log cause focus to stuck
         )
+        self.log_clear = tk.Button(
+            self.log,
+            background=self.settings.colors[0]["background"],
+            activebackground=self.settings.colors[0]["background"],
+            text="🗑",
+            command=lambda: self.log.delete("1.0", tk.END),
+            borderwidth=0,
+            cursor="hand2"
+        )
         self.log.tag_config("X_TURN_TAG", foreground=self.settings.colors[1]["char"])
         self.log.tag_config("O_TURN_TAG", foreground=self.settings.colors[2]["char"])
         self.log.bind("<Key>", lambda event: None if event.keysym in ("Up", "Down", tk.LEFT, tk.RIGHT) else "break")  # disable all user inputs in log except arrow keys
-        self.log.bind("<Control-c>", lambda _: self.log.event_generate("<<Copy>>"))  # explicitly enable copy
-        self.log.bind("<Control-a>", lambda _: self.log.event_generate("<<SelectAll>>"))  # explicitly enable select all
+        self.log.bind("<Control-c>", lambda _: self.log.event_generate("<<Copy>>"))  # enable copy
+        self.log.bind("<Control-a>", lambda _: self.log.event_generate("<<SelectAll>>"))  # enable select all
 
         self.root.config(background=self.settings.colors[0]["background"])
         self.settings_frame.pack(side=tk.LEFT, expand=False, fill=tk.Y)
@@ -818,6 +827,7 @@ class GameMenu:
             self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
         self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 13))
         self.log.grid(columnspan=2, row=11, column=1, sticky=tk.NSEW)
+        self.log_clear.place(relx=1.0, rely=0.0, anchor=tk.NE)  # take the NE corner, stick to top-right corner of parent
 
         self.__init_child__()
 
@@ -1147,12 +1157,13 @@ class GameMenu:
                     tt.t_table.clear()
                     self.print_log("Cleared Ttable")
 
-            # uncolor last ai_moves, color new ones in case show AI moves is on
+            # uncolor last ai_moves, color new ones
             self.root.after(0, self.update_ind_and_aimoves_buttons)
 
             self.print_log(f"AI moves:\n{self.ai_moves}\n\nSearching...")
             AI(self.board, *args, self.graph, send)
-            self.root.after(0, self.ai_thread_end)
+
+        self.root.after(0, self.ai_thread_end)
 
     def update_aimove(self, NEXT_MOVE: int) -> None:
         """
@@ -1365,7 +1376,7 @@ class GameMenu:
             tuple(self.graph.values()),
             color=tuple(Settings.NODE_COLORS[tt.WIN_SCORE] if wscore >= 0 else Settings.NODE_COLORS[-tt.WIN_SCORE] for wscore in self.graph.values()),
             edgecolor="Black",
-            linewidth=1,
+            linewidth=0.5,
             zorder=2  # show above x-axis
         )
         plt.bar_label(bar, label_type=tk.CENTER)
@@ -1715,10 +1726,8 @@ class TreePrinter:
 
     def __init__(self, parent: GameMenu):
 
-        self.root = parent.root
-        self.tree = parent.graph
-        self.ai_moves = parent.ai_moves
-        self.print_log = parent.print_log
+        self.parent: GameMenu = parent
+        self.tree: nx.DiGraph = parent.graph
         self.NODES: tuple[int] = tuple(self.tree.nodes)
         self.TREE_INFO: str = (
                 f"Total # Nodes: {len(self.NODES)}\n" +
@@ -1756,7 +1765,7 @@ class TreePrinter:
         self.ax.add_collection(self.nodes_collection)
 
         # draw all edges as one artist
-        self.EDGES_COLLECTION: LineCollection = nx.draw_networkx_edges(
+        nx.draw_networkx_edges(
             self.tree,
             nx.get_node_attributes(self.tree, "pos"),
             alpha=Settings.EDGE_ALPHA,
@@ -1804,7 +1813,7 @@ class TreePrinter:
         self.ax.callbacks.connect("ylim_changed", self.repos_edge_labels)
         self.fig.canvas.mpl_connect("button_press_event", self.update_info_text)
         self.fig.canvas.mpl_connect("motion_notify_event", self.update_cursor)
-        parent.print_log(f"No.of artists: {len(self.ax.get_children())}")
+        self.parent.print_log(f"No.of artists: {len(self.ax.get_children())}")
         plt.show()
 
     def update_info_text(self, event: MouseEvent) -> None:
@@ -1825,10 +1834,10 @@ class TreePrinter:
             CHILDS = tuple(self.tree.successors(NODE))
 
             # copy node to clipboard
-            self.root.clipboard_clear()
-            self.root.clipboard_append(NODE)
-            self.root.update()
-            self.print_log(f"Copied to clipboard:\n{NODE}")
+            self.parent.root.clipboard_clear()
+            self.parent.root.clipboard_append(NODE)
+            self.parent.root.update()
+            self.parent.print_log(f"Copied to clipboard:\n{NODE}")
 
             self.info_text.set_text(
                 f"Board:\n{tt.print_board(NODE, False)}" +
@@ -1843,7 +1852,7 @@ class TreePrinter:
                 # total # childs of root (assume root has max # childs) - depth + # visited childs
                 # since DEPTH is negative, + DEPTH instead of - DEPTH
                 # doesn't work for snake AI since assume permutation tree
-                f"{len(self.ai_moves) + DEPTH - len(CHILDS)} Skipped Child(s)"
+                f"{len(self.parent.ai_moves) + DEPTH - len(CHILDS)} Skipped Child(s)"
             )
             # no need draw_idle() since FuncAnimation() automatically redraw
 
@@ -1987,7 +1996,7 @@ class TreePrinter:
                 str(move),
                 prop=FontProperties(size=1)
             )
-            for move in self.ai_moves
+            for move in self.parent.ai_moves
         }
         # since TextPath((0, 0), ...) has origin at the text's baseline, it's offset from the label position
         # use Affine2D to center it around (0, 0)
