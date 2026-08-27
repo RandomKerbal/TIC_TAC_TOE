@@ -282,9 +282,10 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[
         Current ties if any child ties and all other childs lose.
 
     :return:
-        WIN_SCORE: current wins
-        0: current ties
-        -WIN_SCORE: current loses
+        WIN_SCORE: current wins.
+        0: current ties.
+        -WIN_SCORE: current loses.
+        Final move is returned via send() instead.
     """
 
     def is_root() -> bool:
@@ -348,7 +349,7 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[
 
 def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callable[[int], None]) -> None:
     """
-    See also :func:`recur_search()` for player at root.
+    See also :func:`recur_search()`.
 
     Algorithm:
         When traversing down (visit):
@@ -533,11 +534,11 @@ def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD:
 def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None] | None) -> int:
     """
     :param Y0:
-    :param X0: square that the current player last placed
+    :param X0: square that the current player last placed.
     :param Y_CHILD:
-    :param X_CHILD: square that the child player last placed
+    :param X_CHILD: square that the child player last placed.
 
-    See also :func:`recur_search()`
+    See also :func:`recur_search()`.
     """
 
     def is_root() -> bool:
@@ -594,9 +595,9 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], se
 
     Traverse the entire tree to get each root node's weighted win probability ((# win leaf childs - # lose leaf childs) / (# win leaf childs + # lose leaf childs)).
     Closest to actual machine learning, but least effecient among all AIs.
-    Has Statistical Traps: a node with the least lose childs but always lose if best play.
+    Has Statistical Traps: a node with the least lose childs but lose if best play.
 
-    See also :func:`recur_search()` for player at root.
+    See also :func:`recur_search()`.
     """
 
     def traverse(BOARD: int) -> tuple[int, int]:

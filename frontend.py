@@ -1085,7 +1085,7 @@ class GameMenu:
                 Injected into AI() and runs in AI thread.
                 Send NEXT_MOVE to main thread.
                 """
-                # if game ended early
+                # if game ended early, end thread
                 if self.ai_thread is None:
                     sys.exit()
 
@@ -1159,8 +1159,9 @@ class GameMenu:
         2. Color move that AI is currently searching.
         3. Record NEXT_MOVE in moved[-1].
         """
-
+        # moved[-1] is AI's move
         if self.moved[-1] is not None:
+
             # uncolor last move
             self.board_buttons[self.moved[-1]].config(
                 background=self.settings.colors[0]["ai_moves" if self.settings.show_ind_and_aimoves.get() else "board_button"]
@@ -1223,7 +1224,6 @@ class GameMenu:
         return False
 
     def check_result_pvp(self) -> None:
-
         WIN_DIR: str | None = tt.win_dir(self.board, self.moved[-1])
 
         # if someone win
@@ -1242,6 +1242,7 @@ class GameMenu:
         self.update_turn()
 
     def update_turn(self) -> None:
+
         # disable current player's label
         self.turn_labels[tt.plyr_of(self.board)].config(
             foreground="SystemDisabledText",
