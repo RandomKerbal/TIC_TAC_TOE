@@ -273,7 +273,7 @@ def is_win(board: int, move: int) -> int:
     return 0
 
 
-def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
+def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[[int], None] | None) -> int:
     """
     At root, player is human.
     Uses special case of Alpha-Beta-Negamax Algorithm:
@@ -287,6 +287,9 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Call
         -WIN_SCORE: current loses
     """
 
+    def is_root() -> bool:
+        return send is not None
+
     def child_is_leaf() -> bool:
         return len(moves) == 1  # not 0 since move not popped yet
 
@@ -295,7 +298,9 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Call
     tie_child_move: int | None = None
 
     for i, child_move in enumerate(moves):
-        highlight(child_move, BOARD)
+
+        if is_root():
+            send(child_move)
 
         child_board = place(BOARD, child_move, tree)
 
@@ -314,7 +319,7 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Call
 
         else:
             del moves[i]  # optimization: don't modify moves[] for win & leaf nodes
-            child_score = recur_search(child_board, moves, tree, highlight)
+            child_score = recur_search(child_board, moves, tree, None)
             moves.insert(i, child_move)
 
         # if any child wins, current loses
@@ -334,13 +339,14 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, highlight: Call
         return WIN_SCORE
 
     # tie_child_move exists means some child tie
-    # if any child is tie,
-    highlight(tie_child_move, BOARD)
+    # if any child is tie
+    if is_root():
+        send(tie_child_move)
     t_table[BOARD] = 0
     return 0
 
 
-def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
+def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callable[[int], None]) -> None:
     """
     See also :func:`recur_search()` for player at root.
 
@@ -386,7 +392,9 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: C
             child_board: int
 
             for child_move in moves:
-                highlight(child_move, self.BOARD)
+
+                if self.is_root():
+                    send(child_move)
 
                 child_board = place(self.BOARD, child_move, tree)
 
@@ -428,6 +436,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: C
 
         def revisit(self) -> int:
             s.pop()
+
             # node must have won to stay
             t_table[self.BOARD] = WIN_SCORE
 
@@ -485,9 +494,8 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, highlight: C
         curr: Node = s.peek()
         if curr.is_visited:
             if curr.parent_is_root():
-                MOVE: int = curr.revisit()  # final move
-                highlight(MOVE, ROOT_BOARD)
-                return MOVE
+                send(curr.revisit())  # final move
+                return
             else:
                 curr.revisit()
         else:
@@ -506,23 +514,23 @@ def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> "collections.Iterator[tuple
             yield y1, x1
 
 
-def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> None:
+def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None]) -> None:
     child_board: int
 
     for child_move in MOVES:
-        highlight(child_move, BOARD)
+        send(child_move)
 
         child_board = place(BOARD, child_move, tree)
 
         # noinspection PyTypeChecker
-        if snake_search(child_board, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, highlight) == WIN_SCORE:
+        if snake_search(child_board, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, None) == WIN_SCORE:
             t_table[BOARD] = -WIN_SCORE
             return
 
     t_table[BOARD] = WIN_SCORE
 
 
-def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, highlight: Callable[[int, int], None]) -> int:
+def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None] | None) -> int:
     """
     :param Y0:
     :param X0: square that the current player last placed
@@ -531,6 +539,9 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
 
     See also :func:`recur_search()`
     """
+
+    def is_root() -> bool:
+        return send is not None
 
     def child_is_stuck() -> bool:
         # no child and any square is empty
@@ -544,7 +555,8 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
     for y1, x1 in snake_gen_moves(BOARD, Y0, X0):
         child_move = sq_of(y1, x1)
 
-        highlight(child_move, BOARD)
+        if is_root():
+            send(child_move)
 
         child_board = place(BOARD, child_move, tree)
 
@@ -557,7 +569,7 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
             child_score = WIN_SCORE
 
         else:
-            child_score = snake_search(child_board, Y_CHILD, X_CHILD, y1, x1, tree, highlight)
+            child_score = snake_search(child_board, Y_CHILD, X_CHILD, y1, x1, tree, None)
 
         # lose
         if child_score == WIN_SCORE:
@@ -570,12 +582,13 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
         return WIN_SCORE
 
     # tie
-    highlight(tie_child_move, BOARD)
+    if is_root():
+        send(tie_child_move)
     t_table[BOARD] = 0
     return 0
 
 
-def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], highlight: Callable[[int, int], None]) -> None:
+def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], send: Callable[[int], None]) -> None:
     """
     :param wscores: key = root move, val = its weighted score.
 
@@ -613,7 +626,9 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], hi
         child_num: int = 0
 
         for i, child_move in enumerate(moves):
-            highlight(child_move, BOARD)
+
+            if is_root():
+                send(child_move)
 
             child_board = place(BOARD, child_move)
 
@@ -642,12 +657,11 @@ def prob_search(ROOT_BOARD: int, moves: list[int], wscores: dict[int, float], hi
     traverse(ROOT_BOARD)
 
     # pick random move from root moves with highest wscore
-    # use highlight(), NOT return
-    highlight(
+    # use send(), NOT return
+    send(
         random.choice(
             tuple(move for move, score in wscores.items() if score == max(wscores.values()))
-        ),
-        ROOT_BOARD
+        )
     )
 
 
@@ -685,7 +699,6 @@ def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> t
     """
     Return section of a line segment inside a rectangle.
     Point is defined by P0, P1. Rectangle is defined by matplotlib Bbox.
-    :rtype: object
     """
 
     X_MIN: float = BBOX.x0
