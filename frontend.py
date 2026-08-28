@@ -13,12 +13,14 @@ from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.backend_bases import MouseEvent
 from matplotlib.collections import PathCollection
+from matplotlib.container import BarContainer
 from matplotlib.font_manager import FontProperties
 from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 from matplotlib.path import Path
 from matplotlib.text import Text
 from matplotlib.textpath import TextPath
+from matplotlib.ticker import MultipleLocator
 from matplotlib.transforms import IdentityTransform, Affine2D, Bbox
 
 import backend as tt
@@ -214,31 +216,31 @@ class MainMenu:
 
         # === Animate Title & Subtitle ===
         # time between frames, in milliseconds
-        DELTA_TIME: int = 200
+        DT: int = 200
 
         # anim_frames contains id of all 95 (frame 0 - 94) frames of the animation
         self.anim_frames: list[str] = []
 
         # frames 0 - 11: animating title
-        self.anim_frames.append(self.root.after(DELTA_TIME * 0, lambda: self.title_label.config(width=1)))  # width=0 doesn't work
-        self.anim_frames.append(self.root.after(DELTA_TIME * 1, lambda: self.title_label.config(width=8)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 2, lambda: self.title_label.config(width=11)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 3, lambda: self.title_label.config(width=19)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 4, lambda: self.title_label.config(width=25)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 5, lambda: self.title_label.config(width=34)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 6, lambda: self.title_label.config(width=42)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 7, lambda: self.title_label.config(width=50)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 8, lambda: self.title_label.config(width=56)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 9, lambda: self.title_label.config(width=65)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 10, lambda: self.title_label.config(width=74)))
-        self.anim_frames.append(self.root.after(DELTA_TIME * 11, lambda: self.title_label.config(width=82)))
+        self.anim_frames.append(self.root.after(DT * 0, lambda: self.title_label.config(width=1)))  # width=0 doesn't work
+        self.anim_frames.append(self.root.after(DT * 1, lambda: self.title_label.config(width=8)))
+        self.anim_frames.append(self.root.after(DT * 2, lambda: self.title_label.config(width=11)))
+        self.anim_frames.append(self.root.after(DT * 3, lambda: self.title_label.config(width=19)))
+        self.anim_frames.append(self.root.after(DT * 4, lambda: self.title_label.config(width=25)))
+        self.anim_frames.append(self.root.after(DT * 5, lambda: self.title_label.config(width=34)))
+        self.anim_frames.append(self.root.after(DT * 6, lambda: self.title_label.config(width=42)))
+        self.anim_frames.append(self.root.after(DT * 7, lambda: self.title_label.config(width=50)))
+        self.anim_frames.append(self.root.after(DT * 8, lambda: self.title_label.config(width=56)))
+        self.anim_frames.append(self.root.after(DT * 9, lambda: self.title_label.config(width=65)))
+        self.anim_frames.append(self.root.after(DT * 10, lambda: self.title_label.config(width=74)))
+        self.anim_frames.append(self.root.after(DT * 11, lambda: self.title_label.config(width=82)))
 
         # frames 12 - 94: animating subtitle
         # loop iterates 82 times since it's the number of chars (excluding space) in the subtitle
         for frame in range(0, 83):
             self.anim_frames.append(
                 self.root.after(
-                    DELTA_TIME * (frame + 11),
+                    DT * (frame + 11),
                     lambda _frame=frame: self.subtitle_label.config(
                         text=SUBTITLE[:_frame] + "_" * min(1, 82 - _frame) + " " * (81 - _frame))
                 )
@@ -751,7 +753,7 @@ class GameMenu:
             cursor="hand2",
             relief=tk.GROOVE,
             borderwidth=4,
-            width=len(max(Settings.AI_NAMES, key=len)) - 2,
+            width=len(max(Settings.AI_NAMES, key=len)) - 1,
             command=self.print_graph
         )
         self.ind_checkbox = tk.Checkbutton(
@@ -822,7 +824,7 @@ class GameMenu:
         self.board_zoom_slider.grid(row=6, column=2, pady=(0, 8))
         if self.settings.is_pvc:
             self.ai_first_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 8))
-            self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 8))
+            self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 10))
             self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
         self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 13))
         self.log.grid(columnspan=2, row=11, column=1, sticky=tk.NSEW)
@@ -936,7 +938,7 @@ class GameMenu:
     def update_len(self, _=None) -> None:
         """
         1. Update backend constants.
-        2. Create / destory buttons to match new BOARD_AREA.
+        2. Create/destroy buttons to match new BOARD_AREA.
         3. Position new & old buttons.
         """
         # 1.
@@ -971,7 +973,8 @@ class GameMenu:
         for sq, button in enumerate(self.board_buttons):
             button.grid(row=sq // tt.BOARD_LEN, column=sq % tt.BOARD_LEN)
 
-        # update win_len since X always win if it is shorter. No need to update backend win_len since the slider's command will.
+        # update win_len since X always win if it is shorter
+        # no need to update backend win_len since the slider's command will
         self.win_len_slider.config(from_=min(tt.BOARD_LEN, 4), to=tt.BOARD_LEN)
         self.update_ind_and_aimoves_buttons()
         self.update_scrollbars()
@@ -1138,7 +1141,7 @@ class GameMenu:
 
                 elif self.settings.ai_type.get() == Settings.PROB_AI_NAME:
                     AI = tt.prob_search
-                    self.ai_moves = self.ai_moves[:10]
+                    self.ai_moves = self.ai_moves[:14]
                     self.graph = dict.fromkeys(self.ai_moves, 0)
                     args = (self.ai_moves.copy(),)
 
@@ -1152,7 +1155,7 @@ class GameMenu:
                         *divmod(self.moved[-2], tt.BOARD_LEN),
                     )
 
-                # if prunned board different from last search, t_table is unusable
+                # if pruned board different from last search, t_table is unusable
                 # DO NOT clear t_table after search since needed to print tree
                 if not set(self.ai_moves).issubset(PREV_AI_MOVES):
                     tt.t_table.clear()
@@ -1367,34 +1370,9 @@ class GameMenu:
             return
 
         if self.settings.ai_type.get() == Settings.PROB_AI_NAME:
-            self.print_histogram()
+            HistogramPrinter(self)
         else:
             TreePrinter(self)
-
-    def print_histogram(self) -> None:
-        fig = plt.figure(num="Histogram" + str(len(plt.get_fignums()) + 1))
-        bar = plt.bar(
-            tuple(self.graph.keys()),
-            tuple(self.graph.values()),
-            color=tuple(Settings.NODE_COLORS[tt.WIN_SCORE] if wscore >= 0 else Settings.NODE_COLORS[-tt.WIN_SCORE] for wscore in self.graph.values()),
-            edgecolor="Black",
-            linewidth=0.5,
-            zorder=2  # show above x-axis
-        )
-        plt.bar_label(
-            bar,
-            label_type=tk.CENTER
-        )
-        plt.locator_params(axis=tk.X)  # set x tick interval
-        plt.axhline(  # draw y=0
-            color="Black",
-            linewidth=0.5,
-            zorder=1  # show below bars
-        )
-        plt.xlabel("Root Move")
-        plt.ylabel("Normalized Score")
-        plt.title(f"{plt.gca().get_ylabel()} of Each {plt.gca().get_xlabel()}")
-        plt.show()
 
 
 class GameMenuT(GameMenu):
@@ -1582,7 +1560,7 @@ class GameMenuT(GameMenu):
 
 class GameMenuV(GameMenu):
     """
-    :var settings.queue_len: how many turns into the future will an X/O last.
+    :var settings.queue_len: number of X (or O) allowed on the board at any moment.
     :var settings.show_qfront: show/hide the moves about to pop in the next turns.
     """
 
@@ -1727,10 +1705,89 @@ class GameMenuS(GameMenu):
                     )
 
 
+class HistogramPrinter:
+
+    X_LABEL_TEXT: str = "Root Move"
+    Y_LABEL_TEXT: str = "Normalized Squared Score"
+    PAD_WIDTH: float = 0.7
+
+    def __init__(self, parent: GameMenu):
+        self.fig = plt.figure(
+            num="Histogram" + str(len(plt.get_fignums()) + 1)
+        )
+        self.ax: Axes = plt.gca()
+        self.bar: BarContainer = self.ax.bar(
+            tuple(parent.graph.keys()),
+            tuple(parent.graph.values()),
+            color=tuple(
+                Settings.NODE_COLORS[tt.WIN_SCORE]
+                if score >= 0 else Settings.NODE_COLORS[-tt.WIN_SCORE]
+                for score in parent.graph.values()
+            ),
+            edgecolor="Black",
+            linewidth=0.5,
+            zorder=2  # show above x-axis
+        )
+        self.bar_labels: list[Text] = self.ax.bar_label(
+            self.bar,
+            label_type=tk.CENTER
+        )
+        # set x-axis range and interval
+        self.ax.set_xbound(lower=min(parent.ai_moves) - self.PAD_WIDTH, upper=max(parent.ai_moves) + self.PAD_WIDTH)
+        self.ax.xaxis.set_major_locator(MultipleLocator(1))
+
+        # draw y=0 line
+        self.ax.axhline(
+            color="Black",
+            linewidth=0.5,
+            zorder=1  # show below bars
+        )
+        self.ax.set_xlabel(self.X_LABEL_TEXT)
+        # no need set_ylabel() since update_y_offset() later will
+        self.ax.set_title(f"{self.Y_LABEL_TEXT} of Each {self.X_LABEL_TEXT}")
+
+        # initialize y_offset
+        # needed draw() so get_major_formatter().get_offset() is not empty
+        self.fig.canvas.draw()
+        self.update_y_offset()
+
+        self.fig.canvas.mpl_connect('resize_event', self.update_bar_labels)
+        self.ax.callbacks.connect("xlim_changed", self.update_bar_labels)
+        self.ax.callbacks.connect("ylim_changed", self.update_y_offset)
+        plt.show()
+
+    def update_y_offset(self, _=None):
+
+        # needed since offset show again every redraw
+        self.ax.yaxis.offsetText.set_visible(False)
+
+        OFFSET: str = self.ax.yaxis.get_major_formatter().get_offset()
+        self.ax.set_ylabel(self.Y_LABEL_TEXT + (" × " + OFFSET if OFFSET else ''))
+        self.fig.canvas.draw_idle()
+
+    def update_bar_labels(self, _=None):
+        for patch, label in zip(self.bar, self.bar_labels):
+
+            # get bar endpoints to get width
+            X0: float = self.ax.transData.transform((patch.get_x(), 0))[0]
+            X1: float = self.ax.transData.transform((patch.get_x() + patch.get_width(), 0))[0]
+            WIDTH: float = abs(X1 - X0)
+
+            SCORE: float = patch.get_height()
+
+            # reduce # significant digits until label fit in bar
+            for digit_cnt in range(10, -1, -1):
+                label.set_text(f"{SCORE:.{digit_cnt}e}")
+
+                if label.get_window_extent(self.fig.canvas.get_renderer()).width <= WIDTH:
+                    break
+
+        self.fig.canvas.draw_idle()
+
+
 class TreePrinter:
 
     def __init__(self, parent: GameMenu):
-
         self.parent: GameMenu = parent
         self.tree: nx.DiGraph = parent.graph
         self.NODES: tuple[int] = tuple(self.tree.nodes)
@@ -1932,6 +1989,11 @@ class TreePrinter:
         self.e_labels_bg_collection.set_offsets(LABELS_POS)
         self.fig.canvas.draw_idle()
 
+    # every subtree has two pads on both side, this is for one side
+    # this is relative to CHILD_DX
+    # absolute pad width = 0.5 * CHILD_DX
+    PAD_WIDTH: float = 0.5
+
     def set_nodes_pos(self) -> None:
         """
         Set position (x,y) for each node.
@@ -1953,19 +2015,14 @@ class TreePrinter:
                 INTERVAL_CNT: int = len(CHILDS) - 1
 
                 # x-dist between each child
-                CHILD_DELTA_X: float = SUBTREE_WIDTH / (INTERVAL_CNT + PAD_WIDTH * 2)
+                CHILD_DX: float = SUBTREE_WIDTH / (INTERVAL_CNT + self.PAD_WIDTH * 2)
 
                 # x-coord of leftmost child
-                LEFTMOST_X: float = X - SUBTREE_WIDTH / 2 + PAD_WIDTH * CHILD_DELTA_X
+                LEFTMOST_X: float = X - SUBTREE_WIDTH / 2 + self.PAD_WIDTH * CHILD_DX
 
                 # assign positions for each unvisited child
                 for i, child in enumerate(CHILDS):
-                    traverse(child, LEFTMOST_X + CHILD_DELTA_X * i, Y - 1, CHILD_DELTA_X)
-
-        # every subtree has two pads on both side, this is for one side
-        # this is relative to CHILD_DELTA_X
-        # absolute pad width = 0.5 * CHILD_DELTA_X
-        PAD_WIDTH: float = 0.5
+                    traverse(child, LEFTMOST_X + CHILD_DX * i, Y - 1, CHILD_DX)
 
         # select the first node as root
         # no need to check if tree is empty
@@ -2066,7 +2123,7 @@ VERSION_TEXT: str = "Tic Tac Toe v18"
 
 def default_help() -> None:
     messagebox.showinfo("Help",
-                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {Settings.ITER_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AI_NAME}.\n\nThe {Settings.PROB_AI_NAME} has statistical traps and traverses the entire tree, making it the weakest and slowest AI. However, it is special since it is my first original AI and closest to machine learning.\n\nThe {Settings.SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AI_NAME}, and follows snake rules even if not in Snake mode.")
+                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {Settings.ITER_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AI_NAME}.\n\nThe {Settings.PROB_AI_NAME} traverses the entire tree and might have Statistical Traps, making it the slowest and weakest AI. However, it is special since it is my first original AI and closest to machine learning.\n\nThe {Settings.SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AI_NAME}, and follows snake rules even if not in Snake mode.")
 
 
 def time_help() -> None:

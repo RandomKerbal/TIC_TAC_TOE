@@ -104,7 +104,7 @@ def opp_of(plyr: int) -> 1 | 2:
 def plyr_at(board: int, sq: int) -> 0 | 1 | 2:
     """
     :return:
-        Number representating player at given square.
+        Number representing player at given square.
     """
     return board // THREE_POW[sq] % 3
 
@@ -112,7 +112,7 @@ def plyr_at(board: int, sq: int) -> 0 | 1 | 2:
 def char_of(plyr: int, show_empty: bool = False) -> str:
     """
     :return:
-        Letter representationg given player.
+        Letter representing given player.
     """
     if plyr == 1:
         return 'X'
@@ -309,12 +309,12 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[
         if child_board in t_table:
             child_score = t_table[child_board]
 
-        # base case: if any child wins, current loses
+        # base case: if child wins
         elif is_win(child_board, child_move):
             t_table[child_board] = WIN_SCORE
             child_score = WIN_SCORE
 
-        # base case: if child tie
+        # base case: if child ties
         elif child_is_leaf():
             t_table[child_board] = 0
             child_score = 0
@@ -565,7 +565,7 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
         if child_board in t_table:
             child_score = t_table[child_board]
 
-        # base case: win
+        # base case: if child wins
         elif is_win(child_board, child_move):
             t_table[child_board] = WIN_SCORE
             child_score = WIN_SCORE
@@ -573,7 +573,7 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
         else:
             child_score = snake_search(child_board, Y_CHILD, X_CHILD, y1, x1, tree, None)
 
-        # lose
+        # if any child wins, current loses
         if child_score == WIN_SCORE:
             t_table[BOARD] = -WIN_SCORE
             return -WIN_SCORE
@@ -590,45 +590,50 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
     return 0
 
 
-def prob_search(ROOT_BOARD: int, moves: list[int], nscores: dict[int, float], send: Callable[[int], None]) -> None:
+def prob_search(ROOT_BOARD: int, moves: list[int], scores: dict[int, float], send: Callable[[int], None]) -> None:
     """
-    :param nscores: (normalized score) key = root move, val = its normalized score.
+    :param scores: key = root move, val = Normalized Squared Score (NSS).
 
-    Traverse the entire tree to get each root child's normalized score:
-    (# win leaf childs - # lose leaf childs) / (# win leaf childs + # lose leaf childs)
+    Algorithm:
+        Traverse the entire tree to get each root child's NSS, then pick child with the highest NSS.
 
-    Has Statistical Traps: a node with the least lose childs but lose if best play.
+        NSS:
+            (sum_child_scores / CHILD_CNT)**2 * sign(sum_child_scores)
+
+            sum_child_scores: sum of all child scores.
+            CHILD_CNT: number of childs.
+            sign(sum_child_scores): recovers the sign lost during squaring.
+            **2: amplifies sum_child_scores that is further from 0, i.e. amplifies when many childs lose / win.
+                It is used to solve Statistical Traps in 3*3 board.
+                It is inspired by Mean Squared Error.
+
+            Statistical Traps: a node with the least # lose childs, but lose if best play.
 
     :return: Final move is returned via send() instead.
     """
 
-    def traverse(BOARD: int) -> tuple[int, int]:
-        """
-        :return:
-            child_score (# win leaf childs - # lose leaf childs)
-            child_num (# win leaf childs + # lose leaf childs)
-        """
+    def traverse(BOARD: int) -> float:
 
         def is_root() -> bool:
             return BOARD == ROOT_BOARD
 
-        def score_by_depth() -> int:
+        def score_by_plyr() -> int:
+            """
+            Returned score MUST <= 1 so NSS <= 1.
+            If NSS > 1, Statistical Traps will appear again.
+            """
             if plyr_of(child_board) == HUMAN:
                 # penalize
-                # -2 so lose is more impactful than win
-                return len(moves) // 2 - 2
+                return -1
 
             # if plyr == BOT
             else:
                 # reward
-                # len(moves) for depth bonus
-                # //2 to only count the depths with the player's turn
-                # +1 because len(moves) can be 0
-                return len(moves) // 2 + 1
+                return 0.5
 
         child_board: int
-        child_score: int = 0
-        child_num: int = 0
+        sum_child_scores: int = 0
+        CHILD_CNT: int = len(moves)
 
         for i, child_move in enumerate(moves):
 
@@ -637,34 +642,40 @@ def prob_search(ROOT_BOARD: int, moves: list[int], nscores: dict[int, float], se
 
             child_board = place(BOARD, child_move)
 
-            # base case: win
-            if is_win(child_board, child_move):
-                child_score += score_by_depth()
-                child_num += 1
+            if child_board in t_table:
+                sum_child_scores += t_table[child_board]
+
+            # base case: if child wins
+            elif is_win(child_board, child_move):
+                sum_child_scores += score_by_plyr()
 
             else:
                 del moves[i]
-                child_score, child_num = map(
-                    operator.add,
-                    (child_score, child_num),
-                    traverse(child_board)
-                )
+                sum_child_scores += traverse(child_board)
                 moves.insert(i, child_move)
 
-            if is_root() and child_num > 0:
-                nscores[child_move] = child_score / child_num
-                child_score = 0
-                child_num = 0
+            if is_root():
+                scores[child_move] = sum_child_scores
+                sum_child_scores = 0
 
-        return child_score, child_num
+        score: float
+        if CHILD_CNT > 0:
+            score = math.copysign(
+                (sum_child_scores / CHILD_CNT) ** 2,  # NSS
+                sum_child_scores
+            )
+        else:
+            score = 0
+        t_table[BOARD] = score
+        return score
 
     HUMAN: int = plyr_of(ROOT_BOARD)
     traverse(ROOT_BOARD)
 
-    # pick random move from root moves with highest nscore
+    # pick random move from root moves with the highest NSS
     send(
         random.choice(
-            tuple(move for move, score in nscores.items() if score == max(nscores.values()))
+            tuple(move for move, score in scores.items() if score == max(scores.values()))
         )
     )
 
@@ -700,8 +711,8 @@ def midpoint(P0: tuple[float, float], P1: tuple[float, float]) -> tuple[float, f
 
 def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> tuple[tuple[float, float], ...] | None:
     """
-    Return section of a line segment inside a rectangle.
-    Point is defined by P0, P1. Rectangle is defined by matplotlib Bbox.
+    Return section of a line segment inside a screen.
+    Point is defined by P0, P1. Screen is defined by matplotlib Bbox.
     """
 
     X_MIN: float = BBOX.x0
@@ -710,40 +721,45 @@ def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> t
     Y_MAX: float = BBOX.y1
     X0: float = P0[0]
     Y0: float = P0[1]
+
+    # same as t in vector equation of line
     t0: float = 0.0
     t1: float = 1.0
 
-    dx, dy = map(
+    P0_P1X, P0_P1Y = map(
         operator.sub,
         P1,
         P0
     )
 
-    for p, q in (
-            (-dx, X0 - X_MIN),
-            (dx, X_MAX - X0),
-            (-dy, Y0 - Y_MIN),
-            (dy, Y_MAX - Y0),
+    for P0_P1, P0_BBOX in (
+            (-P0_P1X, X0 - X_MIN),
+            (P0_P1X, X_MAX - X0),
+            (-P0_P1Y, Y0 - Y_MIN),
+            (P0_P1Y, Y_MAX - Y0),
     ):
-        if p == 0:
-            if q < 0:
+        # if P0_P1 is horizontal/vertical
+        if P0_P1 == 0:
+            # P0 outside screen
+            if P0_BBOX < 0:
                 return None
             continue
 
-        r = q / p
+        MULTIPLE: float = P0_BBOX / P0_P1
 
-        if p < 0:
-            if r > t1:
+        if P0_P1 < 0:
+            if MULTIPLE > t1:
                 return None
-            if r > t0:
-                t0 = r
+            if MULTIPLE > t0:
+                t0 = MULTIPLE
+
         else:
-            if r < t0:
+            if MULTIPLE < t0:
                 return None
-            if r < t1:
-                t1 = r
+            if MULTIPLE < t1:
+                t1 = MULTIPLE
 
     return (
-        (X0 + t0 * dx, Y0 + t0 * dy),
-        (X0 + t1 * dx, Y0 + t1 * dy)
+        (X0 + t0 * P0_P1X, Y0 + t0 * P0_P1Y),
+        (X0 + t1 * P0_P1X, Y0 + t1 * P0_P1Y)
     )
