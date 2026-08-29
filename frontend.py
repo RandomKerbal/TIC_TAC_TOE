@@ -702,7 +702,7 @@ class GameMenu:
 
             # new value is automatically passed by slider when it changes
             # cast since new value is str
-            command=lambda win_len: tt.set_consts(tk_win_len=int(win_len))
+            command=lambda win_len: tt.set_consts(TK_WIN_LEN=int(win_len))
         )
         self.board_zoom_label = tk.Label(
             self.settings_frame,
@@ -942,7 +942,7 @@ class GameMenu:
         3. Position new & old buttons.
         """
         # 1.
-        tt.set_consts(tk_board_len=self.settings.board_len.get())
+        tt.set_consts(TK_BOARD_LEN=self.settings.board_len.get())
         self.print_log("Cleared Ttable")
 
         # 2.
@@ -1339,7 +1339,7 @@ class GameMenu:
 
         return False
 
-    def print_log(self, TEXT: str | None):
+    def print_log(self, TEXT: str | None) -> None:
         BEGIN: str = self.log.index(f"{tk.END}-1c")
 
         # common case
@@ -1743,11 +1743,14 @@ class HistogramPrinter:
             zorder=1  # show below bars
         )
         self.ax.set_xlabel(self.X_LABEL_TEXT)
-        # no need set_ylabel() since update_y_offset() later will
         self.ax.set_title(f"{self.Y_LABEL_TEXT} of Each {self.X_LABEL_TEXT}")
+        # no need set_ylabel() since update_y_offset() later will
+
+        # prevent long y-axis tick values that push label outside window
+        self.ax.ticklabel_format(axis=tk.Y, style="sci", scilimits=(-3, 3))
 
         # initialize y_offset
-        # needed draw() so get_major_formatter().get_offset() is not empty
+        # need draw() so get_major_formatter().get_offset() is not empty
         self.fig.canvas.draw()
         self.update_y_offset()
 
@@ -1756,7 +1759,7 @@ class HistogramPrinter:
         self.ax.callbacks.connect("ylim_changed", self.update_y_offset)
         plt.show()
 
-    def update_y_offset(self, _=None):
+    def update_y_offset(self, _=None) -> None:
 
         # needed since offset show again every redraw
         self.ax.yaxis.offsetText.set_visible(False)
@@ -1765,7 +1768,7 @@ class HistogramPrinter:
         self.ax.set_ylabel(self.Y_LABEL_TEXT + (" × " + OFFSET if OFFSET else ''))
         self.fig.canvas.draw_idle()
 
-    def update_bar_labels(self, _=None):
+    def update_bar_labels(self, _=None) -> None:
         for patch, label in zip(self.bar, self.bar_labels):
 
             # get bar endpoints to get width
@@ -1959,7 +1962,7 @@ class TreePrinter:
         IS_NODE, _ = self.nodes_collection.contains(EVENT)
         self.fig.canvas.get_tk_widget().config(cursor="hand2" if IS_NODE else '')
 
-    def repos_edge_labels(self, _):
+    def repos_edge_labels(self, _) -> None:
 
         # get window size in pixel coords
         BBOX: Bbox = self.ax.get_window_extent()
@@ -1996,15 +1999,14 @@ class TreePrinter:
 
     def set_nodes_pos(self) -> None:
         """
-        Set position (x,y) for each node.
-        Store node position in the "pos" attribute of each node.
+        Calculate coord for each node and store in its "pos" attribute.
         """
 
-        def traverse(NODE: int, X: float, Y: float, SUBTREE_WIDTH: float):
+        def traverse(NODE: int, X: float, Y: float, SUBTREE_WIDTH: float) -> None:
             """
             Called Recursively.
             1. Store coord of current node.
-            2. Calculate coord of child nodes.
+            2. Calculate coord for child nodes.
             :param SUBTREE_WIDTH: width of subtree with NODE as root, including paddings.
             """
             self.tree.nodes[NODE]["pos"] = (X, Y)
@@ -2031,7 +2033,7 @@ class TreePrinter:
 
     def set_nodes_attrs(self) -> None:
         """
-        Attributes added for each node:
+        Calculate attributes below for each node:
             1. color
             2. size
         """
@@ -2050,7 +2052,7 @@ class TreePrinter:
 
     def set_edges_attrs(self) -> None:
         """
-        Attributes added for each edge:
+        Calculate attributes below for each edge:
             1. pos
             2. textpath: path of label text
         """
@@ -2149,9 +2151,9 @@ v3 : Added basic AI. Added console GUI. Make boards that are 7*7 or larger needs
 v4 : Added board pruning for boards larger than 3x3 to reduce AI calculations. Added some randomization to the moves made by the AI. Restructured the entire AI code for optimization.\n
 v5 : Added deathtrap check - that's the hardest part of this project! Now the AI is 100% unbeatable for a 3x3 board. Added the option to let AI start first.\n
 v6 : Make board pruning only for boards larger than 5x5. Added land-filling to boards larger than 3x3. Added a matplotlib display for AI's Risk Analysis.\n
-v7 : Added Tkinter GUI. Rebuild winner check for HUGE optimization. Changed every code to user-def function. Added user-friendly log window.\n
+v7 : Added Tkinter GUI. Rebuild winner check for HUGE optimization. Changed every code to function. Added user-friendly log window.\n
 v8 : HUGE OPTIMIZATION: Rebuild the board pruning code to combine both pruning and land-filling into 1 function. Pruned board and main board now have the same dimension - no additional function is needed to convert squares between the two boards!\n
-v9 : Rebuild and tidy up all GUI code using class instead of user-def functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty squares. Added 'new_game' button. Changed empty squares from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
+v9 : Rebuild and tidy up all GUI code using class instead of functions. Rebuild to make board pruning dynamic, it can now scale up if that area has not enough empty squares. Added 'new_game' button. Changed empty squares from '[ ]' to ' '. Fixed bug where the endpoint of checking diagonally from top right to down left doesn't move with the start point.\n
 v10: Added title animation. Added 4 modes: Traditional, Time Trial, Vanishing Moves, Snake\n
 v11: Globalised colors for each feature. Added color self.settings. Changed O's snake color. Capped length to win at 4. Added 'Total Child Count' to log.
 v12: Redesign the algorithm to use depth-first search instead of breadth-first-search. Build a specialized, faster check winner algo that only checks for whether a specific player wins, instead of checking who wins.\n

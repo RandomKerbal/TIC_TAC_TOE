@@ -65,20 +65,20 @@ EMPTY_BOARD: int
 
 
 # === AI_NAMES Functions ===
-def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -> None:
+def set_consts(TK_BOARD_LEN: int | None = None, TK_WIN_LEN: int | None = None) -> None:
     global THREE_POW, BOARD_LEN, BOARD_AREA, WIN_LEN, SW_VEC, SE_VEC, BOTTOM_ROW, HALF_W_LEN, HALF_W_LEN_INV, S_VEC_HALF_W_LEN, SE_VEC_HALF_W_LEN, SW_VEC_HALF_W_LEN, EMPTY_BOARD
 
-    if tk_board_len:
-        THREE_POW = tuple(3 ** place_val for place_val in range(tk_board_len ** 2, -1, -1))  # counter is reversed since place values increase from left to right
-        BOARD_LEN = tk_board_len
+    if TK_BOARD_LEN is not None:
+        THREE_POW = tuple(3 ** place_val for place_val in range(TK_BOARD_LEN ** 2, -1, -1))  # counter is reversed since place values increase from left to right
+        BOARD_LEN = TK_BOARD_LEN
         BOARD_AREA = BOARD_LEN ** 2
         SW_VEC = BOARD_LEN - 1
         SE_VEC = BOARD_LEN + 1
         BOTTOM_ROW = BOARD_LEN * SW_VEC
         EMPTY_BOARD = THREE_POW[BOARD_AREA] * 2  # set player before first player as 2
 
-    if tk_win_len:
-        WIN_LEN = tk_win_len
+    if TK_WIN_LEN is not None:
+        WIN_LEN = TK_WIN_LEN
         HALF_W_LEN = WIN_LEN // 2
 
     HALF_W_LEN_INV = BOARD_LEN - HALF_W_LEN
@@ -89,66 +89,65 @@ def set_consts(tk_board_len: int | None = None, tk_win_len: int | None = None) -
     t_table.clear()
 
 
-def sq_of(y: int, x: int) -> int:
-    return y * BOARD_LEN + x
+def sq_of(Y: int, X: int) -> int:
+    return Y * BOARD_LEN + X
 
 
-def opp_of(plyr: int) -> 1 | 2:
+def opp_of(PLYR: int) -> int:
     """
-    :return:
-        Opponent of given player.
+    :return: opponent of given player.
     """
-    return 3 - plyr
+    return 3 - PLYR
 
 
-def plyr_at(board: int, sq: int) -> 0 | 1 | 2:
+def plyr_at(BOARD: int, SQ: int) -> int:
     """
-    :return:
-        Number representing player at given square.
+    :return: number representing player at given square.
     """
-    return board // THREE_POW[sq] % 3
+    return BOARD // THREE_POW[SQ] % 3
 
 
-def char_of(plyr: int, show_empty: bool = False) -> str:
+def char_of(PLYR: int, SHOW_EMPTY: bool = False) -> str:
     """
-    :return:
-        Letter representing given player.
+    :return: letter representing given player.
     """
-    if plyr == 1:
+    if PLYR == 1:
         return 'X'
-    elif plyr == 2:
+    elif PLYR == 2:
         return 'O'
-    elif plyr == 0 and show_empty:
+    elif PLYR == 0 and SHOW_EMPTY:
         return '∟'
 
 
-def plyr_of(board: int) -> 1 | 2:
+def plyr_of(BOARD: int) -> int:
     """
-    :return: Player who made the last move.
+    :return: player who made the last move.
     """
-    return plyr_at(board, BOARD_AREA)  # board has hidden digit at the end to store last player
+    return plyr_at(BOARD, BOARD_AREA)  # board has hidden digit at the end to store last player
 
 
-def place(board: int, move: int, tree: nx.DiGraph | None = None) -> int:
+def place(BOARD: int, MOVE: int, tree: nx.DiGraph | None = None) -> int:
     """
     :return: board after placing given move.
     By reference: updated tree (optional).
     """
-    plyr: int = plyr_of(board)
-    child_board = (board
-                   + opp_of(plyr) * THREE_POW[move]
-                   + (opp_of(plyr) - plyr) * THREE_POW[BOARD_AREA])  # update current player
+    PLYR: int = plyr_of(BOARD)
+    child_board = (
+            BOARD
+            + opp_of(PLYR) * THREE_POW[MOVE]
+            + (opp_of(PLYR) - PLYR) * THREE_POW[BOARD_AREA]  # update current player
+    )
     if tree is not None:
-        tree.add_edge(board, child_board, move=move)
+        tree.add_edge(BOARD, child_board, move=MOVE)
 
     return child_board
 
 
-def unplace(board: int, sq: int) -> int:
-    return board - plyr_of(board) * THREE_POW[sq]  # don't update current player since for vanish mode
+def unplace(BOARD: int, MOVE: int) -> int:
+    return BOARD - plyr_of(BOARD) * THREE_POW[MOVE]  # don't update current player since for vanish mode
 
 
-def gen_moves(board: int, move: int) -> list[int]:
+def gen_moves(BOARD: int, MOVE: int) -> list[int]:
     """
     Optimization: Moves are sorted to prune low-priority moves that are unlikely to change the result.
 
@@ -159,27 +158,27 @@ def gen_moves(board: int, move: int) -> list[int]:
     A move GENERALLY has low priority if:
         Square has adjacent player. However, priority varies with dist to move and the number of adjacent players.
     """
-    plyr: int = plyr_of(board)
-    move_y, move_x = divmod(move, BOARD_LEN)
+    PLYR: int = plyr_of(BOARD)
+    MOVE_Y, MOVE_X = divmod(MOVE, BOARD_LEN)
 
     moves = dict()  # key = square, value = priority
 
     for sq in range(BOARD_AREA):
-        if not plyr_at(board, sq):
+        if not plyr_at(BOARD, sq):
             y, x = divmod(sq, BOARD_LEN)
-            move_d = max(abs(y - move_y), abs(x - move_x))  # calculate Chebyshev distance
+            move_d = max(abs(y - MOVE_Y), abs(x - MOVE_X))  # calculate Chebyshev distance
 
             moves[sq] = moves.get(sq, 0) - move_d  # set distance-dependent base priority
 
             for dir_x, dir_y in ADJ:
                 fwd1_x, fwd1_y = x + dir_x, y + dir_y
 
-                if 0 <= fwd1_x < BOARD_LEN and 0 <= fwd1_y < BOARD_LEN and plyr_at(board, sq_of(fwd1_y, fwd1_x)) == plyr:  # if square has an adjacent player
+                if 0 <= fwd1_x < BOARD_LEN and 0 <= fwd1_y < BOARD_LEN and plyr_at(BOARD, sq_of(fwd1_y, fwd1_x)) == PLYR:  # if square has an adjacent player
                     moves[sq] += BOARD_LEN  # +BOARD_LEN ensures the furthest square with 1 adjacent player has higher priority than the closest isolated square
 
                     fwd2_x, fwd2_y = fwd1_x + dir_x, fwd1_y + dir_y
 
-                    if 0 <= fwd2_x < BOARD_LEN and 0 <= fwd2_y < BOARD_LEN and plyr_at(board, sq_of(fwd2_y, fwd2_x)) == plyr:  # if square is connected to either end of a line
+                    if 0 <= fwd2_x < BOARD_LEN and 0 <= fwd2_y < BOARD_LEN and plyr_at(BOARD, sq_of(fwd2_y, fwd2_x)) == PLYR:  # if square is connected to either end of a line
                         moves[sq] += BOARD_LEN * 8  # +BOARD_LEN * 8 ensures the furthest square connected to 1 line has higher priority than a square surrounded by 8 players
 
                         back1_x, back1_y = x - dir_x, y - dir_y
@@ -187,7 +186,7 @@ def gen_moves(board: int, move: int) -> list[int]:
                         if 0 <= back1_x < BOARD_LEN and 0 <= back1_y < BOARD_LEN:  # if square is at the back of another square connected to either end of a line
                             back1_sq = sq_of(back1_y, back1_x)
 
-                            if not plyr_at(board, back1_sq):
+                            if not plyr_at(BOARD, back1_sq):
                                 moves[back1_sq] = moves.get(back1_sq, 0) + BOARD_LEN * 8
 
     return sorted(moves, key=moves.get, reverse=True)
@@ -203,69 +202,69 @@ def win_dir(board: int, move: int) -> str | None:
     ][is_win(board, move)]
 
 
-def is_win(board: int, move: int) -> int:
+def is_win(BOARD: int, MOVE: int) -> int:
     # Optimizations:
     # 1. only check for the row/col/diagonals connected to the last move
     # 2. only check for whether the current plyr of this node wins, because only the current plyr is allowed to move (and may win)
     # 3. precalculate constants
 
-    plyr: int = plyr_of(board)
-    move_y, move_x = divmod(move, BOARD_LEN)
+    PLYR: int = plyr_of(BOARD)
+    MOVE_Y, MOVE_X = divmod(MOVE, BOARD_LEN)
     start: int
     end: int
 
     # check column
     # is the first block as it is the fastest to complete
-    if ((move_y >= HALF_W_LEN and plyr_at(board, move - S_VEC_HALF_W_LEN) == plyr) or
-            (move_y < HALF_W_LEN_INV and plyr_at(board, move + S_VEC_HALF_W_LEN) == plyr)):
+    if ((MOVE_Y >= HALF_W_LEN and plyr_at(BOARD, MOVE - S_VEC_HALF_W_LEN) == PLYR) or
+            (MOVE_Y < HALF_W_LEN_INV and plyr_at(BOARD, MOVE + S_VEC_HALF_W_LEN) == PLYR)):
 
-        start = move
-        while (start >= BOARD_LEN) and plyr_at(board, start - BOARD_LEN) == plyr:
+        start = MOVE
+        while (start >= BOARD_LEN) and plyr_at(BOARD, start - BOARD_LEN) == PLYR:
             start -= BOARD_LEN
-        end = move
-        while (end < BOTTOM_ROW) and plyr_at(board, end + BOARD_LEN) == plyr:
+        end = MOVE
+        while (end < BOTTOM_ROW) and plyr_at(BOARD, end + BOARD_LEN) == PLYR:
             end += BOARD_LEN
 
         if end // BOARD_LEN - start // BOARD_LEN + 1 >= WIN_LEN:
             return 1
 
     # check row
-    if ((move_x >= HALF_W_LEN and plyr_at(board, move - HALF_W_LEN) == plyr) or
-            (move_x < HALF_W_LEN_INV and plyr_at(board, move + HALF_W_LEN) == plyr)):
+    if ((MOVE_X >= HALF_W_LEN and plyr_at(BOARD, MOVE - HALF_W_LEN) == PLYR) or
+            (MOVE_X < HALF_W_LEN_INV and plyr_at(BOARD, MOVE + HALF_W_LEN) == PLYR)):
 
-        start = move
-        while (start % BOARD_LEN > 0) and plyr_at(board, start - 1) == plyr:
+        start = MOVE
+        while (start % BOARD_LEN > 0) and plyr_at(BOARD, start - 1) == PLYR:
             start -= 1
-        end = move
-        while (end % BOARD_LEN < SW_VEC) and plyr_at(board, end + 1) == plyr:
+        end = MOVE
+        while (end % BOARD_LEN < SW_VEC) and plyr_at(BOARD, end + 1) == PLYR:
             end += 1
 
         if end - start + 1 >= WIN_LEN:
             return 2
 
     # check top left to down right
-    if ((move_y >= HALF_W_LEN <= move_x and plyr_at(board, move - SE_VEC_HALF_W_LEN) == plyr) or
-            (move_y < HALF_W_LEN_INV > move_x and plyr_at(board, move + SE_VEC_HALF_W_LEN) == plyr)):
+    if ((MOVE_Y >= HALF_W_LEN <= MOVE_X and plyr_at(BOARD, MOVE - SE_VEC_HALF_W_LEN) == PLYR) or
+            (MOVE_Y < HALF_W_LEN_INV > MOVE_X and plyr_at(BOARD, MOVE + SE_VEC_HALF_W_LEN) == PLYR)):
 
-        start = move
-        while (start >= BOARD_LEN) and (start % BOARD_LEN > 0) and plyr_at(board, start - SE_VEC) == plyr:
+        start = MOVE
+        while (start >= BOARD_LEN) and (start % BOARD_LEN > 0) and plyr_at(BOARD, start - SE_VEC) == PLYR:
             start -= SE_VEC
-        end = move
-        while (end < BOTTOM_ROW) and (end % BOARD_LEN < SW_VEC) and plyr_at(board, end + SE_VEC) == plyr:
+        end = MOVE
+        while (end < BOTTOM_ROW) and (end % BOARD_LEN < SW_VEC) and plyr_at(BOARD, end + SE_VEC) == PLYR:
             end += SE_VEC
 
         if (end // BOARD_LEN - start // BOARD_LEN) + 1 >= WIN_LEN:
             return 3
 
     # check top right to down left
-    if ((move_y >= HALF_W_LEN and move_x < HALF_W_LEN_INV and plyr_at(board, move - SW_VEC_HALF_W_LEN) == plyr) or
-            (move_y < HALF_W_LEN_INV and move_x >= HALF_W_LEN and plyr_at(board, move + SW_VEC_HALF_W_LEN) == plyr)):
+    if ((MOVE_Y >= HALF_W_LEN and MOVE_X < HALF_W_LEN_INV and plyr_at(BOARD, MOVE - SW_VEC_HALF_W_LEN) == PLYR) or
+            (MOVE_Y < HALF_W_LEN_INV and MOVE_X >= HALF_W_LEN and plyr_at(BOARD, MOVE + SW_VEC_HALF_W_LEN) == PLYR)):
 
-        start = move
-        while (start >= BOARD_LEN) and (start % BOARD_LEN < SW_VEC) and plyr_at(board, start - SW_VEC) == plyr:
+        start = MOVE
+        while (start >= BOARD_LEN) and (start % BOARD_LEN < SW_VEC) and plyr_at(BOARD, start - SW_VEC) == PLYR:
             start -= SW_VEC
-        end = move
-        while (end < BOTTOM_ROW) and (end % BOARD_LEN > 0) and plyr_at(board, end + SW_VEC) == plyr:
+        end = MOVE
+        while (end < BOTTOM_ROW) and (end % BOARD_LEN > 0) and plyr_at(BOARD, end + SW_VEC) == PLYR:
             end += SW_VEC
 
         if (end // BOARD_LEN - start // BOARD_LEN) + 1 >= WIN_LEN:
@@ -309,12 +308,12 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[
         if child_board in t_table:
             child_score = t_table[child_board]
 
-        # base case: if child wins
+        # if child wins (base case)
         elif is_win(child_board, child_move):
             t_table[child_board] = WIN_SCORE
             child_score = WIN_SCORE
 
-        # base case: if child ties
+        # if child ties (base case)
         elif child_is_leaf():
             t_table[child_board] = 0
             child_score = 0
@@ -330,18 +329,18 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[
             t_table[BOARD] = -WIN_SCORE
             return -WIN_SCORE
 
-        # if child tie, save move in case no child win
+        # if child ties, save move in case no child win
         if child_score == 0 and tie_child_move is None:
             tie_child_move = child_move
 
-    # no child tie means all childs lose
+    # no child ties means all childs lose
     # if all childs lose, current wins
     if tie_child_move is None:
         t_table[BOARD] = WIN_SCORE
         return WIN_SCORE
 
-    # tie_child_move exists means some child tie
-    # if any child is tie
+    # if tie_child_move is not None
+    # i.e. if any child is tie
     if is_root():
         send(tie_child_move)
     t_table[BOARD] = 0
@@ -382,7 +381,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
             self.PARENT_PTR = PARENT_PTR
             self.is_visited = False
 
-        def visit(self):
+        def visit(self) -> None:
             self.is_visited = True
 
             # discard() won't raise error if MOVE is not in moves[]
@@ -419,7 +418,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
                     s.pop_all(CURR_PTR)
                     break
 
-                # if child tie
+                # if child ties
                 if child_is_leaf():
 
                     # treat human tie as lose
@@ -453,7 +452,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
         def parent_is_root(self) -> bool:
             return self.PARENT_PTR == 0
 
-        def __repr__(self) -> str:
+        def __str__(self) -> str:
             return f"(Move: {self.MOVE}, Player: {char_of(plyr_of(self.BOARD))}, Board: {"Root" if self.is_root() else self.BOARD}{", Visited" if self.is_visited else ""})"
 
     class Stack:
@@ -504,7 +503,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
             curr.visit()
 
 
-def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> "collections.Iterator[tuple[int, int]]":
+def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> collections.Iterator[tuple[int, int]]:
     y1: int
     x1: int
 
@@ -524,7 +523,6 @@ def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD:
 
         child_board = place(BOARD, child_move, tree)
 
-        # noinspection PyTypeChecker
         if snake_search(child_board, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, None) == WIN_SCORE:
             t_table[BOARD] = -WIN_SCORE
             return
@@ -565,7 +563,7 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
         if child_board in t_table:
             child_score = t_table[child_board]
 
-        # base case: if child wins
+        # if child wins (base case)
         elif is_win(child_board, child_move):
             t_table[child_board] = WIN_SCORE
             child_score = WIN_SCORE
@@ -609,7 +607,7 @@ def prob_search(ROOT_BOARD: int, moves: list[int], scores: dict[int, float], sen
 
             Statistical Traps: a node with the least # lose childs, but lose if best play.
 
-    :return: Final move is returned via send() instead.
+    :return: final move is returned via send() instead.
     """
 
     def traverse(BOARD: int) -> float:
@@ -620,7 +618,7 @@ def prob_search(ROOT_BOARD: int, moves: list[int], scores: dict[int, float], sen
         def score_by_plyr() -> int:
             """
             Returned score MUST <= 1 so NSS <= 1.
-            If NSS > 1, Statistical Traps will appear again.
+            If NSS > 1, Statistical Traps will appear.
             """
             if plyr_of(child_board) == HUMAN:
                 # penalize
@@ -645,7 +643,7 @@ def prob_search(ROOT_BOARD: int, moves: list[int], scores: dict[int, float], sen
             if child_board in t_table:
                 sum_child_scores += t_table[child_board]
 
-            # base case: if child wins
+            # if child wins (base case)
             elif is_win(child_board, child_move):
                 sum_child_scores += score_by_plyr()
 
@@ -696,7 +694,7 @@ def print_board(BOARD: int, SHOW_AXES: bool = True) -> str:
             output += str(y) + " " * (3 - len(str(y)))
 
         for x in range(BOARD_LEN):
-            output += char_of(plyr_at(BOARD, sq_of(y, x)), show_empty=True) + " " * 2  # print rows
+            output += char_of(plyr_at(BOARD, sq_of(y, x)), SHOW_EMPTY=True) + " " * 2  # print rows
         output += "\n"
 
     return output
@@ -709,7 +707,7 @@ def midpoint(P0: tuple[float, float], P1: tuple[float, float]) -> tuple[float, f
     )
 
 
-def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> tuple[tuple[float, float], ...] | None:
+def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> tuple[tuple[float, float], tuple[float, float]] | None:
     """
     Return section of a line segment inside a screen.
     Point is defined by P0, P1. Screen is defined by matplotlib Bbox.
