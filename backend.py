@@ -602,7 +602,7 @@ def prob_search(ROOT_BOARD: int, moves: list[int], scores: dict[int, float], sen
             CHILD_CNT: number of childs.
             sign(sum_child_scores): recovers the sign lost during squaring.
             **2: amplifies sum_child_scores that is further from 0, i.e. amplifies when many childs lose / win.
-                It is used to solve Statistical Traps in 3*3 board.
+                It solves Statistical Traps in 3*3 board.
                 It is inspired by Mean Squared Error.
 
             Statistical Traps: a node with the least # lose childs, but lose if best play.
