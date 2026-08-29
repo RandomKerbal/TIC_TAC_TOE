@@ -253,7 +253,10 @@ class MainMenu:
         self.root.geometry(Settings.WINDOW_DIM)
         self.root.config(background="Black")
 
-    def to_submenu(self, is_pvc: bool) -> None:
+    def to_submenu(self, IS_PVC: bool) -> None:
+        """
+        :param IS_PVC: is player versus computer.
+        """
         # stop all queued frames of the title animation
         for frame in self.anim_frames:
             self.root.after_cancel(frame)
@@ -261,7 +264,7 @@ class MainMenu:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        self.settings.is_pvc = is_pvc
+        self.settings.is_pvc = IS_PVC
         SubMenu(self.root, self.settings)
 
     def exit(self: "MainMenu | SubMenu | GameMenu") -> None:
@@ -382,7 +385,7 @@ class SubMenu:
         self.back_button.pack(side=tk.LEFT, padx=(1, 18))
         self.settings_button.pack(side=tk.LEFT, padx=(18, 1))
 
-    def to_gamemenu(self, mode: type["GameMenu"]) -> None:
+    def to_gamemenu(self, mode: type['GameMenu']) -> None:
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -468,10 +471,10 @@ class ColMenu:
                 color_entry.bind("<KeyRelease>", lambda _, _plyr=plyr, _feat=feat: self.update_color(_plyr, _feat))
                 self.color_entries[plyr][feat] = color_entry
 
-    def update_color(self, plyr: int, feat: str) -> None:
+    def update_color(self, PLYR: int, FEAT: str) -> None:
         try:
             # try to set background color of the text widget
-            self.color_entries[plyr][feat].config(bg=self.color_entries[plyr][feat].get())
+            self.color_entries[PLYR][FEAT].config(bg=self.color_entries[PLYR][FEAT].get())
 
         except tk.TclError:
             # if the color is not valid
@@ -826,7 +829,7 @@ class GameMenu:
             self.ai_first_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 8))
             self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 10))
             self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
-        self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 13))
+        self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 10))
         self.log.grid(columnspan=2, row=11, column=1, sticky=tk.NSEW)
         self.log_clear.place(relx=1.0, rely=1.0, anchor=tk.SE)  # take the SE corner, stick to bottom-right corner of parent
 
@@ -881,11 +884,11 @@ class GameMenu:
         else:
             self.graph_button.config(text="Show search tree\n(impacts performance)")
 
-    def scroll_vertical(self, event) -> None:
-        self.board_canvas.yview_scroll(-1 * (event.delta // 120), tk.UNITS)
+    def scroll_vertical(self, EVENT: tk.Event) -> None:
+        self.board_canvas.yview_scroll(-1 * (EVENT.delta // 120), tk.UNITS)
 
-    def scroll_horizontal(self, event) -> None:
-        self.board_canvas.xview_scroll(-1 * (event.delta // 120), tk.UNITS)
+    def scroll_horizontal(self, EVENT: tk.Event) -> None:
+        self.board_canvas.xview_scroll(-1 * (EVENT.delta // 120), tk.UNITS)
 
     def update_scrollbars(self, *_) -> None:
         """
@@ -1097,7 +1100,7 @@ class GameMenu:
 
             def send(NEXT_MOVE: int) -> None:
                 """
-                Injected into AI() and runs in AI thread.
+                Injected into AI(), run in AI thread.
                 Send NEXT_MOVE to main thread.
                 """
                 # if game ended early, end thread
@@ -1289,14 +1292,14 @@ class GameMenu:
 
         return False
 
-    def new_game(self, board: int) -> bool:
+    def new_game(self, BOARD: int) -> bool:
         # if game is going, ask user
         if not self.moved or messagebox.askyesno(
                 "Confirmation",
                 "Are you sure you want to restart?\n\nYou will lose all your progress."):
 
             # if no last player in loaded board
-            if not tt.plyr_of(board):
+            if not tt.plyr_of(BOARD):
                 messagebox.askretrycancel("Warning", "Enter a board with last player!")
                 return False
 
@@ -1308,7 +1311,7 @@ class GameMenu:
             self.moved.clear()
 
             # load new board
-            self.board = board
+            self.board = BOARD
             plyr: int
             for sq, button in enumerate(self.board_buttons):
                 plyr = tt.plyr_at(self.board, sq)
@@ -1884,12 +1887,12 @@ class TreePrinter:
         self.parent.print_log(f"No.of artists: {len(self.ax.get_children())}")
         plt.show()
 
-    def update_info_text(self, event: MouseEvent) -> None:
+    def update_info_text(self, EVENT: MouseEvent) -> None:
         """
         If clicked on node, update info_text to show information about the node.
         If not, update info_text to show information about the tree.
         """
-        IS_NODE, INFO = self.nodes_collection.contains(event)
+        IS_NODE, INFO = self.nodes_collection.contains(EVENT)
 
         # if clicked on node
         if IS_NODE:

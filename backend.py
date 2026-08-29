@@ -503,7 +503,7 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
             curr.visit()
 
 
-def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> collections.Iterator[tuple[int, int]]:
+def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> collections.abc.Iterator[tuple[int, int]]:
     y1: int
     x1: int
 
