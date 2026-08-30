@@ -1,3 +1,8 @@
+"""
+Compile command:
+    pyinstaller --onefile --windowed --optimize 2 frontend.py
+"""
+
 import math
 import random
 import sys
@@ -93,7 +98,7 @@ class Settings:
                 "board_button": "HoneyDew2",
                 "background": "HoneyDew2",
                 "foreground": "Sea Green2",
-                "qfront": "Yellow",
+                "qfront": "Yellow"
             },
             # X features
             {
@@ -105,13 +110,13 @@ class Settings:
             {
                 "char": "Navy",
                 "snake_head": "Cyan1",
-                "snake_body": "Dark Slate Gray1",
+                "snake_body": "Dark Slate Gray1"
             }
         ]
         self.toolbar_button_cfg: dict = {
             "font": ("Helvetica", 10),
             "background": self.colors[0]["foreground"],
-            "activebackground": self.colors[0]["foreground"],
+            "activebackground": self.colors[0]["background"],
             "cursor": "hand2",
             "relief": tk.GROOVE,
             "overrelief": tk.SUNKEN,
@@ -218,7 +223,7 @@ class MainMenu:
         # time between frames, in milliseconds
         DT: int = 200
 
-        # anim_frames contains id of all 95 (frame 0 - 94) frames of the animation
+        # anim_frames contain id of all 95 (frame 0 - 94) frames of the animation
         self.anim_frames: list[str] = []
 
         # frames 0 - 11: animating title
@@ -560,8 +565,8 @@ class LoadMenu:
 class GameMenu:
     """
     :ivar board: base10 integer representing a base3 number. Each base3 digit is a square on board. Last digit is player.
-    :ivar moved: contains previous moves in chronological order: front = earlier, back = later
-    :ivar ai_moves: contains moves that AI is allowed to search
+    :ivar moved: contain previous moves in chronological order: front = earlier, back = later
+    :ivar ai_moves: contain moves that AI is allowed to search
     """
 
     def __init__(self, root: tk.Tk, settings: Settings):
@@ -579,6 +584,7 @@ class GameMenu:
         self.ai_moves: list[int] = []
         self.ai_thread: threading.Thread | None = None
         self.graph: nx.DiGraph | dict[int, float] | None = None
+        self.textpaths: list[TextPath] = []
 
         self.settings_frame = tk.Frame(
             self.root,
@@ -849,6 +855,7 @@ class GameMenu:
         pass
 
     def toggle_settings(self) -> None:
+        # if
         if self.settings_frame.winfo_ismapped():
             self.settings_frame.pack_forget()
             self.hide_button.config(text="❯")
@@ -920,29 +927,12 @@ class GameMenu:
         else:
             self.v_scrollbar.pack_forget()
 
-    def update_ind_and_aimoves_buttons(self) -> None:
-        """
-        1. Show/hide indexes.
-        2. Color/uncolor buttons with ai_moves.
-        """
-        for sq, button in enumerate(self.board_buttons):
-
-            # if empty and not currently searched by AI
-            if not tt.plyr_at(self.board, sq) and (not self.moved or sq != self.moved[-1]):
-                button.config(
-                    text=sq if self.settings.show_ind_and_aimoves.get() else '',
-                    background=self.settings.colors[0][
-                        "ai_moves" if (self.settings.show_ind_and_aimoves.get() and sq in self.ai_moves) else "board_button"
-                    ]
-                )
-
-        self.root.update_idletasks()
-
     def update_len(self, _=None) -> None:
         """
         1. Update backend constants.
-        2. Create/destroy buttons to match new BOARD_AREA.
-        3. Position new & old buttons.
+        2. Create/hide buttons.
+        3. Position old & new buttons.
+        4. Create textpaths.
         """
         # 1.
         tt.set_consts(TK_BOARD_LEN=self.settings.board_len.get())
@@ -966,21 +956,72 @@ class GameMenu:
                     state=tk.NORMAL
                 )
             )
+        self.print_log(f"Board button count:\n{len(self.board_buttons)} ({len(self.board_buttons) - tt.BOARD_AREA} hidden)")
 
-        # destroy buttons if BOARD_AREA decreased
+        # hide buttons if BOARD_AREA decreased
+        # no need to destroy since reusable next time BOARD_AREA increase
         for button in self.board_buttons[tt.BOARD_AREA:]:
-            button.destroy()
-        self.board_buttons = self.board_buttons[:tt.BOARD_AREA]
+            button.grid_forget()
 
         # 3.
-        for sq, button in enumerate(self.board_buttons):
-            button.grid(row=sq // tt.BOARD_LEN, column=sq % tt.BOARD_LEN)
+        # DO NOT iterate over board_buttons[] since can have buttons outside BOARD_AREA
+        for sq in range(tt.BOARD_AREA):
+            self.board_buttons[sq].grid(row=sq // tt.BOARD_LEN, column=sq % tt.BOARD_LEN)
+
+        # 4.
+        # create textpaths if BOARD_AREA increased
+        while len(self.textpaths) < tt.BOARD_AREA:
+            textpath: TextPath = TextPath(
+                (0, 0),
+                str(len(self.textpaths)),
+                prop=FontProperties(size=1)
+            )
+            # textpath is offset since its bottom-right corner is at label's center
+            # use Affine2D to center it
+            BBOX: Bbox = textpath.get_extents()
+            MID_X, MID_Y = tt.midpoint(BBOX.p0, BBOX.p1)
+            textpath = textpath.transformed(
+                Affine2D().translate(
+                    -MID_X, -MID_Y
+                )
+            )
+            self.textpaths.append(textpath)
+
+        # no need to delete textpaths since reusable next time BOARD_AREA increase
 
         # update win_len since X always win if it is shorter
         # no need to update backend win_len since the slider's command will
         self.win_len_slider.config(from_=min(tt.BOARD_LEN, 4), to=tt.BOARD_LEN)
         self.update_ind_and_aimoves_buttons()
         self.update_scrollbars()
+        self.root.update_idletasks()
+
+    def update_ind_and_aimoves_buttons(self) -> None:
+        """
+        Show/hide button indexes.
+        Color/uncolor buttons with ai_moves[]
+        """
+        # DO NOT iterate over board_buttons[] since can have buttons outside BOARD_AREA
+        for sq in range(tt.BOARD_AREA):
+
+            # if empty
+            if not tt.plyr_at(self.board, sq):
+                # 1.
+                self.board_buttons[sq].config(
+                    text=sq if self.settings.show_ind_and_aimoves.get() else ''
+                )
+                # if currently searched by AI, don't update color
+                if self.moved and sq == self.moved[-1]:
+                    pass
+                # 2.
+                # if not currently searched by AI, color/uncolor button
+                else:
+                    self.board_buttons[sq].config(
+                        background=self.settings.colors[0][
+                            "ai_moves" if (self.settings.show_ind_and_aimoves.get() and sq in self.ai_moves) else "board_button"
+                        ]
+                    )
+
         self.root.update_idletasks()
 
     def update_zoom(self, _=None) -> None:
@@ -1025,11 +1066,13 @@ class GameMenu:
 
     def unlock_board(self) -> None:
         self.cheat_button.config(state=tk.ACTIVE)
-        for sq, button in enumerate(self.board_buttons):
-            button.config(cursor="plus")
+
+        # DO NOT iterate over board_buttons[] since can have buttons outside BOARD_AREA
+        for sq in range(tt.BOARD_AREA):
+            self.board_buttons[sq].config(cursor="plus")
 
             if not tt.plyr_at(self.board, sq):
-                button.config(state=tk.NORMAL)
+                self.board_buttons[sq].config(state=tk.NORMAL)
 
     def ai_play(self) -> None:
         self.place_pretasks()
@@ -1111,7 +1154,7 @@ class GameMenu:
                 # since matplotlib & tkinter must run in main thread
                 self.root.after(0, self.update_aimove, NEXT_MOVE)
 
-            # if AI is snake and placed before, no need ai_moves
+            # if AI is snake and placed before, no need ai_moves[]
             if self.settings.ai_type.get() == Settings.SNAKE_AI_NAME and len(self.moved) >= 3:
                 AI = tt.snake_search
                 self.graph = nx.DiGraph()
@@ -1120,7 +1163,7 @@ class GameMenu:
                     *divmod(self.moved[-2], tt.BOARD_LEN),
                 )
 
-                # only for show, AI doesn't need ai_moves
+                # only for show, AI doesn't need ai_moves[]
                 self.ai_moves = list(
                     tt.sq_of(y, x)
                     for y, x in tt.snake_gen_moves(self.board, *divmod(self.moved[-3], tt.BOARD_LEN))
@@ -1134,7 +1177,7 @@ class GameMenu:
                     AI = tt.recur_search
                     self.ai_moves = self.ai_moves[:14]  # can only search 14 squares in reasonable time
                     self.graph = nx.DiGraph()
-                    args = (self.ai_moves.copy(),)  # must copy so AI thread doesn't refill main thread's ai_moves after end_game()
+                    args = (self.ai_moves.copy(),)  # must copy so AI thread doesn't refill main thread's ai_moves[] after end_game()
 
                 elif self.settings.ai_type.get() == Settings.ITER_AI_NAME:
                     AI = tt.iter_search
@@ -1164,7 +1207,7 @@ class GameMenu:
                     tt.t_table.clear()
                     self.print_log("Cleared Ttable")
 
-            # uncolor last ai_moves, color new ones
+            # uncolor last ai_moves[], color new ones
             self.root.after(0, self.update_ind_and_aimoves_buttons)
 
             self.print_log(f"AI moves:\n{self.ai_moves}")
@@ -1184,7 +1227,9 @@ class GameMenu:
 
             # uncolor last move
             self.board_buttons[self.moved[-1]].config(
-                background=self.settings.colors[0]["ai_moves" if self.settings.show_ind_and_aimoves.get() else "board_button"]
+                background=self.settings.colors[0][
+                    "ai_moves" if self.settings.show_ind_and_aimoves.get() else "board_button"
+                ]
             )
 
         # color current move
@@ -1306,36 +1351,36 @@ class GameMenu:
             self.set_end_flags()
             self.ai_moves.clear()
             if self.moved and self.moved[-1] is not None:
+
                 # uncolor last move
                 self.board_buttons[self.moved[-1]].config(background=self.settings.colors[0]["foreground"])
-            self.moved.clear()
 
-            # load new board
+            self.moved.clear()
             self.board = BOARD
-            plyr: int
-            for sq, button in enumerate(self.board_buttons):
-                plyr = tt.plyr_at(self.board, sq)
+
+            # DO NOT iterate over board_buttons[] since can have buttons outside BOARD_AREA
+            for sq in range(tt.BOARD_AREA):
+                PLYR: int = tt.plyr_at(self.board, sq)
 
                 # if not empty
-                if plyr:
-                    button.config(
-                        text=tt.char_of(plyr),
-                        disabledforeground=self.settings.colors[plyr]["char"],
+                if PLYR:
+                    self.board_buttons[sq].config(
+                        text=tt.char_of(PLYR),
+                        disabledforeground=self.settings.colors[PLYR]["char"],
                         state=tk.DISABLED
                     )
                     # place move from loaded board into moved[]
                     self.moved.append(sq)
 
                 else:
-                    button.config(
-                        disabledforeground=self.settings.colors[plyr]["index"],
+                    self.board_buttons[sq].config(
+                        disabledforeground=self.settings.colors[PLYR]["index"],
                         relief=tk.RAISED,  # for snake mode
                     )
 
             self.update_turn()
             self.update_ind_and_aimoves_buttons()
             self.unlock_settings()
-            self.print_log("Reset game menu")
             self.print_log(None)
             self.unlock_board()
             return True
@@ -1490,7 +1535,7 @@ class GameMenuT(GameMenu):
 
         TIME: float = self.time[tt.opp_of(tt.plyr_of(self.board))].get()
 
-        # if player runs out of time, opponent wins
+        # if player run out of time, opponent wins
         if TIME <= 0:
             messagebox.showinfo("Result", f"Time's up! Player {tt.char_of(tt.plyr_of(self.board))} won!")
             self.lock_board()
@@ -1884,7 +1929,7 @@ class TreePrinter:
         self.ax.callbacks.connect("ylim_changed", self.repos_edge_labels)
         self.fig.canvas.mpl_connect("button_press_event", self.update_info_text)
         self.fig.canvas.mpl_connect("motion_notify_event", self.update_cursor)
-        self.parent.print_log(f"No.of artists: {len(self.ax.get_children())}")
+        self.parent.print_log(f"Artist count: {len(self.ax.get_children())}")
         plt.show()
 
     def update_info_text(self, EVENT: MouseEvent) -> None:
@@ -1995,7 +2040,7 @@ class TreePrinter:
         self.e_labels_bg_collection.set_offsets(LABELS_POS)
         self.fig.canvas.draw_idle()
 
-    # every subtree has two pads on both side, this is for one side
+    # every subtree has two pads on both sides, this is for one side
     # this is relative to CHILD_DX
     # absolute pad width = 0.5 * CHILD_DX
     PAD_WIDTH: float = 0.5
@@ -2060,36 +2105,13 @@ class TreePrinter:
             2. textpath: path of label text
         """
 
-        # create TextPath for label texts
-        textpaths: dict[int, TextPath] = {
-            move: TextPath(
-                (0, 0),
-                str(move),
-                prop=FontProperties(size=1)
-            )
-            for move in self.parent.ai_moves
-        }
-        # since TextPath((0, 0), ...) has origin at the text's baseline, it's offset from the label position
-        # use Affine2D to center it around (0, 0)
-        for move, textpath in textpaths.items():
-            mid_x: int
-            mid_y: int
-            bbox: Bbox = textpath.get_extents()
-            mid_x, mid_y = tt.midpoint((bbox.x0, bbox.y0), (bbox.x1, bbox.y1))
-
-            textpaths[move] = textpath.transformed(
-                Affine2D().translate(
-                    -mid_x, -mid_y
-                )
-            )
-
         for parent, child, attrs in self.tree.edges(data=True):
             # place label in between parent & child
             attrs["pos"] = tt.midpoint(
                 self.tree.nodes[parent]["pos"],
                 self.tree.nodes[child]["pos"]
             )
-            attrs["textpath"] = textpaths[attrs["move"]]
+            attrs["textpath"] = self.parent.textpaths[attrs["move"]]
 
     def get_nodes_attrs(self) -> dict[str, list]:
         offsets: list[tuple[float, float]] = []
