@@ -531,7 +531,7 @@ class LoadMenu:
 
         self.note_label = tk.Label(
             self.toplevel,
-            text="Will not check for winner on load.",
+            text="Note: Winner will not be checked.",
             background=parent.settings.colors[0]["foreground"]
         )
         self.submit_button = tk.Button(
