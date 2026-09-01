@@ -658,8 +658,9 @@ def prob_search(ROOT_BOARD: int, moves: list[int], scores: dict[int, float], sen
 
         score: float
         if CHILD_CNT > 0:
+            # NSS
             score = math.copysign(
-                (sum_child_scores / CHILD_CNT) ** 2,  # NSS
+                (sum_child_scores / CHILD_CNT) ** 2,
                 sum_child_scores
             )
         else:
@@ -760,4 +761,15 @@ def trim_line(P0: tuple[float, float], P1: tuple[float, float], BBOX: Bbox) -> t
     return (
         (X0 + t0 * P0_P1X, Y0 + t0 * P0_P1Y),
         (X0 + t1 * P0_P1X, Y0 + t1 * P0_P1Y)
+    )
+
+
+def framerate_independent_lerp(START: int, END: int, SPEED: float, DT: float) -> float:
+
+    # from: https://sulley.cc/2024/06/01/20/06/
+    FRAMERATE_INDEPENDENT_FACTOR: float = (1 - math.exp(-SPEED * DT))
+
+    return (
+            START + (END - START)
+            * FRAMERATE_INDEPENDENT_FACTOR
     )

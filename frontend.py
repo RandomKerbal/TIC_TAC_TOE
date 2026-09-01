@@ -7,6 +7,7 @@ import math
 import random
 import sys
 import threading
+import time
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import messagebox
@@ -25,7 +26,6 @@ from matplotlib.patches import Patch
 from matplotlib.path import Path
 from matplotlib.text import Text
 from matplotlib.textpath import TextPath
-from matplotlib.ticker import MultipleLocator
 from matplotlib.transforms import IdentityTransform, Affine2D, Bbox
 
 import backend as tt
@@ -40,9 +40,9 @@ class Settings:
     SNAKE_AI_NAME: str = "Recursive Snake AI"
     AI_NAMES: tuple[str, str, str, str] = (RECUR_AI_NAME, ITER_AI_NAME, PROB_AI_NAME, SNAKE_AI_NAME)
     SHOW_QFRONT_TEXT = "Show queue front"
-    DEFAULT_TIME: float = 10
-    MAX_TIME_ENTRY_SCALE: int = 5  # odd number for ease-out effect
+    MAX_TIME_ENTRY_SCALE: int = 6
     MIN_BOARD_LEN: int = 3
+    MIN_BOARD_ZOOM: int = 5
     MAX_NODE_FRAME: int = 8
 
     # matplotlib colors, not tkinter
@@ -81,7 +81,7 @@ class Settings:
     def __init__(self):
         self.board_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
         self.win_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
-        self.board_zoom: tk.IntVar = tk.IntVar(value=5)
+        self.board_zoom: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_ZOOM)
         self.ai_type: tk.StringVar = tk.StringVar(value=Settings.RECUR_AI_NAME)
         self.show_ind_and_aimoves: tk.BooleanVar = tk.BooleanVar(value=False)
         self.queue_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
@@ -140,10 +140,14 @@ class Settings:
         }
         self.turn_label_cfg: dict = {
             "font": ("Helvetica", 10, "bold"),
-            "foreground": self.colors[1]["char"],
             "background": self.colors[0]["background"],
-            "borderwidth": 5,
-            "relief": tk.RIDGE
+            "borderwidth": 5
+        }
+        self.time_entry_cfg: dict = {
+            "disabledbackground": self.colors[0]["background"],
+            "justify": tk.CENTER,
+            "width": 5,
+            "borderwidth": 1
         }
 
 
@@ -411,8 +415,8 @@ class SubMenu:
 
 class ColMenu:
     """
-    :ivar color_frames: index 0 stores LabelFrame for general features; index 1 for X features; index 2 for O features
-    :ivar color_entries: index 0 stores colors for general features; index 1 for X features; index 2 for O features
+    :ivar color_frames: index 0 stores LabelFrame for general features, index 1 for X features, index 2 for O features.
+    :ivar color_entries: index 0 stores colors for general features, index 1 for X features, index 2 for O features.
     """
 
     def __init__(self, root: tk.Tk, settings: Settings):
@@ -671,7 +675,7 @@ class GameMenu:
         self.cheat_button = tk.Button(
             self.toolbar_frame,
             text="Cheat",
-            command=self.ai_play,
+            command=self.cheat_button_press,
             **self.settings.toolbar_button_cfg
         )
         self.hide_button = tk.Button(
@@ -726,10 +730,10 @@ class GameMenu:
             command=self.update_zoom,
             **self.settings.slider_cfg
         )
-        self.ai_first_checkbox = tk.Checkbutton(
+        self.aifirst_checkbox = tk.Checkbutton(
             self.settings_frame,
             text="AI starts first",
-            command=self.ai_play,
+            command=self.cheat_button_press,
             **self.settings.checkbox_cfg
         )
         self.ai_dropdown = tk.OptionMenu(
@@ -832,7 +836,7 @@ class GameMenu:
         self.board_zoom_label.grid(row=6, column=1, sticky=tk.E)
         self.board_zoom_slider.grid(row=6, column=2, pady=(0, 8))
         if self.settings.is_pvc:
-            self.ai_first_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 8))
+            self.aifirst_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 8))
             self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 10))
             self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
         self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 10))
@@ -950,7 +954,7 @@ class GameMenu:
                     activebackground=self.settings.colors[0]["board_button"],
                     cursor="plus",
                     overrelief=tk.RIDGE,
-                    command=lambda SQ=len(self.board_buttons): self.human_play(SQ),
+                    command=lambda SQ=len(self.board_buttons): self.board_button_press(SQ),
                     width=3,
                     borderwidth=5,
                     state=tk.NORMAL
@@ -1041,7 +1045,7 @@ class GameMenu:
         self.win_len_slider.config(state=tk.DISABLED)
         self.win_len_label.config(state=tk.DISABLED)
         self.new_game_button.config(state=tk.NORMAL)
-        self.ai_first_checkbox.config(state=tk.DISABLED)
+        self.aifirst_checkbox.config(state=tk.DISABLED)
 
     def unlock_settings(self) -> None:
         self.board_len_label.config(state=tk.NORMAL)
@@ -1049,8 +1053,8 @@ class GameMenu:
         self.win_len_label.config(state=tk.NORMAL)
         self.win_len_slider.config(state=tk.NORMAL)
         self.new_game_button.config(state=tk.DISABLED)
-        self.ai_first_checkbox.config(state=tk.NORMAL)
-        self.ai_first_checkbox.deselect()
+        self.aifirst_checkbox.config(state=tk.NORMAL)
+        self.aifirst_checkbox.deselect()
 
     def lock_board(self) -> None:
         self.cheat_button.config(state=tk.DISABLED)
@@ -1065,7 +1069,7 @@ class GameMenu:
         self.ai_thread = None
 
     def unlock_board(self) -> None:
-        self.cheat_button.config(state=tk.ACTIVE)
+        self.cheat_button.config(state=tk.NORMAL)
 
         # DO NOT iterate over board_buttons[] since can have buttons outside BOARD_AREA
         for sq in range(tt.BOARD_AREA):
@@ -1074,12 +1078,20 @@ class GameMenu:
             if not tt.plyr_at(self.board, sq):
                 self.board_buttons[sq].config(state=tk.NORMAL)
 
-    def ai_play(self) -> None:
-        self.place_pretasks()
+    def cheat_button_press(self) -> None:
+
+        # if first move
+        if not self.moved:
+            self.lock_settings()
+
         self.ai_thread_start()
 
-    def human_play(self, SQ: int) -> None:
-        self.place_pretasks()
+    def board_button_press(self, SQ: int) -> None:
+
+        # if first move
+        if not self.moved:
+            self.lock_settings()
+
         self.moved.append(SQ)
         self.place()
 
@@ -1087,27 +1099,23 @@ class GameMenu:
 
             # DO NOT exclude first move since first move can win with loaded board
             if not self.check_result_pvc(False):
-                self.ai_play()
+                self.ai_thread_start()
 
         # pvp
         else:
             self.check_result_pvp()
 
-    def place_pretasks(self) -> None:
-        # if first move
-        if not self.moved:
-            self.lock_settings()
-
-        # if not first move and not snake mode
-        elif not isinstance(self, GameMenuS):
-
-            # uncolor last move
-            self.board_buttons[self.moved[-1]].config(background=self.settings.colors[0]["board_button"])
-
     def place(self) -> None:
         """
-        Move-to-place is passed to place_ai() via moved[-1].
+        1. Uncolor last move.
+        2. Place new move.
         """
+
+        # if not first move and not snake mode, uncolor last move
+        if len(self.moved) > 1 and not isinstance(self, GameMenuS):
+            self.board_buttons[self.moved[-2]].config(background=self.settings.colors[0]["board_button"])
+
+        # move to place is passed via moved[-1]
         self.board = tt.place(self.board, self.moved[-1])
 
         self.board_buttons[self.moved[-1]].config(
@@ -1188,8 +1196,10 @@ class GameMenu:
                 elif self.settings.ai_type.get() == Settings.PROB_AI_NAME:
                     AI = tt.prob_search
                     self.ai_moves = self.ai_moves[:14]
-                    self.graph = dict.fromkeys(self.ai_moves, 0)
                     args = (self.ai_moves.copy(),)
+
+                    # sort ai_moves[] to display in-order in histogram
+                    self.graph = dict.fromkeys(sorted(self.ai_moves), 0)
 
                 # if self.settings.ai_type.get() == Settings.SNAKE_AI_NAME
                 else:
@@ -1272,7 +1282,6 @@ class GameMenu:
             else:
                 if messagebox.askyesno("Result", f"You won {WIN_DIR}!\n\nAI: 'NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!'") is True:
                     self.new_game(tt.EMPTY_BOARD)
-
             return True
 
         # if no one win and board is full
@@ -1281,12 +1290,12 @@ class GameMenu:
             self.set_end_flags()
             if messagebox.askyesno("Result", "Ended in draw.\n\nAI: 'You\'ll never win ... not satisfied? new_game!'") is True:
                 self.new_game(tt.EMPTY_BOARD)
-
             return True
 
         # if no one win and board not full
-        self.update_turn()
-        return False
+        else:
+            self.update_turn()
+            return False
 
     def check_result_pvp(self) -> None:
         WIN_DIR: str | None = tt.win_dir(self.board, self.moved[-1])
@@ -1304,16 +1313,17 @@ class GameMenu:
             messagebox.showinfo("Result", "Ended in a draw.")
 
         # if no one win and board not full
-        self.update_turn()
+        else:
+            self.update_turn()
 
     def update_turn(self) -> None:
 
-        # disable current player's label
+        # disable last player's label
         self.turn_labels[tt.plyr_of(self.board)].config(
             foreground="SystemDisabledText",
             relief=tk.FLAT
         )
-        # enable opponent's label
+        # enable current player's label
         self.turn_labels[tt.opp_of(tt.plyr_of(self.board))].config(
             foreground=self.settings.colors[tt.opp_of(tt.plyr_of(self.board))]["char"],
             relief=tk.RIDGE
@@ -1425,27 +1435,25 @@ class GameMenu:
 
 class GameMenuT(GameMenu):
     """
-    :ivar entry_scale: inflation of the active timer, used for animation. Resets to 0 at the beginning of each turn.
-    :ivar time: how much time each player still has: index 1 is X's, index 2 is O's.
+    :ivar entry_scale: used only in timer inflation animation to track current timer scale. Set to 0 to let countdown() restart the animation.
+    :ivar time: time each player still has: index 1 is X's, index 2 is O's.
     """
 
     def __init__(self, root: tk.Tk, settings: Settings):
 
         self.is_countdown: bool | None = None
-        self.entry_scale: int = 0
+        self.entry_scale: float = 0.0
 
         super().__init__(root, settings)
 
     def __init_child__(self):
-        self.time = [
-            None,
-            tk.DoubleVar(value=Settings.DEFAULT_TIME),
-            tk.DoubleVar(value=Settings.DEFAULT_TIME)
-        ]
-        self.trace1 = self.time[1].trace_add("write", lambda _, __, ___: self.validate(1))
-        self.trace2 = self.time[2].trace_add("write", lambda _, __, ___: self.validate(2))
+        self.time: list[float | None] = [None, 0, 0]
+        self.time_str: list[tk.StringVar | None] = [None, tk.StringVar(), tk.StringVar()]
+        self.reset_time()
+        self.trace1 = self.time_str[1].trace_add("write", lambda *_: self.validate(1))
+        self.trace2 = self.time_str[2].trace_add("write", lambda *_: self.validate(2))
 
-        # change widget class of turn_labels from Label to LabelFrame
+        # change widget of turn_labels from Label to LabelFrame
         self.turn_labels[1].destroy()
         self.turn_labels[2].destroy()
         self.turn_labels[1] = tk.LabelFrame(
@@ -1464,24 +1472,18 @@ class GameMenuT(GameMenu):
             # index 1 is X's
             tk.Entry(
                 self.turn_labels[1],
-                width=5,
-                borderwidth=1,
                 foreground=self.settings.colors[1]["char"],
                 disabledforeground=self.settings.colors[1]["char"],
-                disabledbackground=self.settings.colors[0]["background"],
-                justify=tk.CENTER,
-                textvariable=self.time[1]
+                textvariable=self.time_str[1],
+                **self.settings.time_entry_cfg
             ),
             # index 2 is O's
             tk.Entry(
                 self.turn_labels[2],
-                width=5,
-                borderwidth=1,
                 foreground=self.settings.colors[2]["char"],
                 disabledforeground=self.settings.colors[2]["char"],
-                disabledbackground=self.settings.colors[0]["background"],
-                justify=tk.CENTER,
-                textvariable=self.time[2]
+                textvariable=self.time_str[2],
+                **self.settings.time_entry_cfg
             )
         ]
 
@@ -1497,43 +1499,69 @@ class GameMenuT(GameMenu):
         self.time_entry[1].config(font=self.settings.time_font)
         self.time_entry[2].config(font=self.settings.time_font)
 
+    def add_time(self, PLYR: int, DT: float) -> None:
+        self.time[PLYR] += DT
+        self.time_str[PLYR].set(max(0.0, round(self.time[PLYR], 1)))
+
+    def reset_time(self) -> None:
+        for plyr in (1, 2):
+            self.time[plyr] = 10.0
+            self.time_str[plyr].set(self.time[plyr])
+
     def lock_settings(self) -> None:
         super().lock_settings()
 
         self.time_entry[1].config(state=tk.DISABLED)
         self.time_entry[2].config(state=tk.DISABLED)
         self.is_countdown = True
-        self.countdown()
+        self.countdown(time.perf_counter())
 
     def unlock_settings(self) -> None:
         super().unlock_settings()
 
         self.time_entry[1].config(state=tk.NORMAL)
         self.time_entry[2].config(state=tk.NORMAL)
-        self.time[1].set(Settings.DEFAULT_TIME)
-        self.time[2].set(Settings.DEFAULT_TIME)
+        self.reset_time()
 
         # reset time_entry inflation
         self.update_zoom()
 
     def validate(self, PLYR: int) -> None:
-        # try to convert entered time to float
+        # prevent running validate() when count down
+        # since validate() overwrites time[PLYR]
+        if self.is_countdown:
+            return
+
+        # prevent warning when clear all
+        if self.time_str[PLYR].get() == '':
+            return
+
+        # try to convert input time to float
         try:
-            self.time[PLYR].get()
+            self.time[PLYR] = float(self.time_str[PLYR].get())
 
         # if time is not float
-        except tk.TclError:
+        except ValueError:
             messagebox.askretrycancel("Warning", f"Enter a decimal number for {tt.char_of(PLYR)} timer!")
-            self.time[PLYR].set(Settings.DEFAULT_TIME)
+            self.reset_time()
 
-    def countdown(self) -> None:
-        """Recursively decrement time."""
+    def countdown(self, PERF_COUNTER0: float) -> None:
+        """
+        Recursively decrement time.
+        :param PERF_COUNTER0: time of last countdown() call.
+        """
 
         # if game ended
         if not self.is_countdown:
             return
 
-        TIME: float = self.time[tt.opp_of(tt.plyr_of(self.board))].get()
+        # time elapsed since previous countdown() call
+        DT: float = time.perf_counter() - PERF_COUNTER0
+        self.add_time(
+            tt.opp_of(tt.plyr_of(self.board)),
+            -DT
+        )
+        TIME: float = self.time[tt.opp_of(tt.plyr_of(self.board))]
 
         # if player run out of time, opponent wins
         if TIME <= 0:
@@ -1542,32 +1570,27 @@ class GameMenuT(GameMenu):
             self.set_end_flags()
             return
 
-        # update scale of current plyr's timer
-        # update entry_scale after time_entry in case update_turn() resets scale
-        self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
-            font=("Courier", self.settings.board_zoom.get() * 3 + 2 + self.entry_scale, "bold")
+        # must be close to add_time() to minimize time lost in between
+        self.root.after(0, self.countdown, time.perf_counter())
+
+        # update current player's timer scale
+        # SPEED parameter is arbitrary
+        self.entry_scale = tt.framerate_independent_lerp(
+            self.entry_scale,
+            Settings.MAX_TIME_ENTRY_SCALE,
+            15,
+            DT
         )
-        self.entry_scale = min(self.entry_scale + 2, Settings.MAX_TIME_ENTRY_SCALE)
+        self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
+            font=("Courier", self.settings.board_zoom.get() * 3 + 2 + round(self.entry_scale), "bold")
+        )
 
-        # if X has under 5 secs left
+        # if X has under 5 secs left, flash timer
         if TIME < 5.0:
-            # flash the timer
-            if TIME % 1 < 0.4:
-                self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
-                    relief=tk.SUNKEN,
-                    disabledbackground="White",
-                )
-            else:
-                self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
-                    relief=tk.GROOVE,
-                    disabledbackground="yellow"
-                )
+            self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
+                disabledbackground="White" if TIME % 1 < 0.4 else "Yellow",
+            )
         self.root.update_idletasks()
-
-        # decrease the time value by 0.1 every 100ms and display only 1 decimal point using round()
-        # DO NOT decrease by 1 every 1000ms as it slows down the whole app.
-        self.time[tt.opp_of(tt.plyr_of(self.board))].set(round(TIME - 0.1, 1))
-        self.root.after(100, self.countdown)
 
     def set_end_flags(self) -> None:
         super().set_end_flags()
@@ -1577,39 +1600,40 @@ class GameMenuT(GameMenu):
         """
         Overload to include disable timer entry, switch timer and add bonus time.
         """
-        # reset timer scale
-        self.entry_scale = 0
-
         super().update_turn()
 
-        # disable and reset size of current plyr's timer
+        # disable last player's timer and reset scale
         self.time_entry[tt.plyr_of(self.board)].config(
             relief=tk.FLAT,
             disabledforeground="SystemDisabledText",
             disabledbackground=self.settings.colors[0]["background"],
             font=self.settings.time_font
         )
-        # enable next plyr's timer
+        # enable current player's timer
         self.time_entry[tt.opp_of(tt.plyr_of(self.board))].config(
             relief=tk.SUNKEN,
             disabledforeground=self.settings.colors[tt.opp_of(tt.plyr_of(self.board))]["char"],
             disabledbackground="White"
         )
+        # restart animation
+        self.entry_scale = 0
 
-        if self.moved:
-            # current plyr gets bonus time
-            self.time[tt.plyr_of(self.board)].set(self.time[tt.plyr_of(self.board)].get() + 1)
+        # give last player bonus time
+        # condition prevents update_turn() call in __init__ from giving player 2 bonus time
+        if self.is_countdown:
+            self.add_time(tt.plyr_of(self.board), 1)
+            self.print_log(f"Exact time after bonus:\n{self.time[tt.plyr_of(self.board)]}")
 
     def to_submenu(self) -> None:
         if super().to_submenu():
-            self.time[1].trace_remove("write", self.trace1)
-            self.time[2].trace_remove("write", self.trace2)
+            self.time_str[1].trace_remove("write", self.trace1)
+            self.time_str[2].trace_remove("write", self.trace2)
 
 
 class GameMenuV(GameMenu):
     """
     :var settings.queue_len: number of X (or O) allowed on the board at any moment.
-    :var settings.show_qfront: show/hide the moves about to pop in the next turns.
+    :var settings.show_qfront: show/hide the moves to pop this turn and next.
     """
 
     def __init_child__(self):
@@ -1654,7 +1678,7 @@ class GameMenuV(GameMenu):
         # FULL_QUEUE_LEN is for both players
         FULL_QUEUE_LEN: int = 2 * self.settings.queue_len.get()
 
-        # color move-to-pop in current & next turns
+        # color moves to pop this turn & next
         if len(self.moved) >= FULL_QUEUE_LEN:
             COL: str = self.settings.colors[0]["qfront" if self.settings.show_qfront.get() else "board_button"]
 
@@ -1765,7 +1789,7 @@ class HistogramPrinter:
         )
         self.ax: Axes = plt.gca()
         self.bar: BarContainer = self.ax.bar(
-            tuple(parent.graph.keys()),
+            tuple(str(key) for key in parent.graph),
             tuple(parent.graph.values()),
             color=tuple(
                 Settings.NODE_COLORS[tt.WIN_SCORE]
@@ -1780,10 +1804,6 @@ class HistogramPrinter:
             self.bar,
             label_type=tk.CENTER
         )
-        # set x-axis range and interval
-        self.ax.set_xbound(lower=min(parent.ai_moves) - self.PAD_WIDTH, upper=max(parent.ai_moves) + self.PAD_WIDTH)
-        self.ax.xaxis.set_major_locator(MultipleLocator(1))
-
         # draw y=0 line
         self.ax.axhline(
             color="Black",
@@ -1953,7 +1973,6 @@ class TreePrinter:
             # copy node to clipboard
             self.parent.root.clipboard_clear()
             self.parent.root.clipboard_append(NODE)
-            self.parent.root.update()
             self.parent.print_log(f"Copied to clipboard:\n{NODE}")
 
             self.info_text.set_text(
@@ -2021,16 +2040,16 @@ class TreePrinter:
             p0 = self.ax.transData.transform(self.tree.nodes[parent]["pos"])
             p1 = self.ax.transData.transform(self.tree.nodes[child]["pos"])
 
-            TRIMMED: tuple[tuple[float, float]] = tt.trim_line(
+            TRIM_LINE: tuple[tuple[float, float]] = tt.trim_line(
                 p0, p1,
                 BBOX
             )
-            if TRIMMED is not None:
+            if TRIM_LINE is not None:
                 # center label at midpoint of visible section
                 # then transform back to data coords
                 NEW_POS: tuple[float, float] = self.ax.transData.inverted().transform(
                     tt.midpoint(
-                        *TRIMMED
+                        *TRIM_LINE
                     )
                 )
                 self.tree[parent][child]["pos"] = NEW_POS
@@ -2042,7 +2061,7 @@ class TreePrinter:
 
     # every subtree has two pads on both sides, this is for one side
     # this is relative to CHILD_DX
-    # absolute pad width = 0.5 * CHILD_DX
+    # absolute pad width = PAD_WIDTH * CHILD_DX
     PAD_WIDTH: float = 0.5
 
     def set_nodes_pos(self) -> None:
@@ -2145,7 +2164,7 @@ class TreePrinter:
 
 # === Help Pop-ups ===
 MORE_INFO_TEXT: str = "For more information, read the ⍰ of the Traditional mode."
-VERSION_TEXT: str = "Tic Tac Toe v18"
+VERSION_TEXT: str = "Tic Tac Toe v20"
 
 
 def default_help() -> None:
@@ -2185,7 +2204,7 @@ v12: Redesign the algorithm to use depth-first search instead of breadth-first-s
 v13: Prunner V2
 v14: Prunner V3, Shayan's Algo.
 v15: GUI Revamp
-v16, v17, v18: see GitHub\n
+v16, v17, v18, v19, v20: see GitHub\n
     """)
 
 
