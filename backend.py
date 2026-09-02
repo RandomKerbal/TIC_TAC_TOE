@@ -175,19 +175,19 @@ def gen_moves(BOARD: int, MOVE: int) -> list[int]:
             # set distance-dependent base priority
             moves[sq] = moves.get(sq, 0) - SQ_DIST
 
-            for DIR_Y, DIR_X in ADJ:
-                FWD1_Y: int = Y + DIR_Y
-                FWD1_X: int = X + DIR_X
+            for dy, dx in ADJ:
+                FWD1_Y: int = Y + dy
+                FWD1_X: int = X + dx
 
                 if 0 <= FWD1_X < BOARD_LEN and 0 <= FWD1_Y < BOARD_LEN and plyr_at(BOARD, sq_of(FWD1_Y, FWD1_X)) == PLYR:  # if square has an adjacent player
                     moves[sq] += BOARD_LEN  # +BOARD_LEN ensures the furthest square with 1 adjacent player has higher priority than the closest isolated square
-                    FWD2_Y: int = FWD1_Y + DIR_Y
-                    FWD2_X: int = FWD1_X + DIR_X
+                    FWD2_Y: int = FWD1_Y + dy
+                    FWD2_X: int = FWD1_X + dx
 
                     if 0 <= FWD2_X < BOARD_LEN and 0 <= FWD2_Y < BOARD_LEN and plyr_at(BOARD, sq_of(FWD2_Y, FWD2_X)) == PLYR:  # if square is connected to either end of a line
                         moves[sq] += BOARD_LEN * 8  # +BOARD_LEN * 8 ensures the furthest square connected to 1 line has higher priority than a square surrounded by 8 players
-                        BACK1_Y: int = Y - DIR_Y
-                        BACK1_X: int = X - DIR_X
+                        BACK1_Y: int = Y - dy
+                        BACK1_X: int = X - dx
 
                         if 0 <= BACK1_X < BOARD_LEN and 0 <= BACK1_Y < BOARD_LEN:  # if square is at the back of another square connected to either end of a line
                             BACK1_SQ: int = sq_of(BACK1_Y, BACK1_X)
@@ -513,9 +513,9 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
 
 def snake_gen_moves(BOARD: int, MOVES: set[int] | None, Y0: int, X0: int) -> collections.abc.Iterator[tuple[int, int]]:
 
-    for DIR_Y, DIR_X in ADJ:
-        Y1: int = Y0 + DIR_Y
-        X1: int = X0 + DIR_X
+    for dy, dx in ADJ:
+        Y1: int = Y0 + dy
+        X1: int = X0 + dx
         SQ1: int = sq_of(Y1, X1)
 
         if (
