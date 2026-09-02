@@ -1,6 +1,6 @@
 """
 Compile command:
-    pyinstaller --onefile --windowed --optimize 2 frontend.py
+    pyinstaller --onefile --windowed --optimize 2 --name TIC_TAC_TOE_v20 frontend.py
 """
 
 import math
@@ -1250,13 +1250,6 @@ class GameMenu:
 
     def end_ai_thread(self) -> None:
         self.print_log(f"Thread ended:\n{self.ai_thread.name}")
-
-        # moved[-1] is AI's move
-        if self.moved[-1] is None:
-            self.lock_board()
-            messagebox.showinfo("Result", "AI resigns.\n\nAI: \"I have already seen my inevitable fate ...\"")
-            return
-
         self.place()
 
         # check if in t_table in case AI plays randomly for first move
@@ -1267,7 +1260,7 @@ class GameMenu:
         self.graph_button.config(state=tk.NORMAL)
 
         # check_result_pvc() must run after unlock_board()
-        # since in snake mode, check_result_pvc() modify button state
+        # since in snake mode, check_result_pvc() changes button state
         self.check_result_pvc(True)
 
     def check_result_pvc(self, IS_AI: bool) -> bool:
@@ -1290,7 +1283,7 @@ class GameMenu:
 
         # if no one win and board is full
         elif len(self.moved) == tt.BOARD_AREA:
-            # no need lock_board()
+            self.lock_board()  # disable cheat button
             self.set_end_flags()
             if messagebox.askyesno("Result", "Ended in draw.\n\nAI: \"You\'ll never win ... not satisfied? new_game!\"") is True:
                 self.new_game(tt.EMPTY_BOARD)
@@ -1312,7 +1305,7 @@ class GameMenu:
 
         # if no one win and board is full
         elif len(self.moved) == tt.BOARD_AREA:
-            # no need lock_board()
+            self.lock_board()  # disable cheat button
             self.set_end_flags()
             messagebox.showinfo("Result", "Ended in a draw.")
 
@@ -1365,13 +1358,12 @@ class GameMenu:
             self.set_end_flags()
             self.ai_moves.clear()
             if self.moved and self.moved[-1] is not None:
-
                 # uncolor last move
                 self.board_buttons[self.moved[-1]].config(background=self.settings.colors[0]["foreground"])
-
             self.moved.clear()
             self.board = BOARD
 
+            # load into buttons, moved[]
             # DO NOT iterate over board_buttons[] since can have buttons outside BOARD_AREA
             for sq in range(tt.BOARD_AREA):
                 PLYR: int = tt.plyr_at(self.board, sq)
@@ -1383,20 +1375,23 @@ class GameMenu:
                         disabledforeground=self.settings.colors[PLYR]["char"],
                         state=tk.DISABLED
                     )
-                    # place move from loaded board into moved[]
                     self.moved.append(sq)
-
                 else:
-                    self.board_buttons[sq].config(
-                        disabledforeground=self.settings.colors[PLYR]["index"],
-                        relief=tk.RAISED,  # for snake mode
-                    )
+                    # reset sunken buttons in snake mode
+                    self.board_buttons[sq].config(relief=tk.RAISED)
 
+            # if board is full
+            if len(self.moved) == tt.BOARD_AREA:
+                self.lock_board()  # disable cheat button
+                self.lock_settings()
+            # if not full
+            else:
+                self.unlock_board()
+                self.unlock_settings()
+
+            self.print_log(None)
             self.update_turn()
             self.update_ind_and_aimoves_buttons()
-            self.unlock_settings()
-            self.print_log(None)
-            self.unlock_board()
             return True
 
         return False
