@@ -41,11 +41,11 @@ SW_VEC_HALF_W_LEN: int = 0
 """SW_VEC * (WIN_LEN // 2)"""
 
 ADJ: tuple[tuple[int, int], ...] = (
-    (-1, -1), (0, -1), (1, -1),
-    (-1, 0), (1, 0),
-    (-1, 1), (0, 1), (1, 1)
+    (-1, -1), (-1,  0), (-1, 1),
+    ( 0, -1),           ( 0, 1),
+    ( 1, -1), ( 1,  0), ( 1, 1)
 )
-"""Cross-file; contains adjacent coordinates (x, y) relative to a cell."""
+"""Cross-file; contains adjacent coordinates (y, x) relative to a cell."""
 
 THREE_POW: tuple[int]
 """
@@ -149,45 +149,51 @@ def unplace(BOARD: int, MOVE: int) -> int:
 
 def gen_moves(BOARD: int, MOVE: int) -> list[int]:
     """
-    Optimization: Moves are sorted to prune low-priority moves that are unlikely to change the result.
+    Moves are ordered for 2 optimizations:
+        1. later prune low-priority moves that are unlikely to change the result.
+        2. increase chance of Alpha-Beta prunning.
 
-    A move GENERALLY has higher priority if:
+    A move has higher priority GENERALLY if:
         Square is connected to, or at the back of another square connected to, either end of a line formed by current player.
         However, priority varies with dist to move and the number of connected lines.
 
-    A move GENERALLY has low priority if:
+    A move has low priority GENERALLY if:
         Square has adjacent player. However, priority varies with dist to move and the number of adjacent players.
     """
     PLYR: int = plyr_of(BOARD)
     MOVE_Y, MOVE_X = divmod(MOVE, BOARD_LEN)
 
-    moves = dict()  # key = square, value = priority
+    moves: dict[int, int] = dict()  # key = square, value = priority
 
     for sq in range(BOARD_AREA):
         if not plyr_at(BOARD, sq):
-            y, x = divmod(sq, BOARD_LEN)
-            move_d = max(abs(y - MOVE_Y), abs(x - MOVE_X))  # calculate Chebyshev distance
+            Y, X = divmod(sq, BOARD_LEN)
 
-            moves[sq] = moves.get(sq, 0) - move_d  # set distance-dependent base priority
+            # Chebyshev distance
+            SQ_DIST: int = max(abs(Y - MOVE_Y), abs(X - MOVE_X))
 
-            for dir_x, dir_y in ADJ:
-                fwd1_x, fwd1_y = x + dir_x, y + dir_y
+            # set distance-dependent base priority
+            moves[sq] = moves.get(sq, 0) - SQ_DIST
 
-                if 0 <= fwd1_x < BOARD_LEN and 0 <= fwd1_y < BOARD_LEN and plyr_at(BOARD, sq_of(fwd1_y, fwd1_x)) == PLYR:  # if square has an adjacent player
+            for DIR_Y, DIR_X in ADJ:
+                FWD1_Y: int = Y + DIR_Y
+                FWD1_X: int = X + DIR_X
+
+                if 0 <= FWD1_X < BOARD_LEN and 0 <= FWD1_Y < BOARD_LEN and plyr_at(BOARD, sq_of(FWD1_Y, FWD1_X)) == PLYR:  # if square has an adjacent player
                     moves[sq] += BOARD_LEN  # +BOARD_LEN ensures the furthest square with 1 adjacent player has higher priority than the closest isolated square
+                    FWD2_Y: int = FWD1_Y + DIR_Y
+                    FWD2_X: int = FWD1_X + DIR_X
 
-                    fwd2_x, fwd2_y = fwd1_x + dir_x, fwd1_y + dir_y
-
-                    if 0 <= fwd2_x < BOARD_LEN and 0 <= fwd2_y < BOARD_LEN and plyr_at(BOARD, sq_of(fwd2_y, fwd2_x)) == PLYR:  # if square is connected to either end of a line
+                    if 0 <= FWD2_X < BOARD_LEN and 0 <= FWD2_Y < BOARD_LEN and plyr_at(BOARD, sq_of(FWD2_Y, FWD2_X)) == PLYR:  # if square is connected to either end of a line
                         moves[sq] += BOARD_LEN * 8  # +BOARD_LEN * 8 ensures the furthest square connected to 1 line has higher priority than a square surrounded by 8 players
+                        BACK1_Y: int = Y - DIR_Y
+                        BACK1_X: int = X - DIR_X
 
-                        back1_x, back1_y = x - dir_x, y - dir_y
+                        if 0 <= BACK1_X < BOARD_LEN and 0 <= BACK1_Y < BOARD_LEN:  # if square is at the back of another square connected to either end of a line
+                            BACK1_SQ: int = sq_of(BACK1_Y, BACK1_X)
 
-                        if 0 <= back1_x < BOARD_LEN and 0 <= back1_y < BOARD_LEN:  # if square is at the back of another square connected to either end of a line
-                            back1_sq = sq_of(back1_y, back1_x)
-
-                            if not plyr_at(BOARD, back1_sq):
-                                moves[back1_sq] = moves.get(back1_sq, 0) + BOARD_LEN * 8
+                            if not plyr_at(BOARD, BACK1_SQ):
+                                moves[BACK1_SQ] = moves.get(BACK1_SQ, 0) + BOARD_LEN * 8
 
     return sorted(moves, key=moves.get, reverse=True)
 
@@ -275,6 +281,8 @@ def is_win(BOARD: int, MOVE: int) -> int:
 
 def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[[int], None] | None) -> int:
     """
+    :param moves: squares that the AI can search.
+
     At root, player is human.
     Uses special case of Alpha-Beta-Negamax Algorithm:
         Current loses if any child wins.
@@ -503,19 +511,22 @@ def iter_search(ROOT_BOARD: int, moves: set[int], tree: nx.DiGraph, send: Callab
             curr.visit()
 
 
-def snake_gen_moves(BOARD: int, Y0: int, X0: int) -> collections.abc.Iterator[tuple[int, int]]:
-    y1: int
-    x1: int
+def snake_gen_moves(BOARD: int, MOVES: set[int] | None, Y0: int, X0: int) -> collections.abc.Iterator[tuple[int, int]]:
 
-    for DIR_X, DIR_Y in ADJ:
-        y1 = Y0 + DIR_Y
-        x1 = X0 + DIR_X
+    for DIR_Y, DIR_X in ADJ:
+        Y1: int = Y0 + DIR_Y
+        X1: int = X0 + DIR_X
+        SQ1: int = sq_of(Y1, X1)
 
-        if 0 <= y1 < BOARD_LEN and 0 <= x1 < BOARD_LEN and not plyr_at(BOARD, sq_of(y1, x1)):
-            yield y1, x1
+        if (
+            (MOVES is None or SQ1 in MOVES)
+            and 0 <= Y1 < BOARD_LEN and 0 <= X1 < BOARD_LEN
+            and not plyr_at(BOARD, SQ1)
+        ):
+            yield Y1, X1
 
 
-def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None]) -> None:
+def snake_search_first_move(BOARD: int, MOVES: set[int], Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None]) -> None:
     child_board: int
 
     for child_move in MOVES:
@@ -523,14 +534,14 @@ def snake_search_first_move(BOARD: int, MOVES: list[int], Y_CHILD: int, X_CHILD:
 
         child_board = place(BOARD, child_move, tree)
 
-        if snake_search(child_board, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, None) == WIN_SCORE:
+        if snake_search(child_board, MOVES, Y_CHILD, X_CHILD, *divmod(child_move, BOARD_LEN), tree, None) == WIN_SCORE:
             t_table[BOARD] = -WIN_SCORE
             return
 
     t_table[BOARD] = WIN_SCORE
 
 
-def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None] | None) -> int:
+def snake_search(BOARD: int, MOVES: set[int], Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree: nx.DiGraph, send: Callable[[int], None] | None) -> int:
     """
     :param Y0:
     :param X0: square that the current player last placed.
@@ -552,7 +563,7 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
     child_move: int | None = None
     tie_child_move: int | None = None
 
-    for y1, x1 in snake_gen_moves(BOARD, Y0, X0):
+    for y1, x1 in snake_gen_moves(BOARD, MOVES, Y0, X0):
         child_move = sq_of(y1, x1)
 
         if is_root():
@@ -569,7 +580,7 @@ def snake_search(BOARD: int, Y0: int, X0: int, Y_CHILD: int, X_CHILD: int, tree:
             child_score = WIN_SCORE
 
         else:
-            child_score = snake_search(child_board, Y_CHILD, X_CHILD, y1, x1, tree, None)
+            child_score = snake_search(child_board, MOVES, Y_CHILD, X_CHILD, y1, x1, tree, None)
 
         # if any child wins, current loses
         if child_score == WIN_SCORE:

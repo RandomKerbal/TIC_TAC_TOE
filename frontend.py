@@ -39,7 +39,8 @@ class Settings:
     PROB_AI_NAME: str = "Recursive Probability AI"
     SNAKE_AI_NAME: str = "Recursive Snake AI"
     AI_NAMES: tuple[str, str, str, str] = (RECUR_AI_NAME, ITER_AI_NAME, PROB_AI_NAME, SNAKE_AI_NAME)
-    SHOW_QFRONT_TEXT = "Show queue front"
+    SHOW_QFRONT_TEXT: str = "Show queue front"
+    QUEUE_LEN_TEXT: str = "Queue length"
     MAX_TIME_ENTRY_SCALE: int = 6
     MIN_BOARD_LEN: int = 3
     MIN_BOARD_ZOOM: int = 5
@@ -82,7 +83,7 @@ class Settings:
         self.board_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
         self.win_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
         self.board_zoom: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_ZOOM)
-        self.ai_type: tk.StringVar = tk.StringVar(value=Settings.RECUR_AI_NAME)
+        self.ai_name: tk.StringVar = tk.StringVar(value=Settings.RECUR_AI_NAME)
         self.show_ind_and_aimoves: tk.BooleanVar = tk.BooleanVar(value=False)
         self.queue_len: tk.IntVar = tk.IntVar(value=self.MIN_BOARD_LEN)
         self.show_qfront: tk.BooleanVar = tk.BooleanVar(value=False)
@@ -713,9 +714,8 @@ class GameMenu:
             variable=self.settings.win_len,
             **self.settings.slider_cfg,
 
-            # new value is automatically passed by slider when it changes
-            # cast since new value is str
-            command=lambda win_len: tt.set_consts(TK_WIN_LEN=int(win_len))
+            # cast since value passed by slider is str
+            command=lambda new_winlen: tt.set_consts(TK_WIN_LEN=int(new_winlen))
         )
         self.board_zoom_label = tk.Label(
             self.settings_frame,
@@ -738,7 +738,7 @@ class GameMenu:
         )
         self.ai_dropdown = tk.OptionMenu(
             self.settings_frame,
-            self.settings.ai_type,
+            self.settings.ai_name,
             *Settings.AI_NAMES
         )
         self.ai_dropdown.config(
@@ -845,7 +845,7 @@ class GameMenu:
 
         self.__init_child__()
 
-        self.update_ai_type()
+        self.update_aitype()  # init graph button text
         self.update_len()  # init buttons, win_len
         self.update_turn()  # init turn labels
         self.update_zoom()  # init fonts
@@ -876,7 +876,7 @@ class GameMenu:
             # dropdown closed
             else:
                 self.ai_dropdown.config(relief=tk.GROOVE)
-                self.update_ai_type()
+                self.update_aitype()
 
         self.is_dropdown_open = True
         keep_dropdown_raised()
@@ -884,13 +884,13 @@ class GameMenu:
     def close_dropdown(self, _) -> None:
         self.is_dropdown_open = False
 
-    def update_ai_type(self) -> None:
+    def update_aitype(self) -> None:
         tt.t_table.clear()
         self.print_log("Cleared Ttable")
-        self.print_log(f"Selected AI:\n{self.settings.ai_type.get()}")
+        self.print_log(f"Selected AI:\n{self.settings.ai_name.get()}")
         self.graph = None
 
-        if self.settings.ai_type.get() == Settings.PROB_AI_NAME:
+        if self.settings.ai_name.get() == Settings.PROB_AI_NAME:
             self.graph_button.config(text="Show search histogram\n(impacts performance)")
         else:
             self.graph_button.config(text="Show search tree\n(impacts performance)")
@@ -993,7 +993,8 @@ class GameMenu:
 
         # no need to delete textpaths since reusable next time BOARD_AREA increase
 
-        # update win_len since X always win if it is shorter
+        # update win_len
+        # cap min win_len since any shorter let X always win
         # no need to update backend win_len since the slider's command will
         self.win_len_slider.config(from_=min(tt.BOARD_LEN, 4), to=tt.BOARD_LEN)
         self.update_ind_and_aimoves_buttons()
@@ -1036,7 +1037,7 @@ class GameMenu:
         )
 
         for button in self.board_buttons:
-            # button scales automatically with font size
+            # font size controls button scale
             button.config(font=self.settings.board_font)
 
     def lock_settings(self) -> None:
@@ -1084,7 +1085,7 @@ class GameMenu:
         if not self.moved:
             self.lock_settings()
 
-        self.ai_thread_start()
+        self.start_ai_thread()
 
     def board_button_press(self, SQ: int) -> None:
 
@@ -1099,7 +1100,7 @@ class GameMenu:
 
             # DO NOT exclude first move since first move can win with loaded board
             if not self.check_result_pvc(False):
-                self.ai_thread_start()
+                self.start_ai_thread()
 
         # pvp
         else:
@@ -1126,29 +1127,88 @@ class GameMenu:
         )
         self.print_log(None)
 
-    def ai_thread_start(self) -> None:
+    def start_ai_thread(self) -> None:
         self.lock_board()
         self.graph_button.config(state=tk.DISABLED)
-        self.ai_thread = threading.Thread(target=self.ai_thread_work, daemon=True)
+        self.ai_thread = threading.Thread(target=self.ai_thread_work, args=(self.settings.ai_name.get(),), daemon=True)
         self.ai_thread.start()
         self.print_log(f"Spawned thread:\n{self.ai_thread.name}")
 
-    def ai_thread_work(self) -> None:
+    def ai_thread_work(self, AI_NAME: str) -> None:
+        """
+        :param AI_NAME: needed since cannot use settings.ai_name.get() in AI thread since tkinter is not thread safe.
+        """
 
-        # create index for AI's move
+        # initialize index for AI's move
+        # IMPORTANT: AI's move is at moved[-1] from now on
         self.moved.append(None)
 
-        # if AI starts first
+        # if AI starts first, place randomly
         if len(self.moved) == 1:
-            # moved[-1] is AI's move
             self.moved[-1] = random.randint(0, tt.BOARD_AREA - 1)
 
-        # if AI starts second or loaded board
+        # if AI starts second or loaded board, choose AI
         else:
-            # choose AI
             AI: Callable
-            args: tuple
+            ARGS: tuple
+            PREV_AI_MOVES: set[int | None] = set(self.ai_moves)
+            self.ai_moves = tt.gen_moves(self.board, self.moved[-2])
+    
+            if AI_NAME == Settings.SNAKE_AI_NAME:
+                self.graph = nx.DiGraph()
 
+                # if placed before
+                if len(self.moved) >= 3:
+                    AI = tt.snake_search
+                    del self.ai_moves[31:]
+                    ARGS = (
+                        set(self.ai_moves),
+                        *divmod(self.moved[-3], tt.BOARD_LEN),
+                        *divmod(self.moved[-2], tt.BOARD_LEN)
+                    )
+                # if never placed before
+                else:
+                    AI = tt.snake_search_first_move
+                    del self.ai_moves[26:]
+                    ARGS = (
+                        set(self.ai_moves),
+                        *divmod(self.moved[-2], tt.BOARD_LEN)
+                    )
+
+            elif AI_NAME == Settings.RECUR_AI_NAME:
+                AI = tt.recur_search
+                del self.ai_moves[14:]
+                self.graph = nx.DiGraph()
+
+                # MUST copy so AI thread doesn't refill main thread's ai_moves[] after game ends
+                ARGS = (self.ai_moves.copy(),)
+
+            elif AI_NAME == Settings.ITER_AI_NAME:
+                AI = tt.iter_search
+                del self.ai_moves[17:]
+                self.graph = nx.DiGraph()
+                ARGS = (set(self.ai_moves),)
+
+            # if AI_NAME == Settings.PROB_AI_NAME
+            else:
+                AI = tt.prob_search
+                del self.ai_moves[14:]
+                ARGS = (self.ai_moves.copy(),)
+
+                # sort ai_moves[] to display in-order in histogram
+                self.graph = dict.fromkeys(sorted(self.ai_moves), 0)
+
+            # if pruned board different from last search, t_table is unusable
+            # DO NOT clear t_table after search since needed to print tree
+            if not set(self.ai_moves).issubset(PREV_AI_MOVES):
+                tt.t_table.clear()
+                self.root.after(0, self.print_log, "Cleared Ttable")
+
+            # uncolor last ai_moves[], color new ones
+            # use root.after() to run update_aimove() in main thread
+            # since matplotlib & tkinter are not thread safe
+            self.root.after(0, self.update_ind_and_aimoves_buttons)
+            
             def send(NEXT_MOVE: int) -> None:
                 """
                 Injected into AI(), run in AI thread.
@@ -1158,73 +1218,12 @@ class GameMenu:
                 if self.ai_thread is None:
                     sys.exit()
 
-                # use root.after() to run update_aimove() in main thread
-                # since matplotlib & tkinter must run in main thread
                 self.root.after(0, self.update_aimove, NEXT_MOVE)
 
-            # if AI is snake and placed before, no need ai_moves[]
-            if self.settings.ai_type.get() == Settings.SNAKE_AI_NAME and len(self.moved) >= 3:
-                AI = tt.snake_search
-                self.graph = nx.DiGraph()
-                args = (
-                    *divmod(self.moved[-3], tt.BOARD_LEN),
-                    *divmod(self.moved[-2], tt.BOARD_LEN),
-                )
+            self.root.after(0, self.print_log, f"AI moves:\n{self.ai_moves}\n\nSearching...")
+            AI(self.board, *ARGS, self.graph, send)
 
-                # only for show, AI doesn't need ai_moves[]
-                self.ai_moves = list(
-                    tt.sq_of(y, x)
-                    for y, x in tt.snake_gen_moves(self.board, *divmod(self.moved[-3], tt.BOARD_LEN))
-                )
-
-            else:
-                PREV_AI_MOVES: set[int | None] = set(self.ai_moves)
-                self.ai_moves = tt.gen_moves(self.board, self.moved[-2])
-
-                if self.settings.ai_type.get() == Settings.RECUR_AI_NAME:
-                    AI = tt.recur_search
-                    self.ai_moves = self.ai_moves[:14]  # can only search 14 squares in reasonable time
-                    self.graph = nx.DiGraph()
-                    args = (self.ai_moves.copy(),)  # must copy so AI thread doesn't refill main thread's ai_moves[] after end_game()
-
-                elif self.settings.ai_type.get() == Settings.ITER_AI_NAME:
-                    AI = tt.iter_search
-                    self.ai_moves = self.ai_moves[:17]
-                    self.graph = nx.DiGraph()
-                    args = (set(self.ai_moves),)
-
-                elif self.settings.ai_type.get() == Settings.PROB_AI_NAME:
-                    AI = tt.prob_search
-                    self.ai_moves = self.ai_moves[:14]
-                    args = (self.ai_moves.copy(),)
-
-                    # sort ai_moves[] to display in-order in histogram
-                    self.graph = dict.fromkeys(sorted(self.ai_moves), 0)
-
-                # if self.settings.ai_type.get() == Settings.SNAKE_AI_NAME
-                else:
-                    AI = tt.snake_search_first_move
-                    self.ai_moves = self.ai_moves[:16]
-                    self.graph = nx.DiGraph()
-                    args = (
-                        self.ai_moves,  # no need copy since AI thread doesn't modify
-                        *divmod(self.moved[-2], tt.BOARD_LEN),
-                    )
-
-                # if pruned board different from last search, t_table is unusable
-                # DO NOT clear t_table after search since needed to print tree
-                if not set(self.ai_moves).issubset(PREV_AI_MOVES):
-                    tt.t_table.clear()
-                    self.print_log("Cleared Ttable")
-
-            # uncolor last ai_moves[], color new ones
-            self.root.after(0, self.update_ind_and_aimoves_buttons)
-
-            self.print_log(f"AI moves:\n{self.ai_moves}")
-            self.print_log("Searching...")
-            AI(self.board, *args, self.graph, send)
-
-        self.root.after(0, self.ai_thread_end)
+        self.root.after(0, self.end_ai_thread)
 
     def update_aimove(self, NEXT_MOVE: int) -> None:
         """
@@ -1249,16 +1248,21 @@ class GameMenu:
         self.root.update_idletasks()
         self.moved[-1] = NEXT_MOVE
 
-    def ai_thread_end(self) -> None:
+    def end_ai_thread(self) -> None:
         self.print_log(f"Thread ended:\n{self.ai_thread.name}")
 
         # moved[-1] is AI's move
         if self.moved[-1] is None:
             self.lock_board()
-            messagebox.showinfo("Result", "AI resigns.\n\nAI: 'I have already computed my inevitable fate ...'")
+            messagebox.showinfo("Result", "AI resigns.\n\nAI: \"I have already seen my inevitable fate ...\"")
             return
 
         self.place()
+
+        # check if in t_table in case AI plays randomly for first move
+        if self.board in tt.t_table and tt.t_table[self.board] == -tt.WIN_SCORE:
+            messagebox.showinfo("Comment", "AI plays randomly.\n\nAI: \"In every future I saw, I lost.\"")
+
         self.unlock_board()
         self.graph_button.config(state=tk.NORMAL)
 
@@ -1277,10 +1281,10 @@ class GameMenu:
             self.lock_board()
             self.set_end_flags()
             if IS_AI:
-                if messagebox.askyesno("Result", f"AI won {WIN_DIR}!\n\nAI: 'Shouldn\'t humans be smarter?'") is True:
+                if messagebox.askyesno("Result", f"AI won {WIN_DIR}!\n\nAI: \"Shouldn\'t humans be smarter?\"") is True:
                     self.new_game(tt.EMPTY_BOARD)
             else:
-                if messagebox.askyesno("Result", f"You won {WIN_DIR}!\n\nAI: 'NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!'") is True:
+                if messagebox.askyesno("Result", f"You won {WIN_DIR}!\n\nAI: \"NOT MY DIGNITY! LET US HAVE ANOTHER DUEL!\"") is True:
                     self.new_game(tt.EMPTY_BOARD)
             return True
 
@@ -1288,7 +1292,7 @@ class GameMenu:
         elif len(self.moved) == tt.BOARD_AREA:
             # no need lock_board()
             self.set_end_flags()
-            if messagebox.askyesno("Result", "Ended in draw.\n\nAI: 'You\'ll never win ... not satisfied? new_game!'") is True:
+            if messagebox.askyesno("Result", "Ended in draw.\n\nAI: \"You\'ll never win ... not satisfied? new_game!\"") is True:
                 self.new_game(tt.EMPTY_BOARD)
             return True
 
@@ -1304,7 +1308,7 @@ class GameMenu:
         if WIN_DIR is not None:
             self.lock_board()
             self.set_end_flags()
-            messagebox.showinfo("Result", f"Player \'{tt.char_of(tt.plyr_of(self.board))}\' won {WIN_DIR}!")
+            messagebox.showinfo("Result", f"Player {tt.char_of(tt.plyr_of(self.board))} won {WIN_DIR}!")
 
         # if no one win and board is full
         elif len(self.moved) == tt.BOARD_AREA:
@@ -1404,10 +1408,11 @@ class GameMenu:
         if TEXT is None:
             self.log.insert(
                 tk.END,
-                f"Move: {self.moved[-1] if self.moved else None}\n" +
+                f"Move: {self.moved[-1] if self.moved else '-'}\n" +
                 f"Last player: {tt.plyr_of(self.board)}\n" +
                 f"Board: {self.board}\n" +
-                f"Ttable len: {len(tt.t_table)}\n\n"
+                f"Ttable len: {len(tt.t_table)}\n" +
+                f"Score: {tt.t_table[self.board] if self.board in tt.t_table else '-'}\n\n"
             )
 
         else:
@@ -1427,7 +1432,7 @@ class GameMenu:
             messagebox.showinfo("Warning", f"Perform an AI search first!")
             return
 
-        if self.settings.ai_type.get() == Settings.PROB_AI_NAME:
+        if self.settings.ai_name.get() == Settings.PROB_AI_NAME:
             HistogramPrinter(self)
         else:
             TreePrinter(self)
@@ -1574,7 +1579,6 @@ class GameMenuT(GameMenu):
         self.root.after(0, self.countdown, time.perf_counter())
 
         # update current player's timer scale
-        # SPEED parameter is arbitrary
         self.entry_scale = tt.framerate_independent_lerp(
             self.entry_scale,
             Settings.MAX_TIME_ENTRY_SCALE,
@@ -1641,7 +1645,7 @@ class GameMenuV(GameMenu):
         self.queue_len_label = tk.Label(
             self.settings_frame,
             background=self.settings.colors[0]["foreground"],
-            text="\nQueue length"
+            text=f"\n{Settings.QUEUE_LEN_TEXT}"
         )
         self.queue_len_slider = tk.Scale(
             self.settings_frame,
@@ -1719,13 +1723,13 @@ class GameMenuV(GameMenu):
 class GameMenuS(GameMenu):
 
     def __init_child__(self):
-        # X always win if board_len is < 4. The slider automatically call update_len() to update cross-file vars.
-        self.board_len_slider.config(from_=4)
-        self.settings.ai_type.set(Settings.SNAKE_AI_NAME)
+        # set default board as 4x4
+        # the slider's command will update backend board_len
+        self.board_len_slider.set(4)
+        self.settings.ai_name.set(Settings.SNAKE_AI_NAME)
 
     def update_len(self, _=None) -> None:
         super().update_len()
-        self.win_len_slider.config(from_=min(tt.BOARD_LEN // 2 + 1, 3))
 
     def check_result_pvc(self, IS_AI: bool) -> bool:
         if not self.update_snake():
@@ -1754,7 +1758,7 @@ class GameMenuS(GameMenu):
 
         # prepare for opponent's turn
         if len(self.moved) >= 2:
-            adjs: set = set(tt.sq_of(y, x) for y, x in tt.snake_gen_moves(self.board, *divmod(self.moved[-2], tt.BOARD_LEN)))
+            adjs: set = set(tt.sq_of(y, x) for y, x in tt.snake_gen_moves(self.board, None, *divmod(self.moved[-2], tt.BOARD_LEN)))
 
             # if opponent is stuck, current wins
             if not adjs:
@@ -1776,6 +1780,10 @@ class GameMenuS(GameMenu):
                         relief=tk.SUNKEN
                     )
 
+    def to_submenu(self) -> bool:
+        if super().to_submenu():
+            self.settings.ai_name.set(self.settings.RECUR_AI_NAME)
+
 
 class HistogramPrinter:
 
@@ -1785,7 +1793,7 @@ class HistogramPrinter:
 
     def __init__(self, parent: GameMenu):
         self.fig = plt.figure(
-            num="Histogram" + str(len(plt.get_fignums()) + 1)
+            num="Histogram " + str(len(plt.get_fignums()) + 1)
         )
         self.ax: Axes = plt.gca()
         self.bar: BarContainer = self.ax.bar(
@@ -1876,7 +1884,7 @@ class TreePrinter:
             Patch(facecolor=tk.NONE, label=self.TREE_INFO)
         )
         self.fig = plt.figure(
-            num="Depth-first-search Tree" + str(len(plt.get_fignums()) + 1),
+            num="Depth-first-search Tree " + str(len(plt.get_fignums()) + 1),
             layout="constrained"
         )
         self.ax: Axes = plt.gca()
@@ -1990,7 +1998,7 @@ class TreePrinter:
                 # doesn't work for snake AI since assume permutation tree
                 f"{len(self.parent.ai_moves) + DEPTH - len(CHILDS)} Skipped Child(s)"
             )
-            # no need draw_idle() since FuncAnimation() automatically redraw
+            # no need draw_idle() since FuncAnimation() will
 
             # MUST assign FuncAnimation() to variable that lasts the entire animation so it is not garbage-collected
             self.func_animation = FuncAnimation(
@@ -2164,6 +2172,7 @@ class TreePrinter:
 
 # === Help Pop-ups ===
 MORE_INFO_TEXT: str = "For more information, read the ⍰ of the Traditional mode."
+TIP_TEXT: str = "Here's a tip before you go:"
 VERSION_TEXT: str = "Tic Tac Toe v20"
 
 
@@ -2179,12 +2188,12 @@ def time_help() -> None:
 
 def vanish_help() -> None:
     messagebox.showinfo("Help",
-                        f"After a certain number of moves, your oldest move will vanish!\n\nPoor memory? Enable '{Settings.SHOW_QFRONT_TEXT}' to show your oldest move in yellow.\n\nThe number of moves you can have on the board at any time is determined by 'Queue length'. What is a queue you asked? Go study computer science!\n\nBefore you go, here's a tip: the AIs don't know that moves vanish!\n\n{MORE_INFO_TEXT}")
+                        f"After a certain number of moves, your oldest move will vanish!\n\nPoor memory? Enable \"{Settings.SHOW_QFRONT_TEXT}\" to show your oldest move.\n\nThe number of moves you can have on the board at any time is determined by \"{Settings.QUEUE_LEN_TEXT}\". What's a queue you asked? Go study computer science!\n\n{TIP_TEXT} The AIs don't know that moves vanish!\n\n{MORE_INFO_TEXT}")
 
 
 def snake_help() -> None:
     messagebox.showinfo("Help",
-                        f"For your first move, you can place wherever you want.\n\nAfterwards, you can only place around your last move ( your snake's head ). Watch where your snake is going, as turning around can take some time.\n\nBesides winning traditionally, you can also win by trapping your opponent in a corner! I recommend playing on a 7x7 or larger board.\n\n{MORE_INFO_TEXT}")
+                        f"For your first move, you can place wherever you want.\n\nAfterwards, you can only place around your last move ( your snake's head ). Watch where your snake is going, as turning around can take some time.\n\nBesides winning traditionally, you can also win by trapping your opponent in a corner!\n\n{TIP_TEXT} For your first move, usually go for the corners. I also recommend playing on a large board.\n\n{MORE_INFO_TEXT}")
 
 
 def changelog() -> None:
