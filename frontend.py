@@ -255,8 +255,7 @@ class MainMenu:
                         text=SUBTITLE[:_frame] + "_" * min(1, 82 - _frame) + " " * (81 - _frame))
                 )
             )
-
-        # disables the close window button
+        # rebind close window button
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
 
         self.root.title(VERSION_TEXT)
@@ -366,18 +365,14 @@ class SubMenu:
             width=12,
             **Settings.MENU_BUTTON_CFG
         )
-        self.settings_button = tk.Button(
+        self.color_button = tk.Button(
             self.bottom_frame,
             text="⚙",
-            command=self.to_settings,
+            command=self.to_colormenu,
             width=11,
             font=("FixedSys", 13, "bold"),
             **dict(item for item in Settings.MENU_BUTTON_CFG.items() if item[0] != "font")
         )
-
-        # disables the close window button
-        self.root.protocol("WM_DELETE_WINDOW", lambda: MainMenu.exit(self))
-
         # center buttons horizontally by giving same weight to all columns except the ones with the button
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_columnconfigure(3, weight=1)
@@ -393,7 +388,12 @@ class SubMenu:
         self.snake_help_button.grid(row=4, column=2)
         self.bottom_frame.grid(row=5, column=1, columnspan=2, pady=25)
         self.back_button.pack(side=tk.LEFT, padx=(1, 18))
-        self.settings_button.pack(side=tk.LEFT, padx=(18, 1))
+        self.color_button.pack(side=tk.LEFT, padx=(18, 1))
+        self.root.protocol("WM_DELETE_WINDOW", lambda: MainMenu.exit(self))
+
+        # needed in case coming from GameMenu
+        self.root.geometry(Settings.WINDOW_DIM)
+        self.root.config(background="Black")
 
     def to_gamemenu(self, mode: type['GameMenu']) -> None:
         for widget in self.root.winfo_children():
@@ -407,14 +407,14 @@ class SubMenu:
 
         MainMenu(self.root, self.settings)
 
-    def to_settings(self) -> None:
+    def to_colormenu(self) -> None:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        ColMenu(self.root, self.settings)
+        ColorMenu(self.root, self.settings)
 
 
-class ColMenu:
+class ColorMenu:
     """
     :ivar color_frames: index 0 stores LabelFrame for general features, index 1 for X features, index 2 for O features.
     :ivar color_entries: index 0 stores colors for general features, index 1 for X features, index 2 for O features.
@@ -426,17 +426,17 @@ class ColMenu:
         self.color_frames: tuple = (
             tk.LabelFrame(
                 self.root,
-                text="General",
+                text="General Colors",
                 **Settings.COLOR_FRAME_CFG
             ),
             tk.LabelFrame(
                 self.root,
-                text="X colors",
+                text="X Colors",
                 **Settings.COLOR_FRAME_CFG
             ),
             tk.LabelFrame(
                 self.root,
-                text="O colors",
+                text="O Colors",
                 **Settings.COLOR_FRAME_CFG
             )
         )
@@ -447,20 +447,18 @@ class ColMenu:
             command=self.to_submenu,
             **Settings.MENU_BUTTON_CFG
         )
+        self.color_entries: list[dict] = [dict(), dict(), dict()]
         self.color_frames[1].grid(row=0, column=1, pady=(10, 5))
         self.color_frames[2].grid(row=0, column=2, pady=(10, 5))
         self.color_frames[0].grid(row=1, column=1, columnspan=2, pady=5)
         self.exit_button.grid(row=2, column=1, columnspan=2, pady=10)
 
-        self.color_entries: list[dict] = [dict(), dict(), dict()]
-        color_label: tk.Label
-        color_entry: tk.Entry
-
-        for plyr, feats in enumerate(self.settings.colors):  # plyr = general, X, O
-            for row, (feat, color) in enumerate(feats.items()):
+        # plyr = general, X, O
+        for plyr, features in enumerate(self.settings.colors):
+            for row, (feature, color) in enumerate(features.items()):
                 color_label = tk.Label(
                     self.color_frames[plyr],
-                    text=feat,
+                    text=feature,
                     font=Settings.MENU_FONT,
                     **Settings.MENU_LABEL_CFG
                 )
@@ -478,13 +476,13 @@ class ColMenu:
                 color_entry.grid(row=row, column=1)
 
                 # make the key release event update bg of textbox
-                color_entry.bind("<KeyRelease>", lambda _, _plyr=plyr, _feat=feat: self.update_color(_plyr, _feat))
-                self.color_entries[plyr][feat] = color_entry
+                color_entry.bind("<KeyRelease>", lambda _, _plyr=plyr, _feature=feature: self.update_color(_plyr, _feature))
+                self.color_entries[plyr][feature] = color_entry
 
-    def update_color(self, PLYR: int, FEAT: str) -> None:
+    def update_color(self, PLYR: int, FEATURE: str) -> None:
         try:
             # try to set background color of the text widget
-            self.color_entries[PLYR][FEAT].config(bg=self.color_entries[PLYR][FEAT].get())
+            self.color_entries[PLYR][FEATURE].config(bg=self.color_entries[PLYR][FEATURE].get())
 
         except tk.TclError:
             # if the color is not valid
@@ -492,14 +490,14 @@ class ColMenu:
 
     def to_submenu(self) -> None:
         # save colors
-        for plyr, feats in enumerate(self.color_entries):
-            for feat, entry in feats.items():
+        for plyr, features in enumerate(self.color_entries):
+            for feature, entry in features.items():
                 try:
                     self.root.winfo_rgb(entry.get())
-                    self.settings.colors[plyr][feat] = entry.get()
+                    self.settings.colors[plyr][feature] = entry.get()
 
                 except tk.TclError:
-                    messagebox.askretrycancel("Settings", f"Enter a valid color for {feat}!")
+                    messagebox.askretrycancel("Settings", f"Enter a valid color for {feature}!")
                     return
 
         if messagebox.showinfo("Settings", f"Your settings have been updated!\n\n{self.settings.colors}"):
@@ -836,12 +834,12 @@ class GameMenu:
         self.board_zoom_label.grid(row=6, column=1, sticky=tk.E)
         self.board_zoom_slider.grid(row=6, column=2, pady=(0, 8))
         if self.settings.is_pvc:
-            self.aifirst_checkbox.grid(columnspan=2, row=7, column=1, pady=(0, 8))
-            self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(0, 10))
-            self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
+            self.aifirst_checkbox.grid(columnspan=2, row=7, column=1)
+        self.ai_dropdown.grid(columnspan=2, row=8, column=1, pady=(8, 10))
+        self.graph_button.grid(columnspan=2, row=9, column=1, pady=(0, 8))
         self.ind_checkbox.grid(columnspan=2, row=10, column=1, pady=(0, 10))
         self.log.grid(columnspan=2, row=11, column=1, sticky=tk.NSEW)
-        self.log_clear.place(relx=1.0, rely=1.0, anchor=tk.SE)  # take the SE corner, stick to bottom-right corner of parent
+        self.log_clear.place(relx=1.0, rely=1.0, anchor=tk.SE)
 
         self.__init_child__()
 
@@ -850,8 +848,6 @@ class GameMenu:
         self.update_turn()  # init turn labels
         self.update_zoom()  # init fonts
         self.update_ind_and_aimoves_buttons()  # in case this setting is on from last time
-
-        # rebinds the close window button
         self.root.protocol("WM_DELETE_WINDOW", lambda: MainMenu.exit(self))
 
     def __init_child__(self):
@@ -1066,7 +1062,6 @@ class GameMenu:
             )
 
     def set_end_flags(self) -> None:
-        self.graph = None
         self.ai_thread = None
 
     def unlock_board(self) -> None:
@@ -1283,7 +1278,10 @@ class GameMenu:
 
         # if no one win and board is full
         elif len(self.moved) == tt.BOARD_AREA:
-            self.lock_board()  # disable cheat button
+
+            # disable cheat button
+            self.lock_board()
+
             self.set_end_flags()
             if messagebox.askyesno("Result", "Ended in draw.\n\nAI: \"You\'ll never win ... not satisfied? new_game!\"") is True:
                 self.new_game(tt.EMPTY_BOARD)
@@ -1336,9 +1334,6 @@ class GameMenu:
             for widget in self.root.winfo_children():
                 widget.destroy()
 
-            # set window to the SubMenu resolution & color
-            self.root.geometry(Settings.WINDOW_DIM)
-            self.root.config(background="Black")
             SubMenu(self.root, self.settings)
             return True
 
@@ -1361,6 +1356,7 @@ class GameMenu:
                 # uncolor last move
                 self.board_buttons[self.moved[-1]].config(background=self.settings.colors[0]["foreground"])
             self.moved.clear()
+            self.graph = None
             self.board = BOARD
 
             # load into buttons, moved[]
