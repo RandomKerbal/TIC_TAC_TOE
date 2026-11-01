@@ -1,4 +1,4 @@
-from unused.v1_backend import *
+from v6v9_backend import *
 
 print(r"""
 * ============================================================================================================== *
@@ -8,10 +8,11 @@ print(r"""
 *       ██    ██ ██      █████    ██    ███████ ██      █████    ██    ██    ██ █████       ██    ██ ███████╗    *  
 *       ██    ██ ██               ██    ██   ██ ██               ██    ██    ██ ██           ██  ██  ██╔═══██╗   *
 *       ██    ██  ██████          ██    ██   ██  ██████          ██     ██████  ███████       ████   ╚██████╔╝   *     
-*       100% Made by CZY          Infinite boards!               Unbeatable AI_NAMES!                     ╚═════╝    *
+*       100% Made by Zhong Yan      Infinite boards!               Unbeatable AI!                     ╚═════╝    *
 *                                                                                                                *
 * ============================================================================================================== *""")
 
+tmp = tk.Text()
 mode = ''
 while mode == '':
     # ask player for mode pvp, pvcx, or pvco
@@ -28,7 +29,7 @@ board_sz: str | int = ''
 while board_sz == '':
     # ask player for board length
     board_sz = input(
-       'Select a board length.\n>')
+       'Select a board length. Boards that are 7*7 or larger only needs half the board length to win!\n>')
     # if player input rubbish, ask again
     if board_sz.isdigit() is False:
         print('Board length must be an integer!')
@@ -40,8 +41,8 @@ while board_sz == '':
 # initialize the board len and how many slots in a row/column/diagonal to win
 board_sz = int(board_sz)
 filled_slots_ind = []
-WIN_LEN = set_win_len(board_sz)
-check_winner_area = set_check_winner_area(board_sz, WIN_LEN)
+win_len = set_win_len(board_sz)
+check_winner_area = set_check_winner_area(board_sz, win_len)
 
 # initialize the board based on board_sz
 main_board = setup_board(board_sz)
@@ -52,10 +53,8 @@ if mode == 'pvp':
 elif mode == 'pvcx':
     plyr = 'O'
     # computer's turn if computer starts first
-    print_board(main_board, board_sz)
-    print(f'Computer [X]\'s turn! Please wait...')
-    # prev_input = -1 means there is no prev_input yet and the computer will randomly generate a number
-    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(WIN_LEN, 4), set_check_winner_area(board_sz, min(WIN_LEN, 4)), prev_input=-1, is_debugging=False)] = opp(plyr)
+    # last_input = -1 means there is no last_input yet and the computer will randomly generate a number
+    main_board[pc_input(opponent(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input=-1, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opponent(plyr)
 elif mode == 'pvco' or mode == 'pvc':
     plyr = 'X'
 
@@ -63,21 +62,19 @@ elif mode == 'pvco' or mode == 'pvc':
 while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
     # human's turn if human starts first
     # noinspection PyUnboundLocalVariable
-    prev_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, WIN_LEN, check_winner_area)
-    main_board[prev_input] = plyr
+    last_input = ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)
+    main_board[last_input] = plyr
 
     # computer's turn regardless computer or human starts first
-    print_board(main_board, board_sz)
-    print(f'Computer [{opp(plyr)}]\'s turn! Please wait...')
-    main_board[pc_input(opp(plyr), main_board, board_sz, filled_slots_ind, min(WIN_LEN, 4), set_check_winner_area(board_sz, min(WIN_LEN, 4)), prev_input, is_debugging=False)] = opp(plyr)
+    main_board[pc_input(opponent(plyr), main_board, board_sz, filled_slots_ind, min(win_len, 4), set_check_winner_area(board_sz, min(win_len, 4)), last_input, is_debugging=False, debugger=tmp, slot_buttons=tmp)] = opponent(plyr)
 
-    winner = check_winner_anywhere(main_board, board_sz, WIN_LEN, check_winner_area)
+    winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
     if winner[1] == 'tie':
         print_board(main_board, board_sz)
         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw'))//2) + 'Game ended in a draw')
         print(' ' * ((51 - len('So close...but I will NEVER lose!'))//2) + 'So close...but I will NEVER lose!' + '\n' + '=' * 50)
         break
-    elif winner[0] == opp(plyr):
+    elif winner[0] == opponent(plyr):
         print_board(main_board, board_sz)
         print('=' * 50 + '\n' + ' ' * ((51 - len(f'Computer wins {winner[1]}!')) // 2) + f'Computer wins {winner[1]}!')
         print(' ' * ((51 - len('Humans should\'ve been smarter...'))//2) + 'Humans should\'ve been smarter...' + '\n' + '=' * 50)
@@ -90,12 +87,12 @@ while mode == 'pvcx' or mode == 'pvco' or mode == 'pvc':
 # start of the Player versus Player mode
 while mode == 'pvp':
     # player 'X' turn
-    main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, WIN_LEN, check_winner_area)] = plyr
+    main_board[ask_input(plyr, main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = plyr
 
     # player 'O' turn
-    main_board[ask_input(opp(plyr), main_board, board_sz, filled_slots_ind, WIN_LEN, check_winner_area)] = opp(plyr)
+    main_board[ask_input(opponent(plyr), main_board, board_sz, filled_slots_ind, win_len, check_winner_area)] = opponent(plyr)
 
-    winner = check_winner_anywhere(main_board, board_sz, WIN_LEN, check_winner_area)
+    winner = check_winner_anywhere(main_board, board_sz, win_len, check_winner_area)
     if winner[1] == 'tie':
         print_board(main_board, board_sz)
         print('=' * 50 + '\n' + ' ' * ((51 - len('Game ended in a draw.'))//2) + 'Game ended in a draw.' + '\n' + '=' * 50)
