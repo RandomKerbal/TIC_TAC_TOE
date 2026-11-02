@@ -1125,11 +1125,11 @@ class GameMenu:
     def start_ai_thread(self) -> None:
         self.lock_board()
         self.graph_button.config(state=tk.DISABLED)
-        self.ai_thread = threading.Thread(target=self.ai_thread_work, args=(self.settings.ai_name.get(),), daemon=True)
+        self.ai_thread = threading.Thread(target=self.pick_aimove, args=(self.settings.ai_name.get(),), daemon=True)
         self.ai_thread.start()
         self.print_log(f"Spawned thread:\n{self.ai_thread.name}")
 
-    def ai_thread_work(self, AI_NAME: str) -> None:
+    def pick_aimove(self, AI_NAME: str) -> None:
         """
         :param AI_NAME: needed since cannot use settings.ai_name.get() in AI thread since tkinter is not thread safe.
         """
@@ -1204,21 +1204,24 @@ class GameMenu:
             # since matplotlib & tkinter are not thread safe
             self.root.after(0, self.update_ind_and_aimoves_buttons)
             
-            def send(NEXT_MOVE: int) -> None:
+            def callback(NEXT_MOVE: int) -> None:
                 """
-                Injected into AI(), run in AI thread.
-                Send NEXT_MOVE to main thread.
+                Passed into AI(), run in AI thread.
+                Tasks:
+                1. Terminate AI thread if game ended early.
+                2. Pass update_aimove & NEXT_MOVE to main thread to call.
                 """
-                # if game ended early, end thread
+                # 1.
                 if self.ai_thread is None:
                     sys.exit()
 
+                # 2.
                 self.root.after(0, self.update_aimove, NEXT_MOVE)
 
             self.root.after(0, self.print_log, f"AI moves:\n{self.ai_moves}\n\nSearching...")
-            AI(self.board, *ARGS, self.graph, send)
+            AI(self.board, *ARGS, self.graph, callback)
 
-        self.root.after(0, self.end_ai_thread)
+        self.root.after(0, self.place_aimove)
 
     def update_aimove(self, NEXT_MOVE: int) -> None:
         """
@@ -1243,11 +1246,11 @@ class GameMenu:
         self.root.update_idletasks()
         self.moved[-1] = NEXT_MOVE
 
-    def end_ai_thread(self) -> None:
+    def place_aimove(self) -> None:
         self.print_log(f"Thread ended:\n{self.ai_thread.name}")
         self.place()
 
-        # check if in t_table in case AI plays randomly for first move
+        # check if in t_table first in case AI plays randomly for first move
         if self.board in tt.t_table and tt.t_table[self.board] == -tt.WIN_SCORE:
             messagebox.showinfo("Comment", "AI plays randomly.\n\nAI: \"In every future I saw, I lost.\"")
 
@@ -2169,7 +2172,7 @@ VERSION_TEXT: str = "Tic Tac Toe v20"
 
 def default_help() -> None:
     messagebox.showinfo("Help",
-                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Prunning Algorithm that my friend told me.\n\nThe {Settings.ITER_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AI_NAME}.\n\nThe {Settings.PROB_AI_NAME} traverses the entire tree and might have Statistical Traps, making it the slowest and weakest AI. However, it is special since it is my first original AI and closest to machine learning.\n\nThe {Settings.SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AI_NAME}, and follows snake rules even if not in Snake mode.")
+                        f"Just like the good ol\' one you played in kindergarten...\n\nYou can select a board length between {Settings.MIN_BOARD_LEN} and... infinity? Boards larger than 3x3 only needs 4 in a row to win!\n\nThe starting player is always X, and the other is O. No friends? No worries! You can play with one of four unique AIs designed by me and my friend.\n\nAbout the AIs:\n\nThe {Settings.RECUR_AI_NAME} is the strongest. It uses a special case of the Negamax + Alpha-Beta Pruning Algorithm that my friend told me.\n\nThe {Settings.ITER_AI_NAME} uses a similar algorithm that cannot distinguish tie branch nodes, and assumes tie is win if it played the last move. This makes it weaker but faster than the {Settings.RECUR_AI_NAME}.\n\nThe {Settings.PROB_AI_NAME} traverses the entire tree and might have Statistical Traps, making it the slowest and weakest AI. However, it is special since it is my first original AI and closest to machine learning.\n\nThe {Settings.SNAKE_AI_NAME} uses the same algorithm as the {Settings.RECUR_AI_NAME}, and follows snake rules even if not in Snake mode.")
 
 
 def time_help() -> None:

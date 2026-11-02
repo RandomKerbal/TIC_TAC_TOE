@@ -149,21 +149,28 @@ def unplace(BOARD: int, MOVE: int) -> int:
 
 def gen_moves(BOARD: int, MOVE: int) -> list[int]:
     """
+    :param MOVE: last move
+
     Moves are ordered for 2 optimizations:
-        1. later prune low-priority moves that are unlikely to change the result.
-        2. increase chance of Alpha-Beta prunning.
+        1. later prune low score moves that are unlikely to change the result.
+        2. good move-ordering can avoid simulating entire subtrees.
 
-    A move has higher priority GENERALLY if:
-        Square is connected to, or at the back of another square connected to, either end of a line formed by current player.
-        However, priority varies with dist to move and the number of connected lines.
+    Give every empty square an initial score of 0.
+    Modify the score based on following conditions:
+        1. Always: -= chebyshev dist from last move
+        2. For every adjacent opponent square: += 1
+        3. For every adjacent opponent line && is in direction of line: += 8*BOARD_LEN
+        4. For every adjacent square that has condition 3: += 8*BOARD_LEN
 
-    A move has low priority GENERALLY if:
-        Square has adjacent player. However, priority varies with dist to move and the number of adjacent players.
+    Purpose of each condition:
+        1. Assume last area played is active battlefield. Should focus there.
+        2. Should focus more around opponent.
+        3, 4. Should focus most on opponent's developing lines.
     """
     PLYR: int = plyr_of(BOARD)
     MOVE_Y, MOVE_X = divmod(MOVE, BOARD_LEN)
 
-    moves: dict[int, int] = dict()  # key = square, value = priority
+    scores: dict[int, int] = dict()  # key = square, value = score
 
     for sq in range(BOARD_AREA):
         if not plyr_at(BOARD, sq):
@@ -172,20 +179,20 @@ def gen_moves(BOARD: int, MOVE: int) -> list[int]:
             # Chebyshev distance
             SQ_DIST: int = max(abs(Y - MOVE_Y), abs(X - MOVE_X))
 
-            # set distance-dependent base priority
-            moves[sq] = moves.get(sq, 0) - SQ_DIST
+            # set distance-dependent base score
+            scores[sq] = scores.get(sq, 0) - SQ_DIST
 
             for dy, dx in ADJ:
                 FWD1_Y: int = Y + dy
                 FWD1_X: int = X + dx
 
                 if 0 <= FWD1_X < BOARD_LEN and 0 <= FWD1_Y < BOARD_LEN and plyr_at(BOARD, sq_of(FWD1_Y, FWD1_X)) == PLYR:  # if square has an adjacent player
-                    moves[sq] += BOARD_LEN  # +BOARD_LEN ensures the furthest square with 1 adjacent player has higher priority than the closest isolated square
+                    scores[sq] += BOARD_LEN  # +BOARD_LEN ensures the furthest square with 1 adjacent player has higher score than the closest isolated square
                     FWD2_Y: int = FWD1_Y + dy
                     FWD2_X: int = FWD1_X + dx
 
                     if 0 <= FWD2_X < BOARD_LEN and 0 <= FWD2_Y < BOARD_LEN and plyr_at(BOARD, sq_of(FWD2_Y, FWD2_X)) == PLYR:  # if square is connected to either end of a line
-                        moves[sq] += BOARD_LEN * 8  # +BOARD_LEN * 8 ensures the furthest square connected to 1 line has higher priority than a square surrounded by 8 players
+                        scores[sq] += BOARD_LEN * 8  # *8 ensures the furthest square connected to 1 line has higher score than a square surrounded by 8 players
                         BACK1_Y: int = Y - dy
                         BACK1_X: int = X - dx
 
@@ -193,9 +200,9 @@ def gen_moves(BOARD: int, MOVE: int) -> list[int]:
                             BACK1_SQ: int = sq_of(BACK1_Y, BACK1_X)
 
                             if not plyr_at(BOARD, BACK1_SQ):
-                                moves[BACK1_SQ] = moves.get(BACK1_SQ, 0) + BOARD_LEN * 8
+                                scores[BACK1_SQ] = scores.get(BACK1_SQ, 0) + BOARD_LEN * 8
 
-    return sorted(moves, key=moves.get, reverse=True)
+    return sorted(scores, key=scores.get, reverse=True)
 
 
 def win_dir(board: int, move: int) -> str | None:
@@ -332,7 +339,7 @@ def recur_search(BOARD: int, moves: list[int], tree: nx.DiGraph, send: Callable[
             moves.insert(i, child_move)
 
         # if any child wins, current loses
-        # no need to check later childs (alpha-beta prunning with alpha = child_score, beta = WIN_SCORE)
+        # no need to check later childs (alpha-beta pruning with alpha = child_score, beta = WIN_SCORE)
         if child_score == WIN_SCORE:
             t_table[BOARD] = -WIN_SCORE
             return -WIN_SCORE
